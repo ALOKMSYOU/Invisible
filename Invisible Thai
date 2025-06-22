@@ -102,3 +102,60 @@ game:GetService("UserInputService").InputBegan:Connect(function(input, gameProce
         toggleInvisibility()
     end
 end)
+-- เก็บตำแหน่งก่อนวาร์ป
+local savedPosition = nil
+
+-- ปุ่ม UI เพิ่มเติม
+local saveButton = Instance.new("TextButton", frame)
+saveButton.Size = UDim2.new(0, 100, 0, 25)
+saveButton.Position = UDim2.new(0, 10, 0, 0)
+saveButton.Text = "เซฟพิกัด"
+saveButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+saveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+saveButton.Font = Enum.Font.SourceSans
+saveButton.TextScaled = true
+
+local warpBackButton = Instance.new("TextButton", frame)
+warpBackButton.Size = UDim2.new(0, 100, 0, 25)
+warpBackButton.Position = UDim2.new(0, 10, 0, 60)
+warpBackButton.Text = "วาร์ปกลับ"
+warpBackButton.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
+warpBackButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+warpBackButton.Font = Enum.Font.SourceSans
+warpBackButton.TextScaled = true
+
+local clearButton = Instance.new("TextButton", frame)
+clearButton.Size = UDim2.new(0, 20, 0, 20)
+clearButton.Position = UDim2.new(1, -25, 1, -25)
+clearButton.Text = "-"
+clearButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+clearButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+clearButton.Font = Enum.Font.SourceSans
+clearButton.TextSize = 18
+
+-- ปุ่มเซฟตำแหน่ง
+saveButton.MouseButton1Click:Connect(function()
+	local char = player.Character
+	if char and char:FindFirstChild("HumanoidRootPart") then
+		savedPosition = char.HumanoidRootPart.CFrame
+		saveButton.Text = "✅ เซฟแล้ว"
+		task.delay(2, function()
+			if saveButton then saveButton.Text = "เซฟพิกัด" end
+		end)
+	end
+end)
+
+-- ปุ่มวาร์ปกลับ
+warpBackButton.MouseButton1Click:Connect(function()
+	if savedPosition and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+		player.Character.HumanoidRootPart.CFrame = savedPosition
+		savedPosition = nil
+		saveButton.Text = "เซฟพิกัด"
+	end
+end)
+
+-- ปุ่มลบพิกัด
+clearButton.MouseButton1Click:Connect(function()
+	savedPosition = nil
+	saveButton.Text = "เซฟพิกัด"
+end)
