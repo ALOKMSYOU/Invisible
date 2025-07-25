@@ -1,11 +1,50 @@
--- GUI (Resized to match HACKGUI and added Back button)
+-- FE Bring GUI by ChatAbc (ปรับแล้วให้เข้ากับ HACK GUI)
+
+local plrs = game:GetService("Players")
+local lp = plrs.LocalPlayer
+local ws = game:GetService("Workspace")
+local uis = game:GetService("UserInputService")
+
+local angles = CFrame.Angles
+local cf = CFrame.new
+local v3 = Vector3.new
+local v3_010 = v3(0,1,0)
+local v3_0 = v3(0,0,0)
+local twait = task.wait
+local osclock = os.clock
+local slower = string.lower
+
+-- ความเร็ว
+local speeding = 2.4
+local maxspeed = 6
+local off = angles(-math.pi/2, 0, 0)
+
+-- utils
+local function gp(p,n,cl)
+	for _,v in ipairs(p:GetChildren()) do
+		if v.Name==n and v:IsA(cl) then
+			return v
+		end
+	end
+	return nil
+end
+
+local function rs(len)
+	local s = ""
+	for i = 1, len or math.random(8,15) do
+		s = s .. string.char(math.random(65, 90))
+	end
+	return s
+end
+
+-- GUI
 local gui = Instance.new("ScreenGui")
 gui.Name = rs()
 gui.ResetOnSpawn = false
 gui.Parent = lp:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 200) -- Match HACKGUI
+frame.Size = UDim2.new(0, 300, 0, 200)
 frame.Position = UDim2.new(0.5, -150, 0.5, -100)
 frame.AnchorPoint = Vector2.new(0.5,0.5)
 frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
@@ -42,7 +81,6 @@ bringBtn.Font = Enum.Font.SourceSansBold
 bringBtn.TextSize = 18
 bringBtn.Parent = frame
 
--- Back button
 local backBtn = Instance.new("TextButton")
 backBtn.Text = "BACK"
 backBtn.Size = UDim2.new(0, 80, 0, 25)
@@ -54,9 +92,9 @@ backBtn.Font = Enum.Font.SourceSansBold
 backBtn.TextSize = 14
 backBtn.Parent = frame
 
--- ปุ่ม Back: ปิด Bring GUI แล้วโชว์ main GUI
+-- ปุ่ม Back → แสดง HACK GUI กลับมา
 backBtn.MouseButton1Click:Connect(function()
-	local main = lp:FindFirstChild("PlayerGui"):FindFirstChild("HACKGUI") -- ตรวจสอบว่ามี UI หลักไหม
+	local main = lp:FindFirstChild("PlayerGui"):FindFirstChild("HACKGUI")
 	if main then
 		local mainFrame = main:FindFirstChildWhichIsA("Frame")
 		if mainFrame then
@@ -66,7 +104,7 @@ backBtn.MouseButton1Click:Connect(function()
 	gui:Destroy()
 end)
 
--- ปุ่ม Destroy (ออกจาก GUI)
+-- ปุ่ม Destroy
 local destroyBtn = Instance.new("TextButton")
 destroyBtn.Text = "DESTROY"
 destroyBtn.Size = UDim2.new(0, 80, 0, 25)
@@ -92,5 +130,140 @@ statusLbl.TextSize = 14
 statusLbl.Font = Enum.Font.SourceSans
 statusLbl.Parent = frame
 
--- Drag UI
+-- Draggable
+local function Draggable(f)
+	local dragging, start, pos
+	local function update(input)
+		local delta = input.Position - start
+		f.Position = UDim2.new(pos.X.Scale, pos.X.Offset + delta.X, pos.Y.Scale, pos.Y.Offset + delta.Y)
+	end
+	f.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+			start = input.Position
+			pos = f.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
+			end)
+		end
+	end)
+	f.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			update(input)
+		end
+	end)
+end
 Draggable(frame)
+
+-- ระบบค้นหา
+local others = {}
+for _,v in pairs(plrs:GetPlayers()) do
+	if v ~= lp then others[v] = true end
+end
+plrs.PlayerAdded:Connect(function(p) others[p] = true end)
+plrs.PlayerRemoving:Connect(function(p) others[p] = nil end)
+
+local function findplr(txt)
+	if txt == "" then return nil end
+	for v in pairs(others) do
+		if v.DisplayName == txt or v.Name == txt then return v end
+	end
+	for v in pairs(others) do
+		if slower(v.DisplayName) == slower(txt) or slower(v.Name) == slower(txt) then return v end
+	end
+	return nil
+end
+
+local target = nil
+input:GetPropertyChangedSignal("Text"):Connect(function()
+	target = findplr(input.Text)
+	if target then
+		bringBtn.TextColor3 = Color3.fromRGB(80,255,80)
+	else
+		bringBtn.TextColor3 = Color3.fromRGB(255,255,255)
+	end
+end)
+
+-- ฟังก์ชันดึง
+local bringing = false
+local notifyId = 0
+local function notify(msg)
+	notifyId += 1
+	local id = notifyId
+	statusLbl.Text = msg
+	twait(2)
+	if notifyId == id then statusLbl.Text = "by ChatAbc" end
+end
+
+bringBtn.MouseButton1Click:Connect(function()
+	if bringing then bringing = false bringBtn.Text = "BRING" return end
+	if not target then return end
+
+	local c, c1 = lp.Character, target.Character
+	if not (c and c1) then return notify("no character") end
+	if not (c:IsDescendantOf(ws) and c1:IsDescendantOf(ws)) then return notify("not in workspace") end
+
+	local hrp, hrp1 = gp(c,"HumanoidRootPart","BasePart"), gp(c1,"HumanoidRootPart","BasePart")
+	if not (hrp and hrp1) then return notify("no HRP") end
+
+	bringing = true
+	bringBtn.Text = "BRINGING..."
+
+	local fromP, toP = hrp1.Position, hrp.Position
+	local mag = (fromP - toP).Magnitude - 3
+	local lv = cf(fromP,toP).LookVector
+	local vel = 0
+	local pos = fromP - v3_010*2
+
+	local torso = gp(c1, "UpperTorso", "BasePart") or gp(c1, "Torso", "BasePart")
+	if torso then
+		toP = torso.Position
+	else
+		toP = toP - v3_010 * 2
+	end
+
+	local sine = osclock()
+	local lastsine = sine
+	local way = 0
+	local reachedmax = false
+
+	while bringing and c:IsDescendantOf(ws) and c1:IsDescendantOf(ws) do
+		sine = osclock()
+		local delta = sine - lastsine
+		lastsine = sine
+
+		if reachedmax then
+			if mag - way < reachedmax then
+				vel -= delta * speeding
+				if vel < 0 then break end
+			end
+		else
+			if way > mag / 2 then
+				vel -= delta * speeding
+				if vel < 0 then break end
+			else
+				vel += delta * speeding
+				if vel > maxspeed then
+					reachedmax = way
+					vel = maxspeed
+				end
+			end
+		end
+
+		way += vel * delta
+		if not hrp:IsGrounded() then
+			hrp.CFrame = cf(pos + lv*way, toP) * off
+			hrp.Velocity = lv * (vel + 1)
+			hrp.RotVelocity = v3_0
+		end
+		twait()
+	end
+
+	hrp.CFrame = cf(toP)
+	hrp.Velocity = v3_0
+	hrp.RotVelocity = v3_0
+	bringBtn.Text = "BRING"
+	bringing = false
+end)
