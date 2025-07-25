@@ -1,9 +1,10 @@
--- FE Bring GUI by ChatAbc (ปรับแล้วให้เข้ากับ HACK GUI)
+-- FE Bring GUI by ChatAbc (ปรับแล้วให้เข้ากับ HACK GUI และขยับสูงขึ้น 2 หน่วย) | ใช้สคริปต์นี้เท่านั้น
 
 local plrs = game:GetService("Players")
 local lp = plrs.LocalPlayer
 local ws = game:GetService("Workspace")
 local uis = game:GetService("UserInputService")
+local cam = ws.CurrentCamera
 
 local angles = CFrame.Angles
 local cf = CFrame.new
@@ -15,8 +16,8 @@ local osclock = os.clock
 local slower = string.lower
 
 -- ความเร็ว
-local speeding = 2.4
-local maxspeed = 6
+local speeding = 6 -- เริ่มต้น
+local maxspeed = 65
 local off = angles(-math.pi/2, 0, 0)
 
 -- utils
@@ -44,12 +45,18 @@ gui.ResetOnSpawn = false
 gui.Parent = lp:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 200)
-frame.Position = UDim2.new(0.5, -150, 0.5, -100)
-frame.AnchorPoint = Vector2.new(0.5,0.5)
+frame.Size = UDim2.new(0, 300, 0, 260) -- ขยายสูงขึ้นนิดนึงเผื่อ dropdown
 frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
 frame.BorderSizePixel = 0
 frame.Parent = gui
+
+-- จัดให้อยู่กลางจอ แต่เลื่อนขึ้น 2 หน่วย (≈ 40 พิกเซล)
+local function centerFrame()
+	local size = cam.ViewportSize
+	frame.Position = UDim2.new(0, size.X/2 - frame.AbsoluteSize.X/2, 0, size.Y/2 - frame.AbsoluteSize.Y/2 - 40)
+end
+centerFrame()
+cam:GetPropertyChangedSignal("ViewportSize"):Connect(centerFrame)
 
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
@@ -60,8 +67,9 @@ title.Font = Enum.Font.SourceSansBold
 title.TextSize = 20
 title.Parent = frame
 
+-- ซ่อนช่องกรอกข้อความเดิมไว้ แต่ยังไม่ลบ
 local input = Instance.new("TextBox")
-input.PlaceholderText = "DisplayName / Name"
+input.PlaceholderText = "DisplayName / Name (ไม่ต้องใช้)"
 input.Size = UDim2.new(1, -20, 0, 30)
 input.Position = UDim2.new(0, 10, 0, 40)
 input.BackgroundColor3 = Color3.fromRGB(50,50,50)
@@ -69,30 +77,104 @@ input.BorderSizePixel = 0
 input.TextColor3 = Color3.new(1,1,1)
 input.TextSize = 18
 input.Text = ""
+input.Visible = false -- ซ่อนไว้
 input.Parent = frame
 
+-- Dropdown Button
+local dropdownBtn = Instance.new("TextButton")
+dropdownBtn.Size = UDim2.new(1, -20, 0, 30)
+dropdownBtn.Position = UDim2.new(0, 10, 0, 40) -- แทนที่ input ที่ซ่อน
+dropdownBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+dropdownBtn.BorderSizePixel = 0
+dropdownBtn.TextColor3 = Color3.new(1,1,1)
+dropdownBtn.TextSize = 18
+dropdownBtn.Font = Enum.Font.SourceSansBold
+dropdownBtn.Text = "เลือกผู้เล่น"
+dropdownBtn.Parent = frame
+
+local dropdownFrame = Instance.new("ScrollingFrame")
+dropdownFrame.Size = UDim2.new(1, -20, 0, 120)
+dropdownFrame.Position = UDim2.new(0, 10, 0, 70)
+dropdownFrame.BackgroundColor3 = Color3.fromRGB(40,40,40)
+dropdownFrame.BorderSizePixel = 0
+dropdownFrame.Visible = false
+dropdownFrame.CanvasSize = UDim2.new(0,0,0,0)
+dropdownFrame.Parent = frame
+dropdownFrame.ScrollBarThickness = 6
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Parent = dropdownFrame
+
+-- ปุ่ม Bring
 local bringBtn = Instance.new("TextButton")
 bringBtn.Text = "BRING"
 bringBtn.Size = UDim2.new(1, -20, 0, 30)
-bringBtn.Position = UDim2.new(0, 10, 0, 80)
+bringBtn.Position = UDim2.new(0, 10, 0, 200)
 bringBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
 bringBtn.TextColor3 = Color3.new(1,1,1)
 bringBtn.Font = Enum.Font.SourceSansBold
 bringBtn.TextSize = 18
 bringBtn.Parent = frame
 
+-- ความเร็ว (Speed Display)
+local speedLbl = Instance.new("TextLabel")
+speedLbl.Size = UDim2.new(1, -20, 0, 20)
+speedLbl.Position = UDim2.new(0, 10, 0, 235)
+speedLbl.BackgroundTransparency = 1
+speedLbl.Text = "Speed: " .. speeding
+speedLbl.TextColor3 = Color3.new(1, 1, 1)
+speedLbl.Font = Enum.Font.SourceSans
+speedLbl.TextSize = 16
+speedLbl.Parent = frame
+
+-- ปุ่ม + และ -
+local plusBtn = Instance.new("TextButton")
+plusBtn.Size = UDim2.new(0, 30, 0, 25)
+plusBtn.Position = UDim2.new(1, -90, 0, 260)
+plusBtn.Text = "+"
+plusBtn.BackgroundColor3 = Color3.fromRGB(0,200,0)
+plusBtn.TextColor3 = Color3.new(1,1,1)
+plusBtn.Font = Enum.Font.SourceSansBold
+plusBtn.TextSize = 18
+plusBtn.Parent = frame
+
+local minusBtn = Instance.new("TextButton")
+minusBtn.Size = UDim2.new(0, 30, 0, 25)
+minusBtn.Position = UDim2.new(1, -130, 0, 260)
+minusBtn.Text = "-"
+minusBtn.BackgroundColor3 = Color3.fromRGB(200,0,0)
+minusBtn.TextColor3 = Color3.new(1,1,1)
+minusBtn.Font = Enum.Font.SourceSansBold
+minusBtn.TextSize = 18
+minusBtn.Parent = frame
+
+-- ปรับความเร็ว
+plusBtn.MouseButton1Click:Connect(function()
+	if speeding < maxspeed then
+		speeding += 1
+		speedLbl.Text = "Speed: " .. speeding
+	end
+end)
+
+minusBtn.MouseButton1Click:Connect(function()
+	if speeding > 1 then
+		speeding -= 1
+		speedLbl.Text = "Speed: " .. speeding
+	end
+end)
+
+-- ปุ่มกลับ
 local backBtn = Instance.new("TextButton")
 backBtn.Text = "BACK"
 backBtn.Size = UDim2.new(0, 80, 0, 25)
 backBtn.Position = UDim2.new(0, 10, 1, -35)
-backBtn.AnchorPoint = Vector2.new(0, 0)
 backBtn.BackgroundColor3 = Color3.fromRGB(30, 100, 150)
 backBtn.TextColor3 = Color3.new(1,1,1)
 backBtn.Font = Enum.Font.SourceSansBold
 backBtn.TextSize = 14
 backBtn.Parent = frame
 
--- ปุ่ม Back → แสดง HACK GUI กลับมา
 backBtn.MouseButton1Click:Connect(function()
 	local main = lp:FindFirstChild("PlayerGui"):FindFirstChild("HACKGUI")
 	if main then
@@ -104,12 +186,10 @@ backBtn.MouseButton1Click:Connect(function()
 	gui:Destroy()
 end)
 
--- ปุ่ม Destroy
 local destroyBtn = Instance.new("TextButton")
 destroyBtn.Text = "DESTROY"
 destroyBtn.Size = UDim2.new(0, 80, 0, 25)
 destroyBtn.Position = UDim2.new(1, -90, 1, -35)
-destroyBtn.AnchorPoint = Vector2.new(0, 0)
 destroyBtn.BackgroundColor3 = Color3.fromRGB(100, 30, 30)
 destroyBtn.TextColor3 = Color3.new(1,1,1)
 destroyBtn.Font = Enum.Font.SourceSansBold
@@ -157,7 +237,8 @@ local function Draggable(f)
 end
 Draggable(frame)
 
--- ระบบค้นหา
+-- ระบบค้นหาและกำหนด target เดิม
+
 local others = {}
 for _,v in pairs(plrs:GetPlayers()) do
 	if v ~= lp then others[v] = true end
@@ -177,6 +258,7 @@ local function findplr(txt)
 end
 
 local target = nil
+
 input:GetPropertyChangedSignal("Text"):Connect(function()
 	target = findplr(input.Text)
 	if target then
@@ -186,7 +268,53 @@ input:GetPropertyChangedSignal("Text"):Connect(function()
 	end
 end)
 
--- ฟังก์ชันดึง
+-- เมื่อกด dropdown ให้แสดงรายชื่อผู้เล่น
+dropdownBtn.MouseButton1Click:Connect(function()
+	dropdownFrame.Visible = not dropdownFrame.Visible
+end)
+
+-- สร้างรายการชื่อผู้เล่นใน dropdownFrame
+local function refreshDropdown()
+	for _, child in pairs(dropdownFrame:GetChildren()) do
+		if not child:IsA("UIListLayout") then
+			child:Destroy()
+		end
+	end
+	
+	local count = 0
+	for _, p in pairs(plrs:GetPlayers()) do
+		if p ~= lp then
+			count = count + 1
+			local btn = Instance.new("TextButton")
+			btn.Size = UDim2.new(1, 0, 0, 20)
+			btn.Position = UDim2.new(0, 0, 0, (count-1)*20)
+			btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+			btn.BorderSizePixel = 0
+			btn.Font = Enum.Font.SourceSans
+			btn.TextSize = 14
+			btn.TextColor3 = Color3.new(1,1,1)
+			btn.Text = p.Name
+			btn.Parent = dropdownFrame
+
+			btn.MouseButton1Click:Connect(function()
+				target = p
+				dropdownBtn.Text = "▶ " .. p.Name
+				dropdownFrame.Visible = false
+				bringBtn.TextColor3 = Color3.fromRGB(80,255,80)
+			end)
+		end
+	end
+	
+	-- อัพเดตความสูง ScrollFrame
+	dropdownFrame.CanvasSize = UDim2.new(0, 0, 0, count * 20)
+end
+
+refreshDropdown()
+
+plrs.PlayerAdded:Connect(refreshDropdown)
+plrs.PlayerRemoving:Connect(refreshDropdown)
+
+-- ฟังก์ชันดึง (ไม่แก้ไขจากเดิม)
 local bringing = false
 local notifyId = 0
 local function notify(msg)
