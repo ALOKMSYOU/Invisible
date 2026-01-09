@@ -30,8 +30,8 @@ local highlightOn = true
 
 local currentTool = "NONE"
 
-local initialCFrame = {} 
-local initialPos = {}
+local initialCFrames = {} 
+local initialPositions = {}
 
 local gui = Instance.new("ScreenGui")
 pcall(function() gui.Parent = CoreGui end)
@@ -61,7 +61,7 @@ Instance.new("UICorner",main).CornerRadius = UDim.new(0,14)
 
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1,0,0,32)
-title.Text = "TELEKINESIS + F3X"
+title.Text = "TELEKINESIS + F3X (MULTI-EDIT)"
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.TextColor3 = Color3.new(1,1,1)
@@ -115,21 +115,17 @@ local function getTarget()
 	return r and r.Instance
 end
 
-local function refreshHandles()
+local function clearAllHandles()
 	for p, hSet in pairs(handles) do
-		if not p or not p.Parent or not frozen[p] or not selected[p] then
-			if hSet.move then hSet.move:Destroy() end
-			if hSet.rot then hSet.rot:Destroy() end
-			handles[p] = nil
-		else
-			if hSet.move then hSet.move.Visible = (currentTool == "MOVE") end
-			if hSet.rot then hSet.rot.Visible = (currentTool == "ROTATE") end
-		end
+		if hSet.move then hSet.move:Destroy() end
+		if hSet.rot then hSet.rot:Destroy() end
 	end
+	handles = {}
 end
 
 local function createHandles(p)
-	if handles[p] then return end
+	clearAllHandles()
+	if not p then return end
 	
 	local mh = Instance.new("Handles")
 	mh.Adornee = p
@@ -144,10 +140,15 @@ local function createHandles(p)
 	ah.Visible = (currentTool == "ROTATE")
 	
 	mh.MouseButton1Down:Connect(function()
-		initialPos[p] = grabbed[p].bp.Position
+		initialPositions = {}
+		for part in pairs(selected) do
+			if grabbed[part] then
+				initialPositions[part] = grabbed[part].bp.Position
+			end
+		end
 	end)
+
 	mh.MouseDrag:Connect(function(face, dist)
-		if not grabbed[p] then return end
 		local axisVec
 		if face == Enum.NormalId.Top then axisVec = p.CFrame.UpVector
 		elseif face == Enum.NormalId.Bottom then axisVec = -p.CFrame.UpVector
@@ -158,15 +159,25 @@ local function createHandles(p)
 		end
 		
 		local snappedDist = math.round(dist / MOVE_SNAP) * MOVE_SNAP
-		grabbed[p].bp.Position = initialPos[p] + (axisVec * snappedDist)
+		local offset = axisVec * snappedDist
+		
+		for part in pairs(selected) do
+			if grabbed[part] and initialPositions[part] then
+				grabbed[part].bp.Position = initialPositions[part] + offset
+			end
+		end
 	end)
 	
 	ah.MouseButton1Down:Connect(function()
-		initialCFrame[p] = grabbed[p].bg.CFrame
+		initialCFrames = {}
+		for part in pairs(selected) do
+			if grabbed[part] then
+				initialCFrames[part] = grabbed[part].bg.CFrame
+			end
+		end
 	end)
+
 	ah.MouseDrag:Connect(function(axis, angle)
-		if not grabbed[p] then return end
-		
 		local deg = math.deg(angle)
 		local snappedDeg = math.round(deg / ROT_SNAP) * ROT_SNAP
 		local finalRad = math.rad(snappedDeg)
@@ -177,11 +188,19 @@ local function createHandles(p)
 		elseif axis == Enum.Axis.Z then axisVec = Vector3.new(0,0,1)
 		end
 		
-		grabbed[p].bg.CFrame = initialCFrame[p] * CFrame.Angles(
-			axisVec.X * finalRad,
-			axisVec.Y * finalRad,
-			axisVec.Z * finalRad
-		)
+		local rotationCFrame = CFrame.Angles(axisVec.X * finalRad, axisVec.Y * finalRad, axisVec.Z * finalRad)
+		local centerCF = initialCFrames[p]
+		
+		for part in pairs(selected) do
+			if grabbed[part] and initialCFrames[part] then
+				local relativeCF = centerCF:Inverse() * initialCFrames[part]
+				grabbed[part].bg.CFrame = centerCF * rotationCFrame * relativeCF
+				
+				local relativePos = initialCFrames[part].Position - centerCF.Position
+				local rotatedPos = centerCF.Position + (centerCF * rotationCFrame):VectorToWorldSpace(centerCF:VectorToObjectSpace(relativePos))
+				grabbed[part].bp.Position = rotatedPos
+			end
+		end
 	end)
 	
 	handles[p] = {move = mh, rot = ah}
@@ -208,26 +227,18 @@ end
 
 local function setHighlight(p, state)
 	if state then
-		if highlights[p] then return end
-		local hl = Instance.new("Highlight")
-		hl.Adornee = p
-		hl.FillTransparency = 0.4
-		hl.OutlineColor = Color3.fromRGB(255,255,0)
-		hl.Parent = gui
-		highlights[p] = hl
-		
-		if frozen[p] and selected[p] then
-			createHandles(p)
+		if not highlights[p] then
+			local hl = Instance.new("Highlight")
+			hl.Adornee = p
+			hl.FillTransparency = 0.4
+			hl.OutlineColor = Color3.fromRGB(255,255,0)
+			hl.Parent = gui
+			highlights[p] = hl
 		end
 	else
 		if highlights[p] then
 			highlights[p]:Destroy()
 			highlights[p] = nil
-		end
-		if handles[p] then
-			if handles[p].move then handles[p].move:Destroy() end
-			if handles[p].rot then handles[p].rot:Destroy() end
-			handles[p] = nil
 		end
 	end
 end
@@ -269,6 +280,7 @@ btn(pages.main, "DROP (LOOK)", function()
 		frozen[t]=nil
 		selected[t]=nil
 		setHighlight(t,false)
+		clearAllHandles()
 	end
 end)
 
@@ -281,6 +293,7 @@ btn(pages.main, "DROP ALL", function()
 	frozen={}
 	selected={}
 	for p in pairs(highlights) do setHighlight(p,false) end
+	clearAllHandles()
 end)
 
 btn(pages.main, "FREEZE (LOOK)", function()
@@ -303,6 +316,7 @@ btn(pages.main, "UNFREEZE ALL", function()
 	frozen={}
 	selected={}
 	for p in pairs(highlights) do setHighlight(p,false) end
+	clearAllHandles()
 end)
 
 label(pages.main, "--- AUTO SETTINGS ---")
@@ -339,6 +353,7 @@ btn(pages.main, "THROW (LOOK)", function()
 	frozen={}
 	selected={}
 	for p in pairs(highlights) do setHighlight(p,false) end
+	clearAllHandles()
 end)
 
 local distLabel = btn(pages.main, "DISTANCE : "..holdDistance, function() end)
@@ -381,8 +396,10 @@ local function refreshList()
 	for _,c in ipairs(list:GetChildren()) do
 		if c:IsA("TextButton") then c:Destroy() end
 	end
+	local lastPart = nil
 	for p in pairs(frozen) do
 		if p and p.Parent then
+			lastPart = p
 			local b = Instance.new("TextButton", list)
 			b.Size = UDim2.new(1,0,0,26)
 			b.Text = p.Name
@@ -394,8 +411,18 @@ local function refreshList()
 			b.MouseButton1Click:Connect(function()
 				selected[p] = not selected[p]
 				setHighlight(p, selected[p])
-				if selected[p] then
-					createHandles(p)
+				
+				local anySelected = false
+				local lastSelected = nil
+				for part in pairs(selected) do
+					anySelected = true
+					lastSelected = part
+				end
+				
+				if anySelected then
+					createHandles(lastSelected)
+				else
+					clearAllHandles()
 				end
 				refreshList()
 			end)
@@ -405,33 +432,35 @@ end
 
 btn(pages.move, "REFRESH LIST", refreshList)
 btn(pages.move, "SELECT ALL", function()
+	local last = nil
 	for p in pairs(frozen) do 
 		selected[p] = true 
 		setHighlight(p, true)
-		createHandles(p)
+		last = p
 	end
+	if last then createHandles(last) end
 	refreshList()
 end)
 
 btn(pages.move, "UNSELECT ALL", function()
 	for p in pairs(selected) do setHighlight(p, false) end
 	selected = {}
+	clearAllHandles()
 	refreshList()
 end)
 
-label(pages.move, "--- TOOLS (F3X STYLE) ---")
+label(pages.move, "--- TOOLS (MULTI-EDIT) ---")
 
 local toolBtn = btn(pages.move, "CURRENT TOOL: NONE", function(b)
-	if currentTool == "NONE" then
-		currentTool = "MOVE"
-	elseif currentTool == "MOVE" then
-		currentTool = "ROTATE"
-	else
-		currentTool = "NONE"
-	end
+	if currentTool == "NONE" then currentTool = "MOVE"
+	elseif currentTool == "MOVE" then currentTool = "ROTATE"
+	else currentTool = "NONE" end
 	b.Text = "CURRENT TOOL: "..currentTool
 	b.BackgroundColor3 = (currentTool=="NONE") and Color3.fromRGB(70,70,70) or Color3.fromRGB(0,100,200)
-	refreshHandles()
+	
+	local lastSelected = nil
+	for p in pairs(selected) do lastSelected = p end
+	if lastSelected then createHandles(lastSelected) end
 end)
 
 label(pages.move, "--- SETTINGS ---")
@@ -454,7 +483,6 @@ local rSnapBtn = btn(pages.move, "ROTATE STEP (SNAP): "..ROT_SNAP, function(b)
 	b.Text = "ROTATE STEP (SNAP): "..ROT_SNAP
 end)
 
-
 btn(pages.move, "◀ BACK", function()
 	showPage("main")
 end)
@@ -462,34 +490,12 @@ end)
 RunService.RenderStepped:Connect(function()
 	local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
 
-	if autoGrabFreeze and hrp then
-		for _,p in ipairs(workspace:GetDescendants()) do
-			if isValidPart(p) and (p.Position-hrp.Position).Magnitude <= AUTO_RADIUS then
-				local mdl = p:FindFirstAncestorOfClass("Model")
-				if not (mdl and Players:GetPlayerFromCharacter(mdl)) then
-					grabPart(p)
-					frozen[p] = true
-				end
-			end
-		end
-	end
-
 	local t = getTarget()
 	targetHL.Adornee = highlightOn and t or nil
 
 	if t and isValidPart(t) then
 		if autoGrabPart then grabPart(t) end
 		if autoFreeze and grabbed[t] then frozen[t] = true end
-		if autoGrabNPC then
-			local m = t:FindFirstAncestorOfClass("Model")
-			if m and m:FindFirstChildOfClass("Humanoid") and not Players:GetPlayerFromCharacter(m) then
-				local r = m:FindFirstChild("HumanoidRootPart")
-				if r then 
-					grabPart(r) 
-					if autoFreeze then frozen[r] = true end 
-				end
-			end
-		end
 	end
 
 	for p, objs in pairs(grabbed) do
@@ -500,18 +506,9 @@ RunService.RenderStepped:Connect(function()
 			frozen[p] = nil
 			selected[p] = nil
 			setHighlight(p, false)
-			refreshList()
 		elseif not frozen[p] then
 			objs.bp.Position = Cam.CFrame.Position + Cam.CFrame.LookVector * holdDistance
 			objs.bg.CFrame = p.CFrame
-			
-			if autoThrow then
-				p.AssemblyLinearVelocity = Cam.CFrame.LookVector * throwForce
-				objs.bp:Destroy()
-				objs.bg:Destroy()
-				grabbed[p] = nil
-			end
-		else
 		end
 	end
 end)
@@ -528,28 +525,14 @@ toggleBtn.TextSize = 18
 local uiCorner = Instance.new("UICorner", toggleBtn)
 uiCorner.CornerRadius = UDim.new(0, 8)
 
-local uiStroke = Instance.new("UIStroke", toggleBtn)
-uiStroke.Color = Color3.fromRGB(255, 255, 255)
-uiStroke.Transparency = 0.8
-
 local isMinimized = false
-
 toggleBtn.MouseButton1Click:Connect(function()
 	isMinimized = not isMinimized
-	
-	if isMinimized then
-		main.Visible = false
-		toggleBtn.Text = "[+]"
-		toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-	else
-		main.Visible = true
-		toggleBtn.Text = "[-]"
-		toggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-	end
+	main.Visible = not isMinimized
+	toggleBtn.Text = isMinimized and "[+]" or "[-]"
 end)
 
 toggleBtn.Active = true
 toggleBtn.Draggable = true
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))()
-
