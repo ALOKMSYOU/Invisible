@@ -61,7 +61,7 @@ Instance.new("UICorner",main).CornerRadius = UDim.new(0,14)
 
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1,0,0,32)
-title.Text = "TELEKINESIS + F3X (MULTI-EDIT)"
+title.Text = "TELEKINESIS + F3X (NO ANCHORED)"
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.TextColor3 = Color3.new(1,1,1)
@@ -97,9 +97,10 @@ local function showPage(name)
 end
 showPage("main")
 
+-- ฟังก์ชันตรวจสอบ Part (ป้องกันการ Grab ของที่ Anchored)
 local function isValidPart(p)
 	if not p or not p:IsA("BasePart") then return false end
-	if p.Anchored then return false end
+	if p.Anchored then return false end -- บรรทัดนี้คือหัวใจสำคัญ: ถ้าถูกล็อกตำแหน่ง จะไม่ผ่านเงื่อนไข
 	return true
 end
 
@@ -112,7 +113,11 @@ local function getTarget()
 		Cam.CFrame.LookVector * 500,
 		rp
 	)
-	return r and r.Instance
+	-- ตรวจสอบก่อนส่งคืนค่า target ว่า Anchored หรือไม่
+	if r and r.Instance and isValidPart(r.Instance) then
+		return r.Instance
+	end
+	return nil
 end
 
 local function clearAllHandles()
@@ -125,7 +130,7 @@ end
 
 local function createHandles(p)
 	clearAllHandles()
-	if not p then return end
+	if not p or not isValidPart(p) then return end -- ป้องกัน Anchored Part
 	
 	local mh = Instance.new("Handles")
 	mh.Adornee = p
@@ -142,7 +147,7 @@ local function createHandles(p)
 	mh.MouseButton1Down:Connect(function()
 		initialPositions = {}
 		for part in pairs(selected) do
-			if grabbed[part] then
+			if grabbed[part] and not part.Anchored then -- ตรวจสอบอีกชั้น
 				initialPositions[part] = grabbed[part].bp.Position
 			end
 		end
@@ -162,7 +167,7 @@ local function createHandles(p)
 		local offset = axisVec * snappedDist
 		
 		for part in pairs(selected) do
-			if grabbed[part] and initialPositions[part] then
+			if grabbed[part] and initialPositions[part] and not part.Anchored then
 				grabbed[part].bp.Position = initialPositions[part] + offset
 			end
 		end
@@ -171,7 +176,7 @@ local function createHandles(p)
 	ah.MouseButton1Down:Connect(function()
 		initialCFrames = {}
 		for part in pairs(selected) do
-			if grabbed[part] then
+			if grabbed[part] and not part.Anchored then
 				initialCFrames[part] = grabbed[part].bg.CFrame
 			end
 		end
@@ -192,7 +197,7 @@ local function createHandles(p)
 		local centerCF = initialCFrames[p]
 		
 		for part in pairs(selected) do
-			if grabbed[part] and initialCFrames[part] then
+			if grabbed[part] and initialCFrames[part] and not part.Anchored then
 				local relativeCF = centerCF:Inverse() * initialCFrames[part]
 				grabbed[part].bg.CFrame = centerCF * rotationCFrame * relativeCF
 				
@@ -207,7 +212,7 @@ local function createHandles(p)
 end
 
 local function grabPart(p)
-	if not isValidPart(p) then return end
+	if not isValidPart(p) then return end -- ตรวจสอบ Anchored
 	if grabbed[p] then return end
 
 	local bp = Instance.new("BodyPosition")
@@ -227,7 +232,7 @@ end
 
 local function setHighlight(p, state)
 	if state then
-		if not highlights[p] then
+		if not highlights[p] and isValidPart(p) then
 			local hl = Instance.new("Highlight")
 			hl.Adornee = p
 			hl.FillTransparency = 0.4
@@ -396,10 +401,8 @@ local function refreshList()
 	for _,c in ipairs(list:GetChildren()) do
 		if c:IsA("TextButton") then c:Destroy() end
 	end
-	local lastPart = nil
 	for p in pairs(frozen) do
-		if p and p.Parent then
-			lastPart = p
+		if p and p.Parent and not p.Anchored then
 			local b = Instance.new("TextButton", list)
 			b.Size = UDim2.new(1,0,0,26)
 			b.Text = p.Name
@@ -434,9 +437,11 @@ btn(pages.move, "REFRESH LIST", refreshList)
 btn(pages.move, "SELECT ALL", function()
 	local last = nil
 	for p in pairs(frozen) do 
-		selected[p] = true 
-		setHighlight(p, true)
-		last = p
+		if not p.Anchored then
+			selected[p] = true 
+			setHighlight(p, true)
+			last = p
+		end
 	end
 	if last then createHandles(last) end
 	refreshList()
@@ -488,18 +493,12 @@ btn(pages.move, "◀ BACK", function()
 end)
 
 RunService.RenderStepped:Connect(function()
-	local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-
 	local t = getTarget()
+	-- Highlight จะไม่แสดงถ้า Part นั้น Anchored (จัดการโดย getTarget)
 	targetHL.Adornee = highlightOn and t or nil
 
-	if t and isValidPart(t) then
-		if autoGrabPart then grabPart(t) end
-		if autoFreeze and grabbed[t] then frozen[t] = true end
-	end
-
 	for p, objs in pairs(grabbed) do
-		if not p or not p.Parent then
+		if not p or not p.Parent or p.Anchored then -- ถ้าอยู่ดีๆ Part โดน Anchor ระหว่างถือ ให้หลุดทันที
 			if objs.bp then objs.bp:Destroy() end
 			if objs.bg then objs.bg:Destroy() end
 			grabbed[p] = nil
