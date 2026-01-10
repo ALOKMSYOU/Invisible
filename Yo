@@ -1,3 +1,17 @@
+-- [[ NETWORK OWNERSHIP CONFIG ]] --
+local settings = settings()
+local NETWORK_VELOCITY = Vector3.new(14.46262424, 14.46262424, 14.46262424)
+
+-- ฟังก์ชันขยายรัศมี (รันครั้งเดียวหรือรันใน Loop ก็ได้)
+local function ExpandRadius()
+    pcall(function()
+        LP.MaximumSimulationRadius = math.huge
+        LP.SimulationRadius = math.huge
+        settings.Physics.AllowSleep = false
+    end)
+end
+ExpandRadius()
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -544,5 +558,25 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
+-- [[ NETWORK OWNERSHIP TICKER ]] --
+-- ส่วนนี้จะช่วยเติม Velocity Trick เข้าไปใน Loop การทำงานหลัก
+RunService.Heartbeat:Connect(function()
+    -- ขยายรัศมีซ้ำทุกเฟรมเพื่อป้องกันโดนเซิร์ฟเวอร์รีเซ็ต
+    pcall(function()
+        LP.MaximumSimulationRadius = math.huge
+        LP.SimulationRadius = math.huge
+    end)
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
+    -- วนลูปพาร์ททั้งหมดที่เรากำลังถืออยู่
+    for p, _ in pairs(grabbed) do
+        if p and p:IsA("BasePart") and not p.Anchored then
+            -- ฉีดค่า Velocity พิเศษเข้าไปเพื่อให้เราคุมพาร์ทได้ลื่นไหล
+            p.AssemblyLinearVelocity = NETWORK_VELOCITY
+            
+            -- ป้องกันพาร์ทคนอื่นมาขวาง (ถ้าต้องการให้พาร์ททะลุตัวเรา)
+            -- p.CanCollide = false 
+        end
+    end
+end)
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvity
