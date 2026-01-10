@@ -16,7 +16,7 @@ local holdDistance = 25
 local throwForce = 200
 
 local grabbed = {}
-local frozen = {}
+local frozen = { }
 local selected = {}
 local highlights = {}
 local handles = {}
@@ -83,7 +83,7 @@ Instance.new("UICorner",main).CornerRadius = UDim.new(0,14)
 
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1,0,0,32)
-title.Text = "TELEKINESIS + {Fix Auto}"
+title.Text = "TELEKINESIS UI + PC"
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.TextColor3 = Color3.new(1,1,1)
@@ -377,6 +377,173 @@ toggleBtn.MouseButton1Click:Connect(function()
     main.Visible = not isMinimized
     toggleBtn.Text = isMinimized and "[+]" or "[-]"
 end)
+-- [[ ตรวจสอบอุปกรณ์และตั้งค่าเริ่มต้น ]] --
+local UserInputService = game:GetService("UserInputService")
+local isPC = not (UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled)
 
--- Original Loadstring (Qwerty)
-pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() end)
+-- UI วิธีใช้งานสำหรับคอมพิวเตอร์ (ปรับขนาดตัวหนังสือใหญ่ขึ้นและลากได้)
+local helpUI = Instance.new("Frame", gui)
+helpUI.Size = UDim2.fromOffset(280, 320) -- ขยายขนาด UI
+helpUI.Position = UDim2.new(0.7, 0, 0.3, 0)
+helpUI.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+helpUI.BackgroundTransparency = 0.2
+helpUI.Visible = isPC
+helpUI.Active = true
+helpUI.Draggable = true
+Instance.new("UICorner", helpUI).CornerRadius = UDim.new(0, 10)
+
+local helpTitle = Instance.new("TextLabel", helpUI)
+helpTitle.Size = UDim2.new(1, 0, 0, 40)
+helpTitle.Text = "💻 PC CONTROLS"
+helpTitle.TextColor3 = Color3.fromRGB(0, 255, 255)
+helpTitle.BackgroundTransparency = 1
+helpTitle.Font = Enum.Font.GothamBold
+helpTitle.TextSize = 22 -- ขยายหัวข้อ
+
+local helpText = Instance.new("TextLabel", helpUI)
+helpText.Size = UDim2.new(1, -20, 1, -50)
+helpText.Position = UDim2.fromOffset(10, 50)
+helpText.Text = "• [G] : Grab Mode (L-Click)\n• [F] : Freeze Mode (L-Click)\n• [T] : Throw (T x2 = Auto)\n• [N] : Unfreeze All\n\n🖱️ MOUSE ACTIONS:\n• L-Click: Grab/Freeze\n• R-Click: Drop Part\n• R-Click x2: Drop All\n\n⚠️ NOTE: Must turn OFF \nFreeze Mode to Drop parts!"
+helpText.TextColor3 = Color3.new(1, 1, 1)
+helpText.TextWrapped = true
+helpText.TextYAlignment = Enum.TextYAlignment.Top
+helpText.TextXAlignment = Enum.TextXAlignment.Left
+helpText.BackgroundTransparency = 1
+helpText.Font = Enum.Font.GothamMedium
+helpText.TextSize = 18 -- ขยายเนื้อหาให้ใหญ่ชัดเจน
+helpText.LineHeight = 1.2
+
+-- สถานะโหมด
+local grabModeActive = false
+local freezeModeActive = false
+local lastTClick = 0
+local lastRClick = 0
+
+-- ปิด Crosshair ถ้าเป็นคอม เพราะเราจะใช้เมาส์ชี้แทน
+if isPC then cross.Visible = false end
+
+-- [[ ฟังก์ชันตรวจสอบเป้าหมายจากตำแหน่งเมาส์ (Mouse Raycast) ]] --
+local function getMouseTarget()
+    local mousePos = UserInputService:GetMouseLocation()
+    local unitRay = Cam:ViewportPointToRay(mousePos.X, mousePos.Y)
+    local rp = RaycastParams.new()
+    rp.FilterType = Enum.RaycastFilterType.Exclude
+    rp.FilterDescendantsInstances = {LP.Character, Cam}
+    
+    local r = workspace:Raycast(unitRay.Origin, unitRay.Direction * 1000, rp)
+    if r and r.Instance and isValidPart(r.Instance) then 
+        return r.Instance 
+    end
+    return nil
+end
+
+-- [[ การควบคุมผ่านคีย์บอร์ดและเมาส์ ]] --
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed or not isPC then return end
+
+    -- G: Toggle Grab Mode
+    if input.KeyCode == Enum.KeyCode.G then
+        grabModeActive = not grabModeActive
+        freezeModeActive = false
+        updateStatusUI() -- ถ้ามี UI บอกสถานะ
+    
+    -- F: Toggle Freeze Mode
+    elseif input.KeyCode == Enum.KeyCode.F then
+        freezeModeActive = not freezeModeActive
+        grabModeActive = false
+        updateStatusUI()
+
+    -- N: Unfreeze All
+    elseif input.KeyCode == Enum.KeyCode.N then
+        frozen = {}
+        for p in pairs(highlights) do setHighlight(p, false) end
+
+    -- T: Throw & Auto Throw
+    elseif input.KeyCode == Enum.KeyCode.T then
+        local now = tick()
+        if now - lastTClick < 0.3 then
+            autoThrow = not autoThrow
+        else
+            for p, o in pairs(grabbed) do
+                p.AssemblyLinearVelocity = Cam.CFrame.LookVector * throwForce
+                o.bp:Destroy() o.bg:Destroy()
+                grabbed[p] = nil
+            end
+        end
+        lastTClick = now
+
+    -- Mouse Button 1 (คลิกซ้าย): Grab หรือ Freeze
+    elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local target = getMouseTarget()
+        if target then
+            if grabModeActive then
+                grabPart(target)
+            elseif freezeModeActive then
+                grabPart(target)
+                frozen[target] = true
+                setHighlight(target, true)
+                if highlights[target] then 
+                    highlights[target].OutlineColor = Color3.fromRGB(0, 170, 255) 
+                end
+            end
+        end
+
+    -- Mouse Button 2 (คลิกขวา): Drop
+    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+        local now = tick()
+        if now - lastRClick < 0.3 then -- Double Click Right
+            for p, o in pairs(grabbed) do
+                o.bp:Destroy() o.bg:Destroy()
+                grabbed[p] = nil
+            end
+        else
+            -- Single Click: ต้องปิด Freeze Mode ก่อนถึงจะ Drop ได้ตามกฎ
+            if not freezeModeActive then
+                local target = getMouseTarget()
+                if target and grabbed[target] then
+                    grabbed[target].bp:Destroy()
+                    grabbed[target].bg:Destroy()
+                    grabbed[target] = nil
+                end
+            end
+        end
+        lastRClick = now
+    end
+end)
+
+-- [[ ลูปประมวลผล (RenderStepped) ]] --
+RunService.RenderStepped:Connect(function()
+    if not isPC then return end
+
+    -- 1. ระบบ Highlight ตามเมาส์ (เมาส์ชี้ไปที่ไหน Highlight ขึ้นที่นั่น)
+    local targetUnderMouse = getMouseTarget()
+    if targetUnderMouse then
+        targetHL.Adornee = targetUnderMouse
+        if grabModeActive then
+            targetHL.OutlineColor = Color3.fromRGB(0, 255, 0) -- สีเขียวโหมด Grab
+        elseif freezeModeActive then
+            targetHL.OutlineColor = Color3.fromRGB(0, 170, 255) -- สีฟ้าโหมด Freeze
+        else
+            targetHL.OutlineColor = Color3.new(1, 1, 1) -- สีขาวปกติ
+        end
+    else
+        targetHL.Adornee = nil
+    end
+
+    -- 2. ระบบการเคลื่อนที่ของ Part (ตามตำแหน่งเมาส์ ไม่ใช่ตามการหมุนหน้าจอ)
+    for p, objs in pairs(grabbed) do
+        if not frozen[p] then
+            local mousePos = UserInputService:GetMouseLocation()
+            local unitRay = Cam:ViewportPointToRay(mousePos.X, mousePos.Y)
+            
+            -- คำนวณจุดในโลก 3D ตามระยะห่าง (holdDistance) จากเมาส์
+            local targetPosition = unitRay.Origin + (unitRay.Direction * holdDistance)
+            
+            objs.bp.Position = targetPosition
+            objs.bg.CFrame = p.CFrame -- รักษาสองทิศทางเดิม
+        end
+    end
+end)
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvity
+loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvity
