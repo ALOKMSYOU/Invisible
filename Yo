@@ -8,7 +8,7 @@ local Cam = workspace.CurrentCamera
 local Mouse = LP:GetMouse()
 
 local UI_SCALE = 1/1.4
-local AUTO_RADIUS = 30
+local AUTO_RADIUS = 30 -- ระยะของระบบ Auto
 local MOVE_SNAP = 1
 local ROT_SNAP = 15
 
@@ -25,18 +25,40 @@ local autoGrabNPC = false
 local autoGrabPart = false
 local autoFreeze = false
 local autoThrow = false
-local autoGrabFreeze = false
 local highlightOn = true
 
 local currentTool = "NONE"
 
-local initialCFrames = {} 
+local initialCFrames = {}
 local initialPositions = {}
 
+-- ฟังก์ชันตรวจสอบว่าเป็นคนเล่นหรือตัวเราเองไหม
+local function isPlayer(obj)
+    if not obj then return false end
+    local model = obj:FindFirstAncestorOfClass("Model")
+    if model then
+        if Players:GetPlayerFromCharacter(model) then
+            return true
+        end
+        -- ตรวจสอบชื่อตัวละคร (กรณีผู้รันสคริปต์)
+        if model.Name == LP.Name then return true end
+    end
+    return false
+end
+
+-- ฟังก์ชันตรวจสอบ Part (ไม่ Anchored และไม่ใช่ผู้เล่น)
+local function isValidPart(p)
+    if not p or not p:IsA("BasePart") then return false end
+    if p.Anchored then return false end 
+    if isPlayer(p) then return false end
+    return true
+end
+
+-- GUI Setup
 local gui = Instance.new("ScreenGui")
 pcall(function() gui.Parent = CoreGui end)
 if gui.Parent ~= CoreGui then gui.Parent = LP.PlayerGui end
-gui.Name = "TelekinesisUI_F3X"
+gui.Name = "TelekinesisUI_F3X_Pro"
 gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
@@ -61,457 +83,284 @@ Instance.new("UICorner",main).CornerRadius = UDim.new(0,14)
 
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1,0,0,32)
-title.Text = "TELEKINESIS + F3X (NO ANCHORED)"
+title.Text = "TELEKINESIS + {Fix Auto}"
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.TextColor3 = Color3.new(1,1,1)
 title.BackgroundTransparency = 1
 
 local pages = {}
-
 local function createPage()
-	local f = Instance.new("ScrollingFrame", main)
-	f.Position = UDim2.new(0.03,0,0,36)
-	f.Size = UDim2.new(0.94,0,1,-40)
-	f.ScrollBarThickness = 6
-	f.Visible = false
-	f.BackgroundColor3 = Color3.fromRGB(30,30,30)
-	f.BorderSizePixel = 0
-	
-	local layout = Instance.new("UIListLayout", f)
-	layout.Padding = UDim.new(0,5)
-	
-	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-		f.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y+6)
-	end)
-	return f
+    local f = Instance.new("ScrollingFrame", main)
+    f.Position = UDim2.new(0.03,0,0,36)
+    f.Size = UDim2.new(0.94,0,1,-45)
+    f.ScrollBarThickness = 4
+    f.Visible = false
+    f.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    f.BorderSizePixel = 0
+    local layout = Instance.new("UIListLayout", f)
+    layout.Padding = UDim.new(0,5)
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        f.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y+10)
+    end)
+    return f
 end
 
 pages.main = createPage()
 pages.move = createPage()
 
 local function showPage(name)
-	for k,v in pairs(pages) do
-		v.Visible = (k == name)
-	end
+    for k,v in pairs(pages) do v.Visible = (k == name) end
 end
 showPage("main")
 
--- ฟังก์ชันตรวจสอบ Part (ป้องกันการ Grab ของที่ Anchored)
-local function isValidPart(p)
-	if not p or not p:IsA("BasePart") then return false end
-	if p.Anchored then return false end -- บรรทัดนี้คือหัวใจสำคัญ: ถ้าถูกล็อกตำแหน่ง จะไม่ผ่านเงื่อนไข
-	return true
-end
-
+-- Logic Functions
 local function getTarget()
-	local rp = RaycastParams.new()
-	rp.FilterType = Enum.RaycastFilterType.Exclude
-	rp.FilterDescendantsInstances = {LP.Character, workspace.CurrentCamera}
-	local r = workspace:Raycast(
-		Cam.CFrame.Position,
-		Cam.CFrame.LookVector * 500,
-		rp
-	)
-	-- ตรวจสอบก่อนส่งคืนค่า target ว่า Anchored หรือไม่
-	if r and r.Instance and isValidPart(r.Instance) then
-		return r.Instance
-	end
-	return nil
-end
-
-local function clearAllHandles()
-	for p, hSet in pairs(handles) do
-		if hSet.move then hSet.move:Destroy() end
-		if hSet.rot then hSet.rot:Destroy() end
-	end
-	handles = {}
-end
-
-local function createHandles(p)
-	clearAllHandles()
-	if not p or not isValidPart(p) then return end -- ป้องกัน Anchored Part
-	
-	local mh = Instance.new("Handles")
-	mh.Adornee = p
-	mh.Style = Enum.HandlesStyle.Resize
-	mh.Color3 = Color3.fromRGB(255,255,100)
-	mh.Parent = gui
-	mh.Visible = (currentTool == "MOVE")
-	
-	local ah = Instance.new("ArcHandles")
-	ah.Adornee = p
-	ah.Parent = gui
-	ah.Visible = (currentTool == "ROTATE")
-	
-	mh.MouseButton1Down:Connect(function()
-		initialPositions = {}
-		for part in pairs(selected) do
-			if grabbed[part] and not part.Anchored then -- ตรวจสอบอีกชั้น
-				initialPositions[part] = grabbed[part].bp.Position
-			end
-		end
-	end)
-
-	mh.MouseDrag:Connect(function(face, dist)
-		local axisVec
-		if face == Enum.NormalId.Top then axisVec = p.CFrame.UpVector
-		elseif face == Enum.NormalId.Bottom then axisVec = -p.CFrame.UpVector
-		elseif face == Enum.NormalId.Right then axisVec = p.CFrame.RightVector
-		elseif face == Enum.NormalId.Left then axisVec = -p.CFrame.RightVector
-		elseif face == Enum.NormalId.Front then axisVec = p.CFrame.LookVector
-		elseif face == Enum.NormalId.Back then axisVec = -p.CFrame.LookVector
-		end
-		
-		local snappedDist = math.round(dist / MOVE_SNAP) * MOVE_SNAP
-		local offset = axisVec * snappedDist
-		
-		for part in pairs(selected) do
-			if grabbed[part] and initialPositions[part] and not part.Anchored then
-				grabbed[part].bp.Position = initialPositions[part] + offset
-			end
-		end
-	end)
-	
-	ah.MouseButton1Down:Connect(function()
-		initialCFrames = {}
-		for part in pairs(selected) do
-			if grabbed[part] and not part.Anchored then
-				initialCFrames[part] = grabbed[part].bg.CFrame
-			end
-		end
-	end)
-
-	ah.MouseDrag:Connect(function(axis, angle)
-		local deg = math.deg(angle)
-		local snappedDeg = math.round(deg / ROT_SNAP) * ROT_SNAP
-		local finalRad = math.rad(snappedDeg)
-		
-		local axisVec = Vector3.new(0,0,0)
-		if axis == Enum.Axis.X then axisVec = Vector3.new(1,0,0)
-		elseif axis == Enum.Axis.Y then axisVec = Vector3.new(0,1,0)
-		elseif axis == Enum.Axis.Z then axisVec = Vector3.new(0,0,1)
-		end
-		
-		local rotationCFrame = CFrame.Angles(axisVec.X * finalRad, axisVec.Y * finalRad, axisVec.Z * finalRad)
-		local centerCF = initialCFrames[p]
-		
-		for part in pairs(selected) do
-			if grabbed[part] and initialCFrames[part] and not part.Anchored then
-				local relativeCF = centerCF:Inverse() * initialCFrames[part]
-				grabbed[part].bg.CFrame = centerCF * rotationCFrame * relativeCF
-				
-				local relativePos = initialCFrames[part].Position - centerCF.Position
-				local rotatedPos = centerCF.Position + (centerCF * rotationCFrame):VectorToWorldSpace(centerCF:VectorToObjectSpace(relativePos))
-				grabbed[part].bp.Position = rotatedPos
-			end
-		end
-	end)
-	
-	handles[p] = {move = mh, rot = ah}
+    local rp = RaycastParams.new()
+    rp.FilterType = Enum.RaycastFilterType.Exclude
+    rp.FilterDescendantsInstances = {LP.Character, Cam}
+    local r = workspace:Raycast(Cam.CFrame.Position, Cam.CFrame.LookVector * 500, rp)
+    if r and r.Instance and isValidPart(r.Instance) then return r.Instance end
+    return nil
 end
 
 local function grabPart(p)
-	if not isValidPart(p) then return end -- ตรวจสอบ Anchored
-	if grabbed[p] then return end
+    if not isValidPart(p) or grabbed[p] then return end
+    local bp = Instance.new("BodyPosition", p)
+    bp.MaxForce = Vector3.new(1e6,1e6,1e6)
+    bp.P = 10000
+    bp.Position = p.Position
+    local bg = Instance.new("BodyGyro", p)
+    bg.MaxTorque = Vector3.new(1e6,1e6,1e6)
+    bg.P = 10000
+    bg.CFrame = p.CFrame
+    grabbed[p] = {bp = bp, bg = bg}
+    
+    if autoFreeze then frozen[p] = true end
+    if autoThrow then
+        task.wait(0.1)
+        p.AssemblyLinearVelocity = Cam.CFrame.LookVector * throwForce
+        bp:Destroy() bg:Destroy() grabbed[p] = nil
+    end
+end
 
-	local bp = Instance.new("BodyPosition")
-	bp.MaxForce = Vector3.new(1e6,1e6,1e6)
-	bp.P = 10000
-	bp.Position = p.Position
-	bp.Parent = p
-	
-	local bg = Instance.new("BodyGyro")
-	bg.MaxTorque = Vector3.new(1e6,1e6,1e6)
-	bg.P = 10000
-	bg.CFrame = p.CFrame
-	bg.Parent = p
-	
-	grabbed[p] = {bp = bp, bg = bg}
+local function clearAllHandles()
+    for p, hSet in pairs(handles) do
+        if hSet.move then hSet.move:Destroy() end
+        if hSet.rot then hSet.rot:Destroy() end
+    end
+    handles = {}
+end
+
+local function createHandles(p)
+    clearAllHandles()
+    if not p or not isValidPart(p) then return end
+    
+    local mh = Instance.new("Handles", gui)
+    mh.Adornee = p
+    mh.Style = Enum.HandlesStyle.Resize
+    mh.Color3 = Color3.fromRGB(255,255,100)
+    mh.Visible = (currentTool == "MOVE")
+
+    local ah = Instance.new("ArcHandles", gui)
+    ah.Adornee = p
+    ah.Parent = gui
+    ah.Visible = (currentTool == "ROTATE")
+
+    mh.MouseButton1Down:Connect(function()
+        initialPositions = {}
+        for part in pairs(selected) do if grabbed[part] then initialPositions[part] = grabbed[part].bp.Position end end
+    end)
+
+    mh.MouseDrag:Connect(function(face, dist)
+        local axisVec = Vector3.FromNormalId(face)
+        local snappedDist = math.round(dist / MOVE_SNAP) * MOVE_SNAP
+        for part in pairs(selected) do
+            if grabbed[part] and initialPositions[part] then
+                grabbed[part].bp.Position = initialPositions[part] + (p.CFrame:VectorToWorldSpace(axisVec) * snappedDist)
+            end
+        end
+    end)
+
+    ah.MouseButton1Down:Connect(function()
+        initialCFrames = {}
+        for part in pairs(selected) do if grabbed[part] then initialCFrames[part] = grabbed[part].bg.CFrame end end
+    end)
+
+    ah.MouseDrag:Connect(function(axis, angle)
+        local snappedDeg = math.round(math.deg(angle) / ROT_SNAP) * ROT_SNAP
+        local rotationCFrame = CFrame.fromAxisAngle(Vector3.FromAxis(axis), math.rad(snappedDeg))
+        for part in pairs(selected) do
+            if grabbed[part] and initialCFrames[part] then
+                grabbed[part].bg.CFrame = initialCFrames[p] * rotationCFrame * (initialCFrames[p]:Inverse() * initialCFrames[part])
+            end
+        end
+    end)
+    handles[p] = {move = mh, rot = ah}
 end
 
 local function setHighlight(p, state)
-	if state then
-		if not highlights[p] and isValidPart(p) then
-			local hl = Instance.new("Highlight")
-			hl.Adornee = p
-			hl.FillTransparency = 0.4
-			hl.OutlineColor = Color3.fromRGB(255,255,0)
-			hl.Parent = gui
-			highlights[p] = hl
-		end
-	else
-		if highlights[p] then
-			highlights[p]:Destroy()
-			highlights[p] = nil
-		end
-	end
+    if state then
+        if not highlights[p] and isValidPart(p) then
+            local hl = Instance.new("Highlight", gui)
+            hl.Adornee = p
+            hl.FillTransparency = 0.4
+            hl.OutlineColor = Color3.fromRGB(255,255,0)
+            highlights[p] = hl
+        end
+    else
+        if highlights[p] then highlights[p]:Destroy() highlights[p] = nil end
+    end
 end
 
+-- UI Component Helpers
 local function btn(page, text, cb)
-	local b = Instance.new("TextButton", page)
-	b.Size = UDim2.new(1,0,0,26)
-	b.Text = text
-	b.Font = Enum.Font.Gotham
-	b.TextSize = 12
-	b.TextColor3 = Color3.new(1,1,1)
-	b.BackgroundColor3 = Color3.fromRGB(70,70,70)
-	Instance.new("UICorner",b)
-	b.MouseButton1Click:Connect(function() cb(b) end)
-	return b
+    local b = Instance.new("TextButton", page)
+    b.Size = UDim2.new(1,0,0,28)
+    b.Text = text
+    b.Font = Enum.Font.Gotham
+    b.TextSize = 12
+    b.TextColor3 = Color3.new(1,1,1)
+    b.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    Instance.new("UICorner",b)
+    b.MouseButton1Click:Connect(function() cb(b) end)
+    return b
 end
 
 local function label(page, text)
-	local l = Instance.new("TextLabel", page)
-	l.Size = UDim2.new(1,0,0,20)
-	l.BackgroundTransparency = 1
-	l.Text = text
-	l.Font = Enum.Font.GothamBold
-	l.TextColor3 = Color3.fromRGB(150,150,150)
-	l.TextSize = 11
-	return l
+    local l = Instance.new("TextLabel", page)
+    l.Size = UDim2.new(1,0,0,20)
+    l.BackgroundTransparency = 1
+    l.Text = text
+    l.Font = Enum.Font.GothamBold
+    l.TextColor3 = Color3.fromRGB(150,150,150)
+    l.TextSize = 11
+    return l
 end
 
-btn(pages.main, "GRAB (LOOK)", function()
-	grabPart(getTarget())
-end)
-
+-- PAGE 1: MAIN
+btn(pages.main, "GRAB (LOOK)", function() grabPart(getTarget()) end)
 btn(pages.main, "DROP (LOOK)", function()
-	local t=getTarget()
-	if t and grabbed[t] then
-		grabbed[t].bp:Destroy()
-		grabbed[t].bg:Destroy()
-		grabbed[t]=nil
-		frozen[t]=nil
-		selected[t]=nil
-		setHighlight(t,false)
-		clearAllHandles()
-	end
+    local t=getTarget()
+    if t and grabbed[t] then
+        grabbed[t].bp:Destroy() grabbed[t].bg:Destroy()
+        grabbed[t]=nil frozen[t]=nil selected[t]=nil
+        setHighlight(t,false) clearAllHandles()
+    end
 end)
-
 btn(pages.main, "DROP ALL", function()
-	for p, objs in pairs(grabbed) do 
-		objs.bp:Destroy() 
-		objs.bg:Destroy()
-	end
-	grabbed={}
-	frozen={}
-	selected={}
-	for p in pairs(highlights) do setHighlight(p,false) end
-	clearAllHandles()
+    for p, objs in pairs(grabbed) do objs.bp:Destroy() objs.bg:Destroy() end
+    grabbed={} frozen={} selected={}
+    for p in pairs(highlights) do setHighlight(p,false) end
+    clearAllHandles()
 end)
-
-btn(pages.main, "FREEZE (LOOK)", function()
-	local t=getTarget()
-	if t and grabbed[t] then 
-		frozen[t]=true 
-	end
-end)
-
+btn(pages.main, "FREEZE (LOOK)", function() local t=getTarget() if t and grabbed[t] then frozen[t]=true end end)
 btn(pages.main, "UNFREEZE (LOOK)", function()
-	local t=getTarget()
-	if t then
-		frozen[t]=nil
-		selected[t]=nil
-		setHighlight(t,false)
-	end
+    local t=getTarget()
+    if t then frozen[t]=nil setHighlight(t,false) end
 end)
-
-btn(pages.main, "UNFREEZE ALL", function()
-	frozen={}
-	selected={}
-	for p in pairs(highlights) do setHighlight(p,false) end
-	clearAllHandles()
-end)
+btn(pages.main, "UNFREEZE ALL", function() frozen={} selected={} for p in pairs(highlights) do setHighlight(p,false) end clearAllHandles() end)
 
 label(pages.main, "--- AUTO SETTINGS ---")
-
-btn(pages.main, "AUTO GRAB NPC", function(b)
-	autoGrabNPC = not autoGrabNPC
-	b.Text = "AUTO GRAB NPC : "..(autoGrabNPC and "ON" or "OFF")
-end)
-
-btn(pages.main, "AUTO GRAB PART", function(b)
-	autoGrabPart = not autoGrabPart
-	b.Text = "AUTO GRAB PART : "..(autoGrabPart and "ON" or "OFF")
-end)
-
-btn(pages.main, "AUTO FREEZE", function(b)
-	autoFreeze = not autoFreeze
-	b.Text = "AUTO FREEZE : "..(autoFreeze and "ON" or "OFF")
-end)
-
-btn(pages.main, "AUTO THROW", function(b)
-	autoThrow = not autoThrow
-	b.Text = "AUTO THROW : "..(autoThrow and "ON" or "OFF")
-end)
+btn(pages.main, "AUTO GRAB NPC : OFF", function(b) autoGrabNPC = not autoGrabNPC b.Text = "AUTO GRAB NPC : "..(autoGrabNPC and "ON" or "OFF") end)
+btn(pages.main, "AUTO GRAB PART : OFF", function(b) autoGrabPart = not autoGrabPart b.Text = "AUTO GRAB PART : "..(autoGrabPart and "ON" or "OFF") end)
+btn(pages.main, "AUTO FREEZE : OFF", function(b) autoFreeze = not autoFreeze b.Text = "AUTO FREEZE : "..(autoFreeze and "ON" or "OFF") end)
+btn(pages.main, "AUTO THROW : OFF", function(b) autoThrow = not autoThrow b.Text = "AUTO THROW : "..(autoThrow and "ON" or "OFF") end)
 
 label(pages.main, "--- ACTIONS ---")
-
 btn(pages.main, "THROW (LOOK)", function()
-	for p, objs in pairs(grabbed) do
-		p.AssemblyLinearVelocity = Cam.CFrame.LookVector * throwForce
-		objs.bp:Destroy()
-		objs.bg:Destroy()
-	end
-	grabbed={}
-	frozen={}
-	selected={}
-	for p in pairs(highlights) do setHighlight(p,false) end
-	clearAllHandles()
+    local t = getTarget()
+    if t and grabbed[t] then
+        t.AssemblyLinearVelocity = Cam.CFrame.LookVector * throwForce
+        grabbed[t].bp:Destroy() grabbed[t].bg:Destroy()
+        grabbed[t]=nil frozen[t]=nil setHighlight(t,false)
+    end
 end)
 
 local distLabel = btn(pages.main, "DISTANCE : "..holdDistance, function() end)
-btn(pages.main, "+ DIST", function()
-	holdDistance+=5
-	distLabel.Text = "DISTANCE : "..holdDistance
-end)
-btn(pages.main, "- DIST", function()
-	holdDistance = math.max(1, holdDistance-5)
-	distLabel.Text = "DISTANCE : "..holdDistance
-end)
+btn(pages.main, "+ DIST", function() holdDistance+=5 distLabel.Text = "DISTANCE : "..holdDistance end)
+btn(pages.main, "- DIST", function() holdDistance = math.max(1, holdDistance-5) distLabel.Text = "DISTANCE : "..holdDistance end)
+btn(pages.main, "HIGHLIGHT : ON", function(b) highlightOn = not highlightOn b.Text = "HIGHLIGHT : "..(highlightOn and "ON" or "OFF") end)
+btn(pages.main, "▶ MOVE / ROTATE MODE", function() showPage("move") end)
+btn(pages.main, "DESTROY UI", function() for p,o in pairs(grabbed) do o.bp:Destroy() o.bg:Destroy() end gui:Destroy() end)
 
-btn(pages.main, "HIGHLIGHT", function(b)
-	highlightOn = not highlightOn
-	b.Text = "HIGHLIGHT : "..(highlightOn and "ON" or "OFF")
-end)
-
-btn(pages.main, "▶ MOVE / ROTATE MODE", function()
-	showPage("move")
-end)
-
-btn(pages.main, "DESTROY UI", function()
-	for p, objs in pairs(grabbed) do 
-		objs.bp:Destroy() 
-		objs.bg:Destroy()
-	end
-	gui:Destroy()
-end)
-
+-- PAGE 2: MOVE
 local list = Instance.new("ScrollingFrame", pages.move)
-list.Size = UDim2.new(1,0,0,120)
-list.ScrollBarThickness = 6
-list.BackgroundColor3 = Color3.fromRGB(35,35,35)
-list.BorderSizePixel = 0
-
-local ll = Instance.new("UIListLayout", list)
-ll.Padding = UDim.new(0,4)
+list.Size = UDim2.new(1,0,0,120); list.BackgroundColor3 = Color3.fromRGB(35,35,35); list.BorderSizePixel = 0
+local ll = Instance.new("UIListLayout", list); ll.Padding = UDim.new(0,4)
 
 local function refreshList()
-	for _,c in ipairs(list:GetChildren()) do
-		if c:IsA("TextButton") then c:Destroy() end
-	end
-	for p in pairs(frozen) do
-		if p and p.Parent and not p.Anchored then
-			local b = Instance.new("TextButton", list)
-			b.Size = UDim2.new(1,0,0,26)
-			b.Text = p.Name
-			b.Font = Enum.Font.Gotham
-			b.TextSize = 12
-			b.TextColor3 = Color3.new(1,1,1)
-			b.BackgroundColor3 = selected[p] and Color3.fromRGB(120,120,0) or Color3.fromRGB(70,70,70)
-			Instance.new("UICorner",b)
-			b.MouseButton1Click:Connect(function()
-				selected[p] = not selected[p]
-				setHighlight(p, selected[p])
-				
-				local anySelected = false
-				local lastSelected = nil
-				for part in pairs(selected) do
-					anySelected = true
-					lastSelected = part
-				end
-				
-				if anySelected then
-					createHandles(lastSelected)
-				else
-					clearAllHandles()
-				end
-				refreshList()
-			end)
-		end
-	end
+    for _,c in ipairs(list:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+    for p in pairs(frozen) do
+        if p and p.Parent then
+            local b = btn(list, p.Name, function()
+                selected[p] = not selected[p]
+                setHighlight(p, selected[p])
+                local last = nil; for part in pairs(selected) do last = part end
+                if last then createHandles(last) else clearAllHandles() end
+                refreshList()
+            end)
+            b.BackgroundColor3 = selected[p] and Color3.fromRGB(120,120,0) or Color3.fromRGB(70,70,70)
+        end
+    end
 end
 
 btn(pages.move, "REFRESH LIST", refreshList)
 btn(pages.move, "SELECT ALL", function()
-	local last = nil
-	for p in pairs(frozen) do 
-		if not p.Anchored then
-			selected[p] = true 
-			setHighlight(p, true)
-			last = p
-		end
-	end
-	if last then createHandles(last) end
-	refreshList()
+    local last = nil; for p in pairs(frozen) do selected[p] = true; setHighlight(p, true); last = p end
+    if last then createHandles(last) end refreshList()
 end)
-
-btn(pages.move, "UNSELECT ALL", function()
-	for p in pairs(selected) do setHighlight(p, false) end
-	selected = {}
-	clearAllHandles()
-	refreshList()
-end)
+btn(pages.move, "UNSELECT ALL", function() for p in pairs(selected) do setHighlight(p, false) end selected = {}; clearAllHandles(); refreshList() end)
 
 label(pages.move, "--- TOOLS (MULTI-EDIT) ---")
-
 local toolBtn = btn(pages.move, "CURRENT TOOL: NONE", function(b)
-	if currentTool == "NONE" then currentTool = "MOVE"
-	elseif currentTool == "MOVE" then currentTool = "ROTATE"
-	else currentTool = "NONE" end
-	b.Text = "CURRENT TOOL: "..currentTool
-	b.BackgroundColor3 = (currentTool=="NONE") and Color3.fromRGB(70,70,70) or Color3.fromRGB(0,100,200)
-	
-	local lastSelected = nil
-	for p in pairs(selected) do lastSelected = p end
-	if lastSelected then createHandles(lastSelected) end
+    if currentTool == "NONE" then currentTool = "MOVE" elseif currentTool == "MOVE" then currentTool = "ROTATE" else currentTool = "NONE" end
+    b.Text = "CURRENT TOOL: "..currentTool
+    local last = nil; for p in pairs(selected) do last = p end
+    if last then createHandles(last) end
 end)
 
 label(pages.move, "--- SETTINGS ---")
-
-local mSnapBtn = btn(pages.move, "MOVE STEP (SNAP): "..MOVE_SNAP, function(b)
-	if MOVE_SNAP == 0.1 then MOVE_SNAP = 0.5
-	elseif MOVE_SNAP == 0.5 then MOVE_SNAP = 1
-	elseif MOVE_SNAP == 1 then MOVE_SNAP = 5
-	elseif MOVE_SNAP == 5 then MOVE_SNAP = 10
-	else MOVE_SNAP = 0.1 end
-	b.Text = "MOVE STEP (SNAP): "..MOVE_SNAP
+btn(pages.move, "MOVE STEP (SNAP): "..MOVE_SNAP, function(b)
+    if MOVE_SNAP == 0.1 then MOVE_SNAP = 0.5 elseif MOVE_SNAP == 0.5 then MOVE_SNAP = 1 elseif MOVE_SNAP == 1 then MOVE_SNAP = 5 else MOVE_SNAP = 0.1 end
+    b.Text = "MOVE STEP (SNAP): "..MOVE_SNAP
 end)
-
-local rSnapBtn = btn(pages.move, "ROTATE STEP (SNAP): "..ROT_SNAP, function(b)
-	if ROT_SNAP == 1 then ROT_SNAP = 5
-	elseif ROT_SNAP == 5 then ROT_SNAP = 15
-	elseif ROT_SNAP == 15 then ROT_SNAP = 45
-	elseif ROT_SNAP == 45 then ROT_SNAP = 90
-	else ROT_SNAP = 1 end
-	b.Text = "ROTATE STEP (SNAP): "..ROT_SNAP
+btn(pages.move, "ROTATE STEP (SNAP): "..ROT_SNAP, function(b)
+    if ROT_SNAP == 1 then ROT_SNAP = 15 elseif ROT_SNAP == 15 then ROT_SNAP = 45 elseif ROT_SNAP == 45 then ROT_SNAP = 90 else ROT_SNAP = 1 end
+    b.Text = "ROTATE STEP (SNAP): "..ROT_SNAP
 end)
+btn(pages.move, "◀ BACK", function() showPage("main") end)
 
-btn(pages.move, "◀ BACK", function()
-	showPage("main")
-end)
-
+-- Loop สำหรับระบบ Auto และการประมวลผล
 RunService.RenderStepped:Connect(function()
-	local t = getTarget()
-	-- Highlight จะไม่แสดงถ้า Part นั้น Anchored (จัดการโดย getTarget)
-	targetHL.Adornee = highlightOn and t or nil
+    targetHL.Adornee = highlightOn and getTarget() or nil
+    
+    -- Auto Logic
+    if autoGrabPart or autoGrabNPC then
+        for _, p in pairs(workspace:GetPartBoundsInRadius(LP.Character.PrimaryPart.Position, AUTO_RADIUS)) do
+            if isValidPart(p) and not grabbed[p] then
+                local isNPC = p:FindFirstAncestorOfClass("Model") and p:FindFirstAncestorOfClass("Model"):FindFirstChild("Humanoid")
+                if (autoGrabNPC and isNPC) or (autoGrabPart and not isNPC) then
+                    grabPart(p)
+                end
+            end
+        end
+    end
 
-	for p, objs in pairs(grabbed) do
-		if not p or not p.Parent or p.Anchored then -- ถ้าอยู่ดีๆ Part โดน Anchor ระหว่างถือ ให้หลุดทันที
-			if objs.bp then objs.bp:Destroy() end
-			if objs.bg then objs.bg:Destroy() end
-			grabbed[p] = nil
-			frozen[p] = nil
-			selected[p] = nil
-			setHighlight(p, false)
-		elseif not frozen[p] then
-			objs.bp.Position = Cam.CFrame.Position + Cam.CFrame.LookVector * holdDistance
-			objs.bg.CFrame = p.CFrame
-		end
-	end
+    -- Update Position ของของที่ถือ
+    for p, objs in pairs(grabbed) do
+        if not p or not p.Parent or p.Anchored then
+            if objs.bp then objs.bp:Destroy() end
+            if objs.bg then objs.bg:Destroy() end
+            grabbed[p] = nil; frozen[p] = nil; setHighlight(p, false)
+        elseif not frozen[p] then
+            objs.bp.Position = Cam.CFrame.Position + Cam.CFrame.LookVector * holdDistance
+            objs.bg.CFrame = p.CFrame
+        end
+    end
 end)
 
+-- Minimize Button
 local toggleBtn = Instance.new("TextButton", gui)
 toggleBtn.Size = UDim2.fromOffset(40, 40)
 toggleBtn.Position = UDim2.new(0.03, 0, 0.18, -45)
@@ -519,19 +368,15 @@ toggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 toggleBtn.Text = "[-]"
 toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.TextColor3 = Color3.new(1, 1, 1)
-toggleBtn.TextSize = 18
-
-local uiCorner = Instance.new("UICorner", toggleBtn)
-uiCorner.CornerRadius = UDim.new(0, 8)
+toggleBtn.Draggable = true
+Instance.new("UICorner", toggleBtn)
 
 local isMinimized = false
 toggleBtn.MouseButton1Click:Connect(function()
-	isMinimized = not isMinimized
-	main.Visible = not isMinimized
-	toggleBtn.Text = isMinimized and "[+]" or "[-]"
+    isMinimized = not isMinimized
+    main.Visible = not isMinimized
+    toggleBtn.Text = isMinimized and "[+]" or "[-]"
 end)
 
-toggleBtn.Active = true
-toggleBtn.Draggable = true
-
-loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))()
+-- Original Loadstring (Qwerty)
+pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() end)
