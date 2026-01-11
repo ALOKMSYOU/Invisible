@@ -653,6 +653,63 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
+-- [[ ฟังก์ชันเพิ่มประสิทธิภาพการยึดครอง Net Owner (Client-Side) ]] --
+local function claimNetOwner(p)
+    if p:IsA("BasePart") and not p.Anchored then
+        -- เทคนิคทำให้ Client เรามีความสำคัญต่อ Part นี้สูงขึ้นในระบบ Physics
+        p.Velocity = Vector3.new(0, 0.01, 0) -- ขยับเล็กน้อยเพื่อให้ Engine ตรวจสอบ
+        
+        -- ปรับค่าแรงเสียดทานและแรงต้านให้ต่ำที่สุดขณะถือ เพื่อไม่ให้มันขัดขืน
+        if not p:FindFirstChild("OriginalProperties") then
+            local props = Instance.new("Configuration", p)
+            props.Name = "OriginalProperties"
+            local m = Instance.new("NumberValue", props)
+            m.Name = "Massless"
+            m.Value = p.Massless and 1 or 0
+            
+            p.Massless = true -- ทำให้ไร้น้ำหนักชั่วคราวเพื่อให้ BodyPosition ดึงง่ายขึ้น
+        end
+    end
+end
 
+-- [[ ปรับปรุงฟังก์ชัน grabPart เดิม ]] --
+-- ให้คุณนำโค้ดในส่วน grabPart ไปครอบหรือแทนที่ส่วนเดิม
+local originalGrabPart = grabPart -- เก็บฟังก์ชันเดิมไว้ (ถ้ามี)
+grabPart = function(p)
+    if not isValidPart(p) then return end
+    
+    -- บังคับ Network Ownership (Client-side trick)
+    -- โดยการขยับตำแหน่งเล็กน้อยและตั้งค่าฟิสิกส์
+    claimNetOwner(p)
+    
+    -- สร้าง Force ที่แรงขึ้นเพื่อสู้กับคนอื่น
+    local bp = p:FindFirstChildOfClass("BodyPosition") or Instance.new("BodyPosition", p)
+    bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge) -- ใช้แรงมหาศาล
+    bp.P = 50000 -- เพิ่มความเร็วในการตอบสนอง (Stiffness)
+    bp.D = 500   -- ลดการสั่น (Damping)
+    bp.Position = p.Position
+
+    local bg = p:FindFirstChildOfClass("BodyGyro") or Instance.new("BodyGyro", p)
+    bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bg.P = 50000
+    bg.CFrame = p.CFrame
+    
+    grabbed[p] = {bp = bp, bg = bg}
+end
+
+-- [[ ระบบ Anti-Physics Glitch (ใส่ใน RenderStepped) ]] --
+RunService.Heartbeat:Connect(function()
+    for p, objs in pairs(grabbed) do
+        if p and p.Parent and not p.Anchored then
+            -- ป้องกันคนอื่นมาแย่งด้วยการเซ็ต Velocity เป็น 0 ตลอดเวลาที่ถือ
+            -- ถ้า Part มีความเร็ว (Velocity) สูงเกินไป ระบบจะพยายามคืน NetOwner ให้ Server
+            p.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            p.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+            
+            -- บังคับให้เป็น Massless ตลอดเวลาที่ถือเพื่อลดภาระ Engine
+            p.Massless = true
+        end
+    end
+end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
