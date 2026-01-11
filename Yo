@@ -592,7 +592,7 @@ local function deletePart(p)
         setHighlight(p, false)
         
         -- ส่งไป Void แบบรวดเร็ว (ย้ายตำแหน่งไปที่ต่ำมากๆ)
-        p.CFrame = CFrame.new(0, -501, 0)
+        p.CFrame = CFrame.new(0, -490, 0)
         p.AssemblyLinearVelocity = Vector3.new(0, -1000, 0) -- เร่งความเร็วให้หายไปทันที
         
         -- ถ้าต้องการให้ลบออกจากเกมจริงๆ (อาจโดนระบบป้องกันตรวจจับได้ในบางแมพ)
