@@ -578,92 +578,80 @@ if pages and pages.move then
     tpFrontBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 200)
     tpFrontBtn.Font = Enum.Font.GothamBold
 end
--- [[ ฟังก์ชัน Delete Part (ส่งไป Void) ]] --
-local function deletePart(p)
-    if p and isValidPart(p) then
-        -- ยกเลิกการ Grab/Freeze ก่อนลบ
-        if grabbed[p] then
-            grabbed[p].bp:Destroy()
-            grabbed[p].bg:Destroy()
-            grabbed[p] = nil
-        end
-        frozen[p] = nil
-        selected[p] = nil
-        setHighlight(p, false)
-        
-        -- ส่งไป Void แบบรวดเร็ว (ย้ายตำแหน่งไปที่ต่ำมากๆ)
-        p.CFrame = CFrame.new(0, -490, 0)
-        p.AssemblyLinearVelocity = Vector3.new(0, -490, 0) -- เร่งความเร็วให้หายไปทันที
-        
-        -- ถ้าต้องการให้ลบออกจากเกมจริงๆ (อาจโดนระบบป้องกันตรวจจับได้ในบางแมพ)
-        -- task.wait(0.1)
-        -- p:Destroy() 
+-- [[ ฟังก์ชันสำหรับการลบ Part (วาร์ปลง Void) ]] --
+local function deletePartToVoid(p)
+    if not p or not p:IsA("BasePart") or p.Anchored then return end
+    if isPlayer(p) then return end -- ป้องกันการลบตัวผู้เล่น/ผู้รัน
+
+    -- ยกเลิกการ Grab หรือ Freeze ก่อนลบ
+    if grabbed[p] then
+        grabbed[p].bp:Destroy()
+        grabbed[p].bg:Destroy()
+        grabbed[p] = nil
+    end
+    frozen[p] = nil
+    selected[p] = nil
+    setHighlight(p, false)
+
+    -- วาร์ปลง Void (ตำแหน่งปัจจุบันผู้รัน แต่แกน Y ลึกลงไป 500 หน่วยเพื่อให้หายลับตา)
+    local root = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    if root then
+        p.CFrame = CFrame.new(root.Position.X, -30, root.Position.Z)
+        p.AssemblyLinearVelocity = Vector3.new(0, -30, 0) -- เร่งความเร็วให้หายไปทันที
     end
 end
 
--- [[ เพิ่มปุ่มลงในหน้า Main Page ]] --
+-- [[ เพิ่มปุ่มในหน้าหลัก (Main Page) ]] --
 if pages and pages.main then
-    label(pages.main, "--- DESTRUCTION ---")
-    local delBtn = btn(pages.main, "DELETE PART(LOOK)", function()
-        local t = getTarget()
-        if t then deletePart(t) end
+    label(pages.main, "--- DESTRUCTIVE ---")
+    local delBtn = btn(pages.main, "DELETE PART (LOOK)", function()
+        deletePartToVoid(getTarget())
     end)
     delBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- สีแดง
     delBtn.Font = Enum.Font.GothamBold
 end
 
--- [[ ระบบสำหรับคอมพิวเตอร์ (ปุ่ม R + คลิกขวา) ]] --
+-- [[ ส่วนควบคุมสำหรับคอมพิวเตอร์ (ปุ่ม R และคลิกขวา) ]] --
 local deleteModeActive = false
 
--- เพิ่มข้อมูลใน UI วิธีใช้ (PC)
-if helpText then
-    helpText.Text = helpText.Text .. "\n• [R] : Delete Mode (R-Click)"
-end
+if isPC then
+    -- อัปเดต UI วิธีใช้บนคอม
+    if helpText then
+        helpText.Text = helpText.Text .. "\n• [R] : Delete Mode (R-Click)"
+    end
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed or not isPC then return end
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
 
-    -- ปุ่ม R สำหรับเปิด/ปิดโหมดลบ
-    if input.KeyCode == Enum.KeyCode.R then
-        deleteModeActive = not deleteModeActive
-        grabModeActive = false
-        freezeModeActive = false
-        updateStatusUI()
+        -- ปุ่ม R: เปิด/ปิดโหมดลบ
+        if input.KeyCode == Enum.KeyCode.R then
+            deleteModeActive = not deleteModeActive
+            grabModeActive = false
+            freezeModeActive = false
+            updateStatusUI() -- อัปเดตหัวข้อ UI ให้รู้ว่าอยู่โหมดลบ
+            if helpTitle then helpTitle.Text = deleteModeActive and "PC: DELETE MODE" or helpTitle.Text end
         
-        -- แจ้งสถานะผ่าน Highlight (ถ้าเปิดโหมดลบจะเป็นสีแดง)
-        if deleteModeActive then
-            targetHL.OutlineColor = Color3.fromRGB(255, 0, 0)
-        end
-    
-    -- คลิกขวาเพื่อใช้ (เฉพาะเมื่อเปิดโหมดลบ)
-    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-        if deleteModeActive then
+        -- คลิกขวาตอนเปิดโหมดลบ
+        elseif input.UserInputType == Enum.UserInputType.MouseButton2 and deleteModeActive then
             local target = getMouseTarget()
             if target then
-                deletePart(target)
+                deletePartToVoid(target)
             end
         end
-    end
-end)
-
--- อัปเดตสถานะในหน้าจอ (PC)
-local function oldUpdateStatusUI() -- เก็บฟังก์ชันเดิมไว้ถ้ามี
-    if helpTitle then
-        helpTitle.Text = "PC: "..(deleteModeActive and "DELETE" or (grabModeActive and "GRAB" or (freezeModeActive and "FREEZE" or "IDLE")))
-    end
+    end)
 end
-updateStatusUI = oldUpdateStatusUI -- แทนที่ฟังก์ชันเดิม
 
--- อัปเดต Highlight ใน RenderStepped
+-- อัปเดตสี Highlight เมื่ออยู่ในโหมดลบ
 RunService.RenderStepped:Connect(function()
     if isPC and deleteModeActive then
         local t = getMouseTarget()
         if t then
             targetHL.Adornee = t
-            targetHL.OutlineColor = Color3.fromRGB(255, 0, 0) -- สีแดงโหมดลบ
+            targetHL.OutlineColor = Color3.fromRGB(255, 0, 0) -- สีแดงจัด
         end
     end
 end)
+
 
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
