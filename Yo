@@ -579,7 +579,7 @@ if pages and pages.move then
     tpFrontBtn.Font = Enum.Font.GothamBold
 end
 -- [[ ตั้งค่าความแรงสำหรับการลบ (ลบแบบใช้แรงเหวี่ยง) ]] --
-local deleteForce = 9999 -- ความแรงระดับที่มองไม่ทัน
+local deleteForce = 3000 -- ความแรงระดับที่มองไม่ทัน
 
 -- [[ เพิ่มปุ่ม DELETE ในหน้า Main (สำหรับมือถือ) ]] --
 if pages and pages.main then
