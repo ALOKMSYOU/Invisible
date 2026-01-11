@@ -83,7 +83,7 @@ Instance.new("UICorner",main).CornerRadius = UDim.new(0,14)
 
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1,0,0,32)
-title.Text = "TELEKINESIS UI 1.4"
+title.Text = "TELEKINESIS UI + PC"
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.TextColor3 = Color3.new(1,1,1)
@@ -578,93 +578,81 @@ if pages and pages.move then
     tpFrontBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 200)
     tpFrontBtn.Font = Enum.Font.GothamBold
 end
--- [[ ฟังก์ชันลบ Part โดยส่งลง Void (ตำแหน่งผู้รัน Y - 300) ]] --
-local function deletePartToVoid(part)
-    if part and part.Parent and not part.Anchored then
-        local char = LP.Character
-        if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-        
-        -- ปิดระบบ Grab ถ้าถืออยู่
-        if grabbed[part] then
-            grabbed[part].bp:Destroy()
-            grabbed[part].bg:Destroy()
-            grabbed[part] = nil
-        end
+-- [[ ตั้งค่าความแรงสำหรับการลบ (ลบแบบใช้แรงเหวี่ยง) ]] --
+local deleteForce = 5000 -- ความแรงระดับที่มองไม่ทัน
 
-        -- ทำให้ NoClip เพื่อให้ตกทะลุพื้นได้ทุกอย่าง
-        part.CanCollide = false
-        
-        -- ย้ายไปตำแหน่งปัจจุบันของผู้รัน แต่ลดระดับความลึกลงไปใน Void (ปรับเป็น -300 เพื่อความชัวร์ว่ามองไม่เห็น)
-        local hrpPos = char.HumanoidRootPart.Position
-        part.CFrame = CFrame.new(hrpPos.X, -20, hrpPos.Z)
-        
-        -- ใส่แรงส่งเล็กน้อยเพื่อให้ตกเร็วขึ้น
-        part.AssemblyLinearVelocity = Vector3.new(0, -20, 0)
-    end
+-- [[ เพิ่มปุ่ม DELETE ในหน้า Main (สำหรับมือถือ) ]] --
+if pages and pages.main then
+    label(pages.main, "--- DESTRUCTION ---")
+    local delBtn = btn(pages.main, "DELETE PART(LOOK)", function()
+        local t = getTarget()
+        if t and isValidPart(t) then
+            -- ส่งออกไปในทิศทางที่มองอยู่ด้วยความเร็วสูงมาก
+            t.AssemblyLinearVelocity = Cam.CFrame.LookVector * deleteForce
+            -- ถ้ากำลัง Grab อยู่ให้ปล่อยทันที
+            if grabbed[t] then
+                grabbed[t].bp:Destroy()
+                grabbed[t].bg:Destroy()
+                grabbed[t] = nil
+            end
+        end
+    end)
+    delBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0) -- สีแดง
+    delBtn.Font = Enum.Font.GothamBold
 end
 
--- [[ ระบบสำหรับ PC: ปุ่ม R เพื่อเปิดโหมด Delete และคลิกขวาเพื่อใช้ ]] --
+-- [[ ระบบสำหรับคอมพิวเตอร์ (ปุ่ม R + คลิกขวา) ]] --
 local deleteModeActive = false
 
 if isPC then
-    -- อัปเดต UI วิธีใช้บนคอม
+    -- อัปเดตวิธีใช้บน UI
     if helpText then
         helpText.Text = helpText.Text .. "\n• [R] : Delete Mode (R-Click)"
     end
 
+    -- ตรวจสอบการกดปุ่ม R
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         
-        -- กด R เพื่อเปิด/ปิดโหมดลบ
         if input.KeyCode == Enum.KeyCode.R then
             deleteModeActive = not deleteModeActive
             grabModeActive = false
             freezeModeActive = false
-            
-            -- อัปเดตหัวข้อ UI ให้รู้ว่าอยู่โหมดลบ
-            if helpTitle then
-                helpTitle.Text = deleteModeActive and "PC: DELETE MODE" or "PC: IDLE"
-                helpTitle.TextColor3 = deleteModeActive and Color3.new(1, 0, 0) or Color3.new(0, 255, 255)
+            if helpTitle then 
+                helpTitle.Text = "PC: "..(deleteModeActive and "DELETE MODE" or "IDLE")
+                helpTitle.TextColor3 = deleteModeActive and Color3.new(1, 0, 0) or Color3.new(0, 1, 1)
             end
         
-        -- ถ้าเปิดโหมดลบอยู่ แล้วกดคลิกขวาที่ Part
+        -- ถ้าเปิดโหมด Delete แล้วคลิกขวา
         elseif input.UserInputType == Enum.UserInputType.MouseButton2 and deleteModeActive then
-            local target = getMouseTarget()
-            if target then
-                deletePartToVoid(target)
+            local target = getMouseTarget() -- ใช้ฟังก์ชัน GetTarget จากเมาส์ที่เราทำไว้
+            if target and isValidPart(target) then
+                -- ดีดออกไปตามทิศทางเมาส์
+                local mousePos = UserInputService:GetMouseLocation()
+                local unitRay = Cam:ViewportPointToRay(mousePos.X, mousePos.Y)
+                target.AssemblyLinearVelocity = unitRay.Direction * deleteForce
+                
+                -- ปล่อยถ้าถืออยู่
+                if grabbed[target] then
+                    grabbed[target].bp:Destroy()
+                    grabbed[target].bg:Destroy()
+                    grabbed[target] = nil
+                end
             end
         end
     end)
 end
 
--- [[ เพิ่มปุ่ม Delete ในหน้าปกติ (สำหรับมือถือ/UI) ]] --
--- สมมติว่าหน้าปกติคือหน้าแรก (Home/Main)
-if pages and (pages.main or pages.home) then
-    local targetPage = pages.main or pages.home
-    label(targetPage, "--- DESTRUCTION ---")
-    local delBtn = btn(targetPage, "DELETE PART(LOOK)", function()
-        -- ลบตัวที่เลือก (Selected) ทั้งหมด
-        for part in pairs(selected) do
-            deletePartToVoid(part)
-        end
-        -- ล้างรายการที่เลือกหลังจากลบแล้ว
-        selected = {}
-        if clearHandles then clearHandles() end
-    end)
-    
-    delBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0) -- สีแดง
-    delBtn.Font = Enum.Font.GothamBold
-end
-
--- แก้ไข Highlight สำหรับโหมดลบ (PC)
+-- [[ อัปเดต Highlight เมื่ออยู่ในโหมด Delete ]] --
 RunService.RenderStepped:Connect(function()
     if isPC and deleteModeActive then
         local t = getMouseTarget()
         if t then
             targetHL.Adornee = t
-            targetHL.OutlineColor = Color3.fromRGB(255, 0, 0) -- Highlight สีแดงในโหมดลบ
+            targetHL.OutlineColor = Color3.fromRGB(255, 0, 0) -- Highlight สีแดงเข้ม
         end
     end
 end)
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvity
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
