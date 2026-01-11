@@ -596,8 +596,8 @@ local function deletePartToVoid(p)
     -- วาร์ปลง Void (ตำแหน่งปัจจุบันผู้รัน แต่แกน Y ลึกลงไป 500 หน่วยเพื่อให้หายลับตา)
     local root = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
     if root then
-        p.CFrame = CFrame.new(root.Position.X, -1, root.Position.Z)
-        p.AssemblyLinearVelocity = Vector3.new(0, -1, 0) -- เร่งความเร็วให้หายไปทันที
+        p.CFrame = CFrame.new(root.Position.X, -8, root.Position.Z)
+        p.AssemblyLinearVelocity = Vector3.new(0, -8, 0) -- เร่งความเร็วให้หายไปทันที
     end
 end
 
