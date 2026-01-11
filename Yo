@@ -653,54 +653,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
--- [[ ฟังก์ชันสำหรับแย่ง Network Ownership ]] --
--- หมายเหตุ: ฟังก์ชัน SetNetworkOwner จะใช้งานได้เฉพาะกับ Part ที่ไม่ได้ถูก Anchor 
--- และในบางเกมอาจมีการป้องกันจากฝั่ง Server (Server-Sided Anticheat)
-local function claimNetworkOwner(p)
-    if p and p:IsA("BasePart") and not p.Anchored then
-        pcall(function()
-            -- ตรวจสอบว่าเราสามารถตั้งค่าเจ้าของได้หรือไม่ (ต้องเป็นเจ้าของทางฟิสิกส์)
-            if p.ReceiveAge > 0 then 
-                -- พยายามบังคับให้จำลองฟิสิกส์ที่ฝั่งเรา
-                p.Velocity = p.Velocity + Vector3.new(0, 0.01, 0)
-            end
-            
-            -- บรรทัดนี้จะทำงานได้สมบูรณ์หากเซิร์ฟเวอร์อนุญาต (หรือใช้ในเกมที่ระบบป้องกันต่ำ)
-            -- หากใช้ในเกมที่มีระบบความปลอดภัยสูง อาจจะต้องใช้การขยับตำแหน่งแบบถี่ๆ แทน
-            if p:CanSetNetworkOwnership() then
-                p:SetNetworkOwner(LP)
-            end
-        end)
-    end
-end
 
--- [[ ปรับปรุงระบบ Grab เพื่อให้แย่ง Net Owner ทันทีที่จับ ]] --
--- นำโค้ดนี้ไปแทรกหรือต่อท้ายเพื่อดักจับเหตุการณ์การ Grab
-RunService.Stepped:Connect(function()
-    for p, _ in pairs(grabbed) do
-        if p and p.Parent and not p.Anchored then
-            -- พยายามยึด Owner ทุกเฟรมเพื่อให้ Part นิ่งที่สุด
-            claimNetworkOwner(p)
-            
-            -- บังคับให้ AssemblyLinearVelocity ไม่เป็น 0 เพื่อกระตุ้นฟิสิกส์
-            if p.AssemblyLinearVelocity.Magnitude < 0.1 then
-                p.AssemblyLinearVelocity = Vector3.new(0, 0.05, 0)
-            end
-        end
-    end
-end)
-
--- [[ เพิ่มปุ่ม "FORCE CLAIM NET" ในหน้า MAIN (เผื่อไว้กดตอนของไม่ขยับ) ]] --
-if pages and pages.main then
-    label(pages.main, "--- CONNECTION ---")
-    btn(pages.main, "⚡ FORCE CLAIM NET (LOOK)", function()
-        local t = getTarget()
-        if t then
-            claimNetworkOwner(t)
-            -- สร้างแรงสั่นเล็กน้อยเพื่อกระตุ้นให้ Server ส่งต่อการคำนวณมาที่เรา
-            t.CFrame = t.CFrame * CFrame.new(0, 0.01, 0)
-        end
-    end)
-end
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
