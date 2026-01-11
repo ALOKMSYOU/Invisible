@@ -544,5 +544,51 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
+-- [[ ฟังก์ชันสำหรับการวาร์ป Part ที่เลือกมาหาตัวละคร ]] --
+local function teleportSelectedToMe()
+    local character = LP.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local targetPos = character.HumanoidRootPart.Position + (character.HumanoidRootPart.CFrame.LookVector * 5) -- วาร์ปมาข้างหน้าตัวละคร 5 หน่วย
+    
+    local anyTeleported = false
+    for part in pairs(selected) do
+        if part and part.Parent and not part.Anchored then
+            -- ถ้า Part ถูก Grab อยู่ ให้ขยับ BodyPosition
+            if grabbed[part] then
+                grabbed[part].bp.Position = targetPos
+                grabbed[part].bg.CFrame = part.CFrame
+            else
+                -- ถ้าไม่ได้ Grab ให้วาร์ป CFrame โดยตรง (แต่ต้องระวังถ้าเป็นของที่มีระบบกันโปร)
+                part.CFrame = CFrame.new(targetPos)
+            end
+            anyTeleported = true
+        end
+    end
+    
+    -- ถ้าวาร์ปมาแล้ว ให้รีเฟรช Handles ถ้ามีตัวที่เลือกอยู่
+    local lastSelected = nil
+    for p in pairs(selected) do lastSelected = p end
+    if lastSelected then createHandles(lastSelected) end
+end
+
+-- [[ เพิ่มปุ่มลงในหน้า Move Mode ]] --
+-- ค้นหาหน้า Move Page จากตาราง pages ที่สร้างไว้ก่อนหน้านี้
+if pages and pages.move then
+    label(pages.move, "--- QUICK ACTIONS ---")
+    local tpBtn = btn(pages.move, "🌀 TELEPORT SELECTED TO ME", function()
+        teleportSelectedToMe()
+    end)
+    
+    -- ปรับแต่งสีปุ่มให้เด่นขึ้น
+    tpBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+    tpBtn.Font = Enum.Font.GothamBold
+end
+
+-- [[ อัปเดตวิธีใช้บน UI PC ]] --
+if helpText then
+    helpText.Text = helpText.Text .. "\n• [Move Mode] Select Part & Press TP"
+end
+
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
