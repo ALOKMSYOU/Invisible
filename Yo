@@ -685,103 +685,121 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
--- [[ Futuristic UI Redesign Module ]] --
+-- [[ 🛸 FUTURISTIC GLOW UI REDESIGN - 2026 EDITION 🛸 ]] --
 local TweenService = game:GetService("TweenService")
 
-local function applyFuturisticStyle(instance)
-    for _, obj in pairs(instance:GetDescendants()) do
-        -- ปรับแต่ง Frame หลัก
-        if obj.Name == "main" or obj.Name == "helpUI" then
-            obj.BackgroundColor3 = Color3.fromRGB(10, 12, 18)
-            obj.BackgroundTransparency = 0.15
-            obj.BorderSizePixel = 0
-            
-            -- เพิ่มขอบเรืองแสง (Neon Border)
-            local uiStroke = Instance.new("UIStroke", obj)
-            uiStroke.Thickness = 2
-            uiStroke.Color = Color3.fromRGB(0, 255, 255)
-            uiStroke.Transparency = 0.5
-            
-            -- ปรับความโค้งมน
-            if obj:FindFirstChildOfClass("UICorner") then
-                obj:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, 10)
-            end
+local function getGlow(parent, color)
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 1.5
+    stroke.Color = color
+    stroke.ApplyStrokeMode = Enum.UIStrokeMode.Border
+    stroke.Transparency = 0.4
+    stroke.Parent = parent
+    return stroke
+end
 
-        -- ปรับแต่งปุ่ม (Futuristic Buttons)
-        elseif obj:IsA("TextButton") and obj.Name ~= "[-] " and obj.Name ~= "[+]" then
-            obj.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
-            obj.BackgroundTransparency = 0.3
-            obj.TextColor3 = Color3.fromRGB(200, 255, 255)
-            obj.Font = Enum.Font.Code
+local function makeFuturistic()
+    -- 1. ปรับแต่ง Main Frame
+    main.BackgroundColor3 = Color3.fromRGB(5, 10, 15)
+    main.BackgroundTransparency = 0.2
+    getGlow(main, Color3.fromRGB(0, 255, 255)) -- ขอบฟ้านีออน
+    
+    if main:FindFirstChildOfClass("UICorner") then
+        main:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, 12)
+    end
+
+    -- 2. ปรับแต่ง Help UI (PC)
+    if helpUI then
+        helpUI.BackgroundColor3 = Color3.fromRGB(5, 5, 10)
+        helpUI.BackgroundTransparency = 0.15
+        getGlow(helpUI, Color3.fromRGB(255, 0, 150)) -- ขอบชมพูนีออนให้แยกโหมดชัดเจน
+    end
+
+    -- 3. ลูปปรับแต่งทุก Object ภายใน
+    for _, v in pairs(gui:GetDescendants()) do
+        -- ปรับแต่งปุ่ม
+        if v:IsA("TextButton") and v.Parent ~= gui then
+            v.BackgroundColor3 = Color3.fromRGB(20, 30, 45)
+            v.BackgroundTransparency = 0.5
+            v.TextColor3 = Color3.fromRGB(255, 255, 255)
+            v.Font = Enum.Font.Code
+            v.BorderSizePixel = 0
             
-            local btnStroke = Instance.new("UIStroke", obj)
-            btnStroke.Thickness = 1
-            btnStroke.Color = Color3.fromRGB(0, 255, 255)
-            btnStroke.Transparency = 0.8
+            local corner = v:FindFirstChildOfClass("UICorner") or Instance.new("UICorner", v)
+            corner.CornerRadius = UDim.new(0, 6)
             
-            -- Hover Animation (อนิเมชั่นเวลาเอาเมาส์ไปชี้)
-            obj.MouseEnter:Connect(function()
-                TweenService:Create(obj, TweenInfo.new(0.2), {
+            local btnGlow = getGlow(v, Color3.fromRGB(0, 180, 255))
+            btnGlow.Transparency = 0.8
+
+            -- Hover Effects
+            v.MouseEnter:Connect(function()
+                TweenService:Create(v, TweenInfo.new(0.3), {
                     BackgroundColor3 = Color3.fromRGB(0, 255, 255),
-                    TextColor3 = Color3.fromRGB(0, 0, 0),
-                    BackgroundTransparency = 0.1
+                    BackgroundTransparency = 0.2,
+                    TextColor3 = Color3.fromRGB(0, 0, 0)
                 }):Play()
-                TweenService:Create(btnStroke, TweenInfo.new(0.2), {Transparency = 0}):Play()
-            end)
-            
-            obj.MouseLeave:Connect(function()
-                TweenService:Create(obj, TweenInfo.new(0.2), {
-                    BackgroundColor3 = Color3.fromRGB(20, 25, 35),
-                    TextColor3 = Color3.fromRGB(200, 255, 255),
-                    BackgroundTransparency = 0.3
-                }):Play()
-                TweenService:Create(btnStroke, TweenInfo.new(0.2), {Transparency = 0.8}):Play()
+                TweenService:Create(btnGlow, TweenInfo.new(0.3), {Transparency = 0}):Play()
             end)
 
-        -- ปรับแต่งหัวข้อและตัวหนังสือ
-        elseif obj:IsA("TextLabel") then
-            if obj:IsA("TextLabel") and obj.Font == Enum.Font.GothamBold then
-                obj.TextColor3 = Color3.fromRGB(0, 255, 255)
-                obj.TextStrokeTransparency = 0.5
-                obj.TextStrokeColor3 = Color3.fromRGB(0, 150, 150)
-            else
-                obj.TextColor3 = Color3.fromRGB(150, 200, 200)
+            v.MouseLeave:Connect(function()
+                TweenService:Create(v, TweenInfo.new(0.3), {
+                    BackgroundColor3 = Color3.fromRGB(20, 30, 45),
+                    BackgroundTransparency = 0.5,
+                    TextColor3 = Color3.fromRGB(255, 255, 255)
+                }):Play()
+                TweenService:Create(btnGlow, TweenInfo.new(0.3), {Transparency = 0.8}):Play()
+            end)
+
+        -- ปรับแต่ง TextLabel (หัวข้อ)
+        elseif v:IsA("TextLabel") then
+            v.TextColor3 = Color3.fromRGB(0, 255, 255)
+            v.Font = Enum.Font.Code
+            if v.Parent == main then -- Title
+                v.TextSize = 18
+                local gradient = Instance.new("UIGradient", v)
+                gradient.Color = ColorSequence.new({
+                    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 255)),
+                    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 255))
+                })
             end
-            obj.Font = Enum.Font.Code
-        
-        -- ปรับแต่ง Scrolling Frame (แถบเลื่อน)
-        elseif obj:IsA("ScrollingFrame") then
-            obj.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 255)
-            obj.ScrollBarThickness = 2
-            obj.CanvasBorderMode = Enum.CanvasBorderMode.None
+        end
+    end
+
+    -- 4. ตกแต่ง Scrolling Frame
+    for _, sc in pairs(gui:GetDescendants()) do
+        if sc:IsA("ScrollingFrame") then
+            sc.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 255)
+            sc.BackgroundTransparency = 0.8
+            sc.ScrollBarThickness = 3
         end
     end
 end
 
--- สั่งให้ทำงานทันที
-applyFuturisticStyle(gui)
+-- เรียกใช้งานทันที
+makeFuturistic()
 
--- เพิ่ม Gradient ให้พื้นหลังดูแพงขึ้น
-local function addGradient(parent)
-    local grad = Instance.new("UIGradient")
-    grad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 30, 40)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(5, 5, 10))
-    })
-    grad.Rotation = 45
-    grad.Parent = parent
+-- เพิ่มระบบเปิด/ปิดแบบลื่นๆ (Smooth Toggle)
+local function toggleUI(state)
+    local targetTrans = state and 0.2 or 1
+    local targetPos = state and UDim2.fromScale(0.03, 0.18) or UDim2.fromScale(-0.4, 0.18)
+    
+    TweenService:Create(main, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        Position = targetPos,
+        BackgroundTransparency = targetTrans
+    }):Play()
 end
 
-if main then addGradient(main) end
-if helpUI then addGradient(helpUI) end
+-- อัปเดตฟังก์ชันปุ่มย่อ UI เดิมให้ลื่นขึ้น
+if toggleBtn then
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
+    toggleBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    toggleBtn.Text = "MENU"
+    toggleBtn.MouseButton1Click:Connect(function()
+        isMinimized = not isMinimized
+        toggleUI(not isMinimized)
+    end)
+end
 
--- อนิเมชั่นตอนเปิด UI (Fade In)
-main.GroupTransparency = 1
-local group = Instance.new("CanvasGroup", main.Parent)
-main.Parent = group
-group.Size = UDim2.fromScale(1,1)
-group.BackgroundTransparency = 1
-
-TweenService:Create(group, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {GroupTransparency = 0}):Play()
+            
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
