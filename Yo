@@ -83,7 +83,7 @@ Instance.new("UICorner",main).CornerRadius = UDim.new(0,14)
 
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1,0,0,32)
-title.Text = "TELEKINESIS UI + PC"
+title.Text = "TELEKINESIS UI 1.4"
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.TextColor3 = Color3.new(1,1,1)
@@ -579,7 +579,7 @@ if pages and pages.move then
     tpFrontBtn.Font = Enum.Font.GothamBold
 end
 -- [[ ตั้งค่าความแรงสำหรับการลบ (ลบแบบใช้แรงเหวี่ยง) ]] --
-local deleteForce = 5000 -- ความแรงระดับที่มองไม่ทัน
+local deleteForce = 4500 -- ความแรงระดับที่มองไม่ทัน
 
 -- [[ เพิ่มปุ่ม DELETE ในหน้า Main (สำหรับมือถือ) ]] --
 if pages and pages.main then
