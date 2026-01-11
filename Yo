@@ -685,5 +685,103 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
+-- [[ Futuristic UI Redesign Module ]] --
+local TweenService = game:GetService("TweenService")
+
+local function applyFuturisticStyle(instance)
+    for _, obj in pairs(instance:GetDescendants()) do
+        -- ปรับแต่ง Frame หลัก
+        if obj.Name == "main" or obj.Name == "helpUI" then
+            obj.BackgroundColor3 = Color3.fromRGB(10, 12, 18)
+            obj.BackgroundTransparency = 0.15
+            obj.BorderSizePixel = 0
+            
+            -- เพิ่มขอบเรืองแสง (Neon Border)
+            local uiStroke = Instance.new("UIStroke", obj)
+            uiStroke.Thickness = 2
+            uiStroke.Color = Color3.fromRGB(0, 255, 255)
+            uiStroke.Transparency = 0.5
+            
+            -- ปรับความโค้งมน
+            if obj:FindFirstChildOfClass("UICorner") then
+                obj:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, 10)
+            end
+
+        -- ปรับแต่งปุ่ม (Futuristic Buttons)
+        elseif obj:IsA("TextButton") and obj.Name ~= "[-] " and obj.Name ~= "[+]" then
+            obj.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
+            obj.BackgroundTransparency = 0.3
+            obj.TextColor3 = Color3.fromRGB(200, 255, 255)
+            obj.Font = Enum.Font.Code
+            
+            local btnStroke = Instance.new("UIStroke", obj)
+            btnStroke.Thickness = 1
+            btnStroke.Color = Color3.fromRGB(0, 255, 255)
+            btnStroke.Transparency = 0.8
+            
+            -- Hover Animation (อนิเมชั่นเวลาเอาเมาส์ไปชี้)
+            obj.MouseEnter:Connect(function()
+                TweenService:Create(obj, TweenInfo.new(0.2), {
+                    BackgroundColor3 = Color3.fromRGB(0, 255, 255),
+                    TextColor3 = Color3.fromRGB(0, 0, 0),
+                    BackgroundTransparency = 0.1
+                }):Play()
+                TweenService:Create(btnStroke, TweenInfo.new(0.2), {Transparency = 0}):Play()
+            end)
+            
+            obj.MouseLeave:Connect(function()
+                TweenService:Create(obj, TweenInfo.new(0.2), {
+                    BackgroundColor3 = Color3.fromRGB(20, 25, 35),
+                    TextColor3 = Color3.fromRGB(200, 255, 255),
+                    BackgroundTransparency = 0.3
+                }):Play()
+                TweenService:Create(btnStroke, TweenInfo.new(0.2), {Transparency = 0.8}):Play()
+            end)
+
+        -- ปรับแต่งหัวข้อและตัวหนังสือ
+        elseif obj:IsA("TextLabel") then
+            if obj:IsA("TextLabel") and obj.Font == Enum.Font.GothamBold then
+                obj.TextColor3 = Color3.fromRGB(0, 255, 255)
+                obj.TextStrokeTransparency = 0.5
+                obj.TextStrokeColor3 = Color3.fromRGB(0, 150, 150)
+            else
+                obj.TextColor3 = Color3.fromRGB(150, 200, 200)
+            end
+            obj.Font = Enum.Font.Code
+        
+        -- ปรับแต่ง Scrolling Frame (แถบเลื่อน)
+        elseif obj:IsA("ScrollingFrame") then
+            obj.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 255)
+            obj.ScrollBarThickness = 2
+            obj.CanvasBorderMode = Enum.CanvasBorderMode.None
+        end
+    end
+end
+
+-- สั่งให้ทำงานทันที
+applyFuturisticStyle(gui)
+
+-- เพิ่ม Gradient ให้พื้นหลังดูแพงขึ้น
+local function addGradient(parent)
+    local grad = Instance.new("UIGradient")
+    grad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 30, 40)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(5, 5, 10))
+    })
+    grad.Rotation = 45
+    grad.Parent = parent
+end
+
+if main then addGradient(main) end
+if helpUI then addGradient(helpUI) end
+
+-- อนิเมชั่นตอนเปิด UI (Fade In)
+main.GroupTransparency = 1
+local group = Instance.new("CanvasGroup", main.Parent)
+main.Parent = group
+group.Size = UDim2.fromScale(1,1)
+group.BackgroundTransparency = 1
+
+TweenService:Create(group, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {GroupTransparency = 0}):Play()
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
