@@ -733,7 +733,7 @@ if pages and pages.main then
     -- แถวที่ 1: ช่องใส่พิกัด
     local inputBox = Instance.new("TextBox", pages.main)
     inputBox.Size = UDim2.new(1, 0, 0, 30)
-    inputBox.PlaceholderText = "X, Y, Z (เช่น 100, 20, -50)"
+    inputBox.PlaceholderText = "X, Y, Z (Like 100, 20, -50)"
     inputBox.Text = targetPosInput
     inputBox.Font = Enum.Font.Gotham
     inputBox.TextSize = 14
