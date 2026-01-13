@@ -754,7 +754,7 @@ if pages and pages.main then
     l.Padding = UDim.new(0, 5)
 
     -- ปุ่ม THROW ไปยังพิกัด
-    local btnThrow = btn(throwFrame, "🚀 THROW TO POS", function()
+    local btnThrow = btn(throwFrame, "THROW TO POS", function()
         local coords = {}
         for s in string.gmatch(targetPosInput, "[%d%.%-]+") do
             table.insert(coords, tonumber(s))
