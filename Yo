@@ -685,7 +685,109 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
+-- [[ ---------------------------------------------------------------- ]] --
+-- [[                  THROW TO COORDINATES EXTENSION                  ]] --
+-- [[ ---------------------------------------------------------------- ]] --
 
+if pages and pages.main then
+    label(pages.main, "--- TARGET THROW SYSTEM ---")
+
+    -- 1. สร้างช่องกรอกพิกัด (X, Y, Z)
+    local coordInput = Instance.new("TextBox", pages.main)
+    coordInput.Size = UDim2.new(1, 0, 0, 30)
+    coordInput.PlaceholderText = "Input X, Y, Z (e.g. 50, 10, -100)"
+    coordInput.Text = ""
+    coordInput.Font = Enum.Font.Gotham
+    coordInput.TextSize = 12
+    coordInput.TextColor3 = Color3.new(1, 1, 1)
+    coordInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    Instance.new("UICorner", coordInput).CornerRadius = UDim.new(0, 8)
+
+    -- ฟังก์ชันช่วยแปลง Text เป็น Vector3
+    local function parseCoordinates(text)
+        -- ลบช่องว่างออก
+        text = text:gsub(" ", "")
+        -- แยกข้อความด้วยเครื่องหมายจุลภาค (,)
+        local split = text:split(",")
+        
+        if #split >= 3 then
+            local x = tonumber(split[1])
+            local y = tonumber(split[2])
+            local z = tonumber(split[3])
             
+            if x and y and z then
+                return Vector3.new(x, y, z)
+            end
+        end
+        return nil
+    end
+
+    -- 2. ปุ่มกดปาของ (THROW BUTTON)
+    local throwCoordBtn = btn(pages.main, "THROW TO COORDS", function(b)
+        local targetPos = parseCoordinates(coordInput.Text)
+        
+        if not targetPos then
+            -- ถ้าใส่เลขผิด ให้ปุ่มขึ้นเตือนแปปนึง
+            local oldText = b.Text
+            b.Text = "INVALID FORMAT! (Use X,Y,Z)"
+            b.TextColor3 = Color3.fromRGB(255, 100, 100)
+            task.wait(1)
+            b.Text = oldText
+            b.TextColor3 = Color3.new(1, 1, 1)
+            return
+        end
+
+        -- ลูปของทุกชิ้นที่ถืออยู่
+        local count = 0
+        for part, objs in pairs(grabbed) do
+            if part and part.Parent and not part.Anchored then
+                count = count + 1
+                
+                -- [[ ระบบคำนวณวิถีโค้ง (Projectile Motion Logic) ]] --
+                local startPos = part.Position
+                local gravity = workspace.Gravity
+                local dist = (targetPos - startPos).Magnitude
+
+                -- คำนวณเวลาที่ใช้ในการบิน (Time of Flight)
+                -- ยิ่งไกล ยิ่งให้เวลาเยอะ เพื่อให้วิถีสวยงามและไม่แรงจนหลุดแมพ
+                -- ความเร็วเฉลี่ยประมาณ 150 studs ต่อวินาที (ปรับเลขนี้ได้ถ้าอยากให้ปาแรงขึ้น)
+                local projectileSpeed = 150 
+                local time = dist / projectileSpeed
+                
+                -- เวลาขั้นต่ำ 0.3 วิ เพื่อไม่ให้ปาแรงเกินไปในระยะประชิด
+                if time < 0.3 then time = 0.3 end
+
+                -- สูตรฟิสิกส์: V0 = (Target - Start - 0.5*g*t^2) / t
+                local gVector = Vector3.new(0, -gravity, 0)
+                local velocity = (targetPos - startPos - (0.5 * gVector * time * time)) / time
+
+                -- ปล่อยของ (Release)
+                if objs.bp then objs.bp:Destroy() end
+                if objs.bg then objs.bg:Destroy() end
+                grabbed[part] = nil
+                frozen[part] = nil
+                setHighlight(part, false)
+
+                -- ใส่แรงเข้าไป
+                part.AssemblyLinearVelocity = velocity
+                -- หมุนควงสว่านเล็กน้อยเพื่อความสมจริง
+                part.AssemblyAngularVelocity = Vector3.new(math.random(-10,10), math.random(-10,10), math.random(-10,10))
+            end
+        end
+
+        -- แจ้งเตือนสถานะ
+        if count > 0 then
+            local oldText = b.Text
+            b.Text = "THROWN " .. count .. " OBJS!"
+            b.TextColor3 = Color3.fromRGB(100, 255, 100)
+            task.wait(1)
+            b.Text = oldText
+            b.TextColor3 = Color3.new(1, 1, 1)
+        end
+    end)
+    
+    -- ปรับสีปุ่มให้เด่น
+    throwCoordBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 200) -- สีฟ้าเข้ม
+end
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
