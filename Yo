@@ -786,73 +786,84 @@ if pages and pages.main then
     end)
     btnPower.Size = UDim2.new(0.4, -3, 1, 0)
 end
--- [[ CONFIGURATION เพิ่มเติม ]] --
-local followOwner = false
+-- [[ VARIABLE SETTINGS ]] --
 local autoShield = false
-local minShieldSpeed = 50 -- ค่าเริ่มต้นความเร็วที่ตรวจจับ
+local followOwner = false
+local shieldSpeedThreshold = 50 -- ค่าเริ่มต้นความเร็วที่ตรวจจับ
 local shieldRadius = 15 -- ระยะตรวจจับ 15 studs
 
--- [[ ระบบ FOLLOW OWNER & AUTO SHIELD LOGIC ]] --
-
-RunService.Heartbeat:Connect(function()
-    local char = LP.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    local root = char.HumanoidRootPart
-
-    -- 1. ระบบ Follow Owner (ลอยตามตัวผู้เล่น)
-    if followOwner then
-        for p, objs in pairs(grabbed) do
-            if not frozen[p] then
-                -- คำนวณตำแหน่งให้ลอยอยู่หน้าตัวละครตามระยะ holdDistance
-                local targetPos = root.CFrame.Position + (root.CFrame.LookVector * holdDistance)
-                objs.bp.Position = targetPos
-                objs.bg.CFrame = root.CFrame
-            end
+-- [[ ฟังก์ชันสำหรับปุ่มกดค้าง (Hold to change value) ]] --
+local function setupHoldButton(button, delta, callback)
+    local holding = false
+    button.MouseButton1Down:Connect(function()
+        holding = true
+        while holding do
+            callback(delta)
+            task.wait(0.1) -- ความเร็วในการเพิ่ม/ลดเมื่อกดค้าง
         end
-    end
+    end)
+    button.MouseButton1Up:Connect(function() holding = false end)
+    button.MouseLeave:Connect(function() holding = false end)
+end
 
-    -- 2. ระบบ Auto Shield (ตรวจจับแรงกระแทก)
-    if autoShield then
-        -- ตรวจสอบรอบตัวในระยะ 15 studs
-        local params = OverlapParams.new()
-        params.FilterType = Enum.RaycastFilterType.Exclude
-        params.FilterDescendantsInstances = {char, Cam}
-        
-        local nearbyParts = workspace:GetPartBoundsInRadius(root.Position, shieldRadius, params)
-        
-        for _, p in pairs(nearbyParts) do
-            if isValidPart(p) and not grabbed[p] then
-                local velocity = p.AssemblyLinearVelocity
-                -- ตรวจจับความเร็ว และทิศทางว่าพุ่งมาหาเราหรือไม่ (Dot Product)
-                local directionToMe = (root.Position - p.Position).Unit
-                local isMovingTowardsMe = velocity.Unit:Dot(directionToMe) > 0.5 -- ถ้าพุ่งหาตัวมากกว่า 50%
-                
-                if velocity.Magnitude >= minShieldSpeed and isMovingTowardsMe then
-                    -- ทำการ Grab และ Freeze ทันที
-                    grabPart(p)
-                    frozen[p] = true
-                    setHighlight(p, true)
-                    if highlights[p] then 
-                        highlights[p].OutlineColor = Color3.fromRGB(255, 0, 0) -- สีแดงแจ้งเตือน
-                    end
-                end
-            end
-        end
-    end
-end)
-
--- [[ UI SYSTEM: FOLLOW & SHIELD ]] --
-
+-- [[ UI UPDATES - แทรกลงในหน้า Main ]] --
 if pages and pages.main then
-    label(pages.main, "--- ADVANCED SURVIVAL ---")
+    -- สร้าง Container สำหรับ Auto Shield ไว้ด้านบนสุด
+    local shieldFrame = Instance.new("Frame", pages.main)
+    shieldFrame.Size = UDim2.new(1, 0, 0, 70)
+    shieldFrame.BackgroundTransparency = 1
+    shieldFrame.LayoutOrder = -10 -- บังคับให้อยู่บนสุด
 
-    -- ปุ่ม Follow Owner
-    local followBtn = btn(pages.main, "FOLLOW OWNER: OFF", function(b)
+    local sLayout = Instance.new("UIListLayout", shieldFrame)
+    sLayout.Padding = UDim.new(0, 2)
+
+    -- ปุ่มเปิด/ปิด Auto Shield
+    local btnShield = btn(shieldFrame, "🛡️ AUTO SHIELD : OFF", function(b)
+        autoShield = not autoShield
+        b.Text = "🛡️ AUTO SHIELD : " .. (autoShield and "ON" or "OFF")
+        b.BackgroundColor3 = autoShield and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(70, 70, 70)
+    end)
+    btnShield.Font = Enum.Font.GothamBold
+
+    -- ส่วนปรับความเร็ว Shield
+    local speedCtrlFrame = Instance.new("Frame", shieldFrame)
+    speedCtrlFrame.Size = UDim2.new(1, 0, 0, 30)
+    speedCtrlFrame.BackgroundTransparency = 1
+    
+    local speedLabel = Instance.new("TextLabel", speedCtrlFrame)
+    speedLabel.Size = UDim2.new(0.5, 0, 1, 0)
+    speedLabel.Text = "DETECT SPEED: " .. shieldSpeedThreshold
+    speedLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    speedLabel.TextColor3 = Color3.new(1, 1, 1)
+    speedLabel.Font = Enum.Font.GothamMedium
+    speedLabel.TextSize = 12
+
+    local btnMinus = btn(speedCtrlFrame, "-", function() end)
+    btnMinus.Position = UDim2.new(0.55, 0, 0, 0)
+    btnMinus.Size = UDim2.new(0.2, -2, 1, 0)
+
+    local btnPlus = btn(speedCtrlFrame, "+", function() end)
+    btnPlus.Position = UDim2.new(0.75, 0, 0, 0)
+    btnPlus.Size = UDim2.new(0.2, -2, 1, 0)
+
+    -- ตั้งค่าระบบกดค้างสำหรับปุ่ม + และ -
+    setupHoldButton(btnPlus, 1, function(d)
+        shieldSpeedThreshold = shieldSpeedThreshold + d
+        speedLabel.Text = "DETECT SPEED: " .. shieldSpeedThreshold
+    end)
+    setupHoldButton(btnMinus, -1, function(d)
+        shieldSpeedThreshold = math.max(0, shieldSpeedThreshold + d)
+        speedLabel.Text = "DETECT SPEED: " .. shieldSpeedThreshold
+    end)
+
+    -- ปุ่ม Part Follow Owner (วางไว้ในโซน Actions)
+    label(pages.main, "--- OWNER PHYSICS ---")
+    local btnFollow = btn(pages.main, "👤 FOLLOW OWNER : OFF", function(b)
         followOwner = not followOwner
-        b.Text = "FOLLOW OWNER: " .. (followOwner and "ON" or "OFF")
-        b.BackgroundColor3 = followOwner and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(70, 70, 70)
+        b.Text = "👤 FOLLOW OWNER : " .. (followOwner and "ON" or "OFF")
+        b.BackgroundColor3 = followOwner and Color3.fromRGB(100, 0, 150) or Color3.fromRGB(70, 70, 70)
         
-        -- เมื่อกดปุ่ม ให้ Freeze ของที่ถืออยู่ทันทีตามคำขอ
+        -- เมื่อกดเปิด จะทำการ Freeze Part ที่ถืออยู่ทันทีตามคำขอ
         if followOwner then
             for p in pairs(grabbed) do
                 frozen[p] = true
@@ -860,55 +871,46 @@ if pages and pages.main then
             end
         end
     end)
+end
 
-    -- ปุ่ม Auto Shield
-    local shieldToggle = btn(pages.main, "AUTO SHIELD: OFF", function(b)
-        autoShield = not autoShield
-        b.Text = "AUTO SHIELD: " .. (autoShield and "ON" or "OFF")
-        b.BackgroundColor3 = autoShield and Color3.fromRGB(150, 100, 0) or Color3.fromRGB(70, 70, 70)
-    end)
+-- [[ CORE LOGIC (RunService) ]] --
+RunService.Heartbeat:Connect(function()
+    local char = LP.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local root = char.HumanoidRootPart
 
-    -- ส่วนควบคุมความเร็ว (Speed Settings)
-    local speedFrame = Instance.new("Frame", pages.main)
-    speedFrame.Size = UDim2.new(1, 0, 0, 35)
-    speedFrame.BackgroundTransparency = 1
-    local sl = Instance.new("UIListLayout", speedFrame)
-    sl.FillDirection = Enum.FillDirection.Horizontal
-    sl.Padding = UDim.new(0, 5)
-
-    -- ช่องโชว์ค่าความเร็ว
-    local speedDisplay = btn(speedFrame, "DETECTION: " .. minShieldSpeed, function() end)
-    speedDisplay.Size = UDim2.new(0.5, -5, 1, 0)
-    speedDisplay.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-
-    -- ฟังก์ชันปุ่มกดค้างสำหรับ + และ -
-    local function createHoldButton(text, delta, parent)
-        local b = btn(parent, text, function() end)
-        b.Size = UDim2.new(0.25, -2, 1, 0)
-        
-        local holding = false
-        b.MouseButton1Down:Connect(function()
-            holding = true
-            minShieldSpeed = math.max(0, minShieldSpeed + delta)
-            speedDisplay.Text = "DETECTION: " .. minShieldSpeed
-            task.wait(0.4) -- หน่วงเวลาก่อนเริ่มรัว
-            while holding do
-                minShieldSpeed = math.max(0, minShieldSpeed + delta)
-                speedDisplay.Text = "DETECTION: " .. minShieldSpeed
-                task.wait(0.05) -- ความเร็วในการรัว
+    -- 1. ระบบ Auto Shield
+    if autoShield then
+        local foundParts = workspace:GetPartBoundsInRadius(root.Position, shieldRadius)
+        for _, p in ipairs(foundParts) do
+            if isValidPart(p) and not grabbed[p] then
+                -- ตรวจสอบความเร็วของ Part
+                local vel = p.AssemblyLinearVelocity
+                if vel.Magnitude >= shieldSpeedThreshold then
+                    -- ตรวจสอบว่าพุ่งมาหาตัวเราหรือไม่ (Dot Product)
+                    local toPlayer = (root.Position - p.Position).Unit
+                    if vel.Unit:Dot(toPlayer) > 0.1 then 
+                        grabPart(p)
+                        frozen[p] = true
+                        setHighlight(p, true)
+                        if highlights[p] then highlights[p].OutlineColor = Color3.fromRGB(255, 0, 0) end
+                    end
+                end
             end
-        end)
-        
-        UserInputService.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                holding = false
-            end
-        end)
-        return b
+        end
     end
 
-    createHoldButton("-", -1, speedFrame)
-    createHoldButton("+", 1, speedFrame)
-end
+    -- 2. ระบบ Part Follow Owner (ลอยตามหลัง)
+    if followOwner then
+        for p, objs in pairs(grabbed) do
+            if p and p.Parent and not p.Anchored then
+                -- คำนวณตำแหน่งด้านหลังผู้เล่น ตามระยะ holdDistance
+                local targetCFrame = root.CFrame * CFrame.new(0, 0, holdDistance)
+                objs.bp.Position = targetCFrame.Position
+                objs.bg.CFrame = root.CFrame -- หันองศาตามตัวละคร
+            end
+        end
+    end
+end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
