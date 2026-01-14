@@ -786,101 +786,123 @@ if pages and pages.main then
     end)
     btnPower.Size = UDim2.new(0.4, -3, 1, 0)
 end
--- [[ ระบบ FOLLOW OWNER & AUTO SHIELD ]] --
-
+-- [[ VARIABLE SETTINGS ]] --
 local followOwner = false
 local autoShield = false
-local shieldSpeedThreshold = 50 -- ความเร็วขั้นต่ำของ Part ที่จะให้โล่ทำงาน (ปรับได้)
-local shieldRadius = 15 -- ระยะตรวจจับ 15 studs
+local shieldThreshold = 50 -- ความเร็วเริ่มต้นที่ตรวจจับ
+local isPressingPlus = false
+local isPressingMinus = false
 
--- [[ ฟังก์ชันสำหรับหน้า UI ]] --
-if pages and pages.main then
-    label(pages.main, "--- ADVANCED SURVIVAL ---")
+-- [[ FUNCTIONS ]] --
 
-    -- 1. ปุ่ม FOLLOW OWNER
-    local followBtn = btn(pages.main, "FOLLOW OWNER : OFF", function(b)
-        followOwner = not followOwner
-        b.Text = "FOLLOW OWNER : " .. (followOwner and "ON" or "OFF")
-        b.BackgroundColor3 = followOwner and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(70, 70, 70)
-        
-        -- เมื่อกดปุ่ม (หรือปิด) ให้ทำการ Freeze Part ที่ถืออยู่ทันทีตามเงื่อนไข
-        for p, _ in pairs(grabbed) do
-            frozen[p] = true
-            setHighlight(p, true)
-            if highlights[p] then 
-                highlights[p].OutlineColor = Color3.fromRGB(0, 255, 255) 
-            end
-        end
-    end)
-
-    -- 2. ปุ่ม AUTO SHIELD (ตรวจจับ Part พุ่งใส่)
-    local shieldBtn = btn(pages.main, "AUTO SHIELD : OFF", function(b)
-        autoShield = not autoShield
-        b.Text = "AUTO SHIELD : " .. (autoShield and "ON" or "OFF")
-        b.BackgroundColor3 = autoShield and Color3.fromRGB(150, 100, 0) or Color3.fromRGB(70, 70, 70)
-    end)
-
-    -- 3. ช่องปรับความเร็วตรวจจับของโล่
-    local shieldSpeedLabel = label(pages.main, "SHIELD SPEED SENSITIVITY: " .. shieldSpeedThreshold)
-    local shieldSetBtn = btn(pages.main, "ADJUST SHIELD SPEED (+10)", function(b)
-        if shieldSpeedThreshold >= 0 then
-            shieldSpeedThreshold = 0 -- ปรับเป็นทุกความเร็ว
-        else
-            shieldSpeedThreshold = shieldSpeedThreshold + 10
-        end
-        shieldSpeedLabel.Text = "SHIELD SPEED SENSITIVITY: " .. (shieldSpeedThreshold == 0 and "ALL SPEEDS" or shieldSpeedThreshold)
-    end)
-end
-
--- [[ ลูปการทำงานหลัก (Logic Loop) ]] --
-RunService.Heartbeat:Connect(function()
-    local char = LP.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-    local root = char.HumanoidRootPart
-
-    -- Logic สำหรับ Follow Owner: ให้ของลอยรอบตัวผู้รัน
-    if followOwner then
+-- ระบบคำนวณตำแหน่งการตาม (Follow Logic)
+local function updateFollow()
+    if followOwner and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        local root = LP.Character.HumanoidRootPart
         for p, objs in pairs(grabbed) do
             if not frozen[p] then
-                -- คำนวณตำแหน่งด้านหน้าผู้เล่นตามระยะ holdDistance ที่ตั้งไว้
+                -- ให้ลอยไปข้างหน้าตัวละครตามระยะ holdDistance
                 local targetPos = root.Position + (root.CFrame.LookVector * holdDistance)
                 objs.bp.Position = targetPos
                 objs.bg.CFrame = root.CFrame
             end
         end
     end
+end
 
-    -- Logic สำหรับ Auto Shield: ตรวจจับ Part รอบตัว
-    if autoShield then
-        -- หาวัตถุในระยะ 15 studs
-        local nearbyParts = workspace:FindPartsInRegion3(
-            Region3.new(root.Position - Vector3.new(shieldRadius, shieldRadius, shieldRadius), 
-                        root.Position + Vector3.new(shieldRadius, shieldRadius, shieldRadius)), 
-            nil, 100
-        )
-
-        for _, p in pairs(nearbyParts) do
+-- ระบบ Auto Shield (ตรวจจับวัตถุความเร็วสูง)
+local function runAutoShield()
+    if autoShield and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LP.Character.HumanoidRootPart
+        local detectionRadius = 15 -- ระยะ 15 studs ตามที่ระบุ
+        
+        local parts = workspace:GetPartBoundsInRadius(hrp.Position, detectionRadius)
+        for _, p in pairs(parts) do
             if isValidPart(p) and not grabbed[p] then
-                -- ตรวจสอบว่า Part มีความเร็วพุ่งเข้ามาหาเราหรือไม่
-                local velocity = p.AssemblyLinearVelocity
-                if velocity.Magnitude > shieldSpeedThreshold then
-                    -- ตรวจสอบทิศทาง (ถ้าพุ่งเข้าหาตัว)
-                    local directionToMe = (root.Position - p.Position).Unit
-                    local moveDirection = velocity.Unit
-                    local dot = directionToMe:Dot(moveDirection)
-
-                    if dot > 0.5 then -- ถ้าทิศทางพุ่งเข้าหาตัวมากกว่า 50%
+                -- ตรวจสอบความเร็วของ Part
+                if p.AssemblyLinearVelocity.Magnitude >= shieldThreshold then
+                    -- ตรวจสอบว่าพุ่งเข้าหาตัวเราหรือไม่ (Dot Product)
+                    local directionToMe = (hrp.Position - p.Position).Unit
+                    local velocityDir = p.AssemblyLinearVelocity.Unit
+                    if velocityDir:Dot(directionToMe) > 0.1 then -- ถ้าพุ่งมาทางเรา
                         grabPart(p)
-                        frozen[p] = true -- หยุดทันที
+                        frozen[p] = true -- Freeze ทันที
                         setHighlight(p, true)
                         if highlights[p] then 
-                            highlights[p].OutlineColor = Color3.fromRGB(255, 0, 0) -- โล่จับได้จะเป็นสีแดง
+                            highlights[p].OutlineColor = Color3.fromRGB(255, 0, 0) -- สีแดงเตือนภัย
                         end
                     end
                 end
             end
         end
     end
+end
+
+-- [[ UI ADDITIONS (MAIN PAGE) ]] --
+if pages and pages.main then
+    label(pages.main, "--- ADVANCED SURVIVAL ---")
+
+    --ปุ่ม FOLLOW OWNER
+    local followBtn = btn(pages.main, "FOLLOW OWNER: OFF", function(b)
+        followOwner = not followOwner
+        b.Text = "FOLLOW OWNER: "..(followOwner and "ON" or "OFF")
+        b.BackgroundColor3 = followOwner and Color3.fromRGB(0, 150, 100) or Color3.fromRGB(70, 70, 70)
+        
+        -- เมื่อกดปิด (หรือเปลี่ยนสถานะ) ให้ทำการ Freeze ของที่ถืออยู่ทันที
+        if not followOwner then
+            for p in pairs(grabbed) do
+                frozen[p] = true
+                setHighlight(p, true)
+            end
+        end
+    end)
+
+    -- ปุ่ม AUTO SHIELD
+    local shieldBtn = btn(pages.main, "AUTO SHIELD: OFF", function(b)
+        autoShield = not autoShield
+        b.Text = "AUTO SHIELD: "..(autoShield and "ON" or "OFF")
+        b.BackgroundColor3 = autoShield and Color3.fromRGB(150, 100, 0) or Color3.fromRGB(70, 70, 70)
+    end)
+
+    -- แถบปรับ SHIELD SENSITIVITY
+    local sensLabel = label(pages.main, "SHIELD MIN SPEED: "..shieldThreshold)
+    
+    local sensFrame = Instance.new("Frame", pages.main)
+    sensFrame.Size = UDim2.new(1, 0, 0, 35)
+    sensFrame.BackgroundTransparency = 1
+    local sl = Instance.new("UIListLayout", sensFrame)
+    sl.FillDirection = Enum.FillDirection.Horizontal
+    sl.Padding = UDim.new(0, 5)
+
+    -- ฟังก์ชันสร้างปุ่มที่กดค้างได้
+    local function createRepeatBtn(text, step)
+        local b = btn(sensFrame, text, function() end)
+        b.Size = UDim2.new(0.5, -3, 1, 0)
+        
+        b.MouseButton1Down:Connect(function()
+            local active = true
+            local connection
+            connection = b.MouseButton1Up:Connect(function() active = false connection:Disconnect() end)
+            
+            local waitTime = 0.3 -- รอเวลาช่วงแรกก่อนจะบวกรัวๆ
+            while active do
+                shieldThreshold = math.max(0, shieldThreshold + step)
+                sensLabel.Text = "SHIELD MIN SPEED: "..shieldThreshold
+                task.wait(waitTime)
+                waitTime = 0.05 -- เร่งความเร็วในการบวกลบเมื่อกดค้าง
+            end
+        end)
+        return b
+    end
+
+    createRepeatBtn("-", -1)
+    createRepeatBtn("+", 1)
+end
+
+-- [[ LOOP INTEGRATION ]] --
+RunService.Heartbeat:Connect(function()
+    updateFollow()
+    runAutoShield()
 end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
