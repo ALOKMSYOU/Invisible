@@ -912,5 +912,92 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
+-- [[ VARIABLE SETTINGS ]] --
+local autoDelete = false
+local deleteSpeed = 5000 -- ความเร็วในการดีด (ยิ่งเยอะยิ่งหายไว)
+local deleteRadius = 20 -- ระยะตรวจจับรอบตัว
+
+-- [[ UI UPDATES - แทรกลงในหน้า Main ]] --
+if pages and pages.main then
+    label(pages.main, "--- AUTO DESTRUCTION ---")
+    
+    -- ปุ่มเปิด/ปิด Auto Delete
+    local btnAutoDel = btn(pages.main, "AUTO DELETE : OFF", function(b)
+        autoDelete = not autoDelete
+        b.Text = "AUTO DELETE : " .. (autoDelete and "ON" or "OFF")
+        b.BackgroundColor3 = autoDelete and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(70, 70, 70)
+        b.Font = Enum.Font.GothamBold
+    end)
+
+    -- ปุ่มปรับระยะการ Delete (กดค้างได้)
+    local delRangeFrame = Instance.new("Frame", pages.main)
+    delRangeFrame.Size = UDim2.new(1, 0, 0, 30)
+    delRangeFrame.BackgroundTransparency = 1
+    
+    local rangeLabel = Instance.new("TextLabel", delRangeFrame)
+    rangeLabel.Size = UDim2.new(0.5, 0, 1, 0)
+    rangeLabel.Text = "DEL RADIUS: " .. deleteRadius
+    rangeLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    rangeLabel.TextColor3 = Color3.new(1, 1, 1)
+    rangeLabel.Font = Enum.Font.GothamMedium
+    rangeLabel.TextSize = 12
+
+    local btnMinusR = btn(delRangeFrame, "-", function() end)
+    btnMinusR.Position = UDim2.new(0.55, 0, 0, 0)
+    btnMinusR.Size = UDim2.new(0.2, -2, 1, 0)
+
+    local btnPlusR = btn(delRangeFrame, "+", function() end)
+    btnPlusR.Position = UDim2.new(0.75, 0, 0, 0)
+    btnPlusR.Size = UDim2.new(0.2, -2, 1, 0)
+
+    -- ระบบกดค้างเพื่อเพิ่ม/ลดระยะ
+    setupHoldButton(btnPlusR, 5, function(d)
+        deleteRadius = math.min(200, deleteRadius + d)
+        rangeLabel.Text = "DEL RADIUS: " .. deleteRadius
+    end)
+    setupHoldButton(btnMinusR, -5, function(d)
+        deleteRadius = math.max(5, deleteRadius + d)
+        rangeLabel.Text = "DEL RADIUS: " .. deleteRadius
+    end)
+end
+
+-- [[ CORE LOGIC (RunService) ]] --
+RunService.Stepped:Connect(function()
+    if not autoDelete then return end
+    
+    local char = LP.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local myRoot = char.HumanoidRootPart
+
+    -- ค้นหา Part รอบตัวในระยะที่กำหนด
+    local parts = workspace:GetPartBoundsInRadius(myRoot.Position, deleteRadius)
+    
+    for _, p in ipairs(parts) do
+        -- เงื่อนไข: เป็น BasePart, ไม่ได้ Anchor, ไม่ใช่ตัวผู้เล่นเอง
+        if p:IsA("BasePart") and not p.Anchored and not isPlayer(p) then
+            -- ปล่อยจากการจับถ้ามีการจับอยู่
+            if grabbed[p] then
+                grabbed[p].bp:Destroy()
+                grabbed[p].bg:Destroy()
+                grabbed[p] = nil
+            end
+
+            -- ดีดออกไปด้วยความเร็วสูง (พุ่งขึ้นฟ้าและออกไปด้านข้าง)
+            p.AssemblyLinearVelocity = Vector3.new(
+                math.random(-10, 10), 
+                deleteSpeed, 
+                math.random(-10, 10)
+            )
+            
+            -- ป้องกัน Network Ownership ขัดขวางการดีด
+            pcall(function()
+                if p:GetNetworkOwner() ~= LP then
+                    p:SetNetworkOwner(LP)
+                end
+            end)
+        end
+    end
+end)
+
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
