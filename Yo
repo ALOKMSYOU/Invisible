@@ -822,11 +822,11 @@ if pages and pages.main then
 
     -- 3. ช่องปรับความเร็วตรวจจับของโล่
     local shieldSpeedLabel = label(pages.main, "SHIELD SPEED SENSITIVITY: " .. shieldSpeedThreshold)
-    local shieldSetBtn = btn(pages.main, "ADJUST SHIELD SPEED (+25)", function(b)
-        if shieldSpeedThreshold >= 200 then
+    local shieldSetBtn = btn(pages.main, "ADJUST SHIELD SPEED (+10)", function(b)
+        if shieldSpeedThreshold >= 0 then
             shieldSpeedThreshold = 0 -- ปรับเป็นทุกความเร็ว
         else
-            shieldSpeedThreshold = shieldSpeedThreshold + 25
+            shieldSpeedThreshold = shieldSpeedThreshold + 10
         end
         shieldSpeedLabel.Text = "SHIELD SPEED SENSITIVITY: " .. (shieldSpeedThreshold == 0 and "ALL SPEEDS" or shieldSpeedThreshold)
     end)
