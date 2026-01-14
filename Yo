@@ -786,5 +786,101 @@ if pages and pages.main then
     end)
     btnPower.Size = UDim2.new(0.4, -3, 1, 0)
 end
+-- [[ ระบบ FOLLOW OWNER & AUTO SHIELD ]] --
+
+local followOwner = false
+local autoShield = false
+local shieldSpeedThreshold = 50 -- ความเร็วขั้นต่ำของ Part ที่จะให้โล่ทำงาน (ปรับได้)
+local shieldRadius = 15 -- ระยะตรวจจับ 15 studs
+
+-- [[ ฟังก์ชันสำหรับหน้า UI ]] --
+if pages and pages.main then
+    label(pages.main, "--- ADVANCED SURVIVAL ---")
+
+    -- 1. ปุ่ม FOLLOW OWNER
+    local followBtn = btn(pages.main, "FOLLOW OWNER : OFF", function(b)
+        followOwner = not followOwner
+        b.Text = "FOLLOW OWNER : " .. (followOwner and "ON" or "OFF")
+        b.BackgroundColor3 = followOwner and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(70, 70, 70)
+        
+        -- เมื่อกดปุ่ม (หรือปิด) ให้ทำการ Freeze Part ที่ถืออยู่ทันทีตามเงื่อนไข
+        for p, _ in pairs(grabbed) do
+            frozen[p] = true
+            setHighlight(p, true)
+            if highlights[p] then 
+                highlights[p].OutlineColor = Color3.fromRGB(0, 255, 255) 
+            end
+        end
+    end)
+
+    -- 2. ปุ่ม AUTO SHIELD (ตรวจจับ Part พุ่งใส่)
+    local shieldBtn = btn(pages.main, "AUTO SHIELD : OFF", function(b)
+        autoShield = not autoShield
+        b.Text = "AUTO SHIELD : " .. (autoShield and "ON" or "OFF")
+        b.BackgroundColor3 = autoShield and Color3.fromRGB(150, 100, 0) or Color3.fromRGB(70, 70, 70)
+    end)
+
+    -- 3. ช่องปรับความเร็วตรวจจับของโล่
+    local shieldSpeedLabel = label(pages.main, "SHIELD SPEED SENSITIVITY: " .. shieldSpeedThreshold)
+    local shieldSetBtn = btn(pages.main, "ADJUST SHIELD SPEED (+25)", function(b)
+        if shieldSpeedThreshold >= 200 then
+            shieldSpeedThreshold = 0 -- ปรับเป็นทุกความเร็ว
+        else
+            shieldSpeedThreshold = shieldSpeedThreshold + 25
+        end
+        shieldSpeedLabel.Text = "SHIELD SPEED SENSITIVITY: " .. (shieldSpeedThreshold == 0 and "ALL SPEEDS" or shieldSpeedThreshold)
+    end)
+end
+
+-- [[ ลูปการทำงานหลัก (Logic Loop) ]] --
+RunService.Heartbeat:Connect(function()
+    local char = LP.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local root = char.HumanoidRootPart
+
+    -- Logic สำหรับ Follow Owner: ให้ของลอยรอบตัวผู้รัน
+    if followOwner then
+        for p, objs in pairs(grabbed) do
+            if not frozen[p] then
+                -- คำนวณตำแหน่งด้านหน้าผู้เล่นตามระยะ holdDistance ที่ตั้งไว้
+                local targetPos = root.Position + (root.CFrame.LookVector * holdDistance)
+                objs.bp.Position = targetPos
+                objs.bg.CFrame = root.CFrame
+            end
+        end
+    end
+
+    -- Logic สำหรับ Auto Shield: ตรวจจับ Part รอบตัว
+    if autoShield then
+        -- หาวัตถุในระยะ 15 studs
+        local nearbyParts = workspace:FindPartsInRegion3(
+            Region3.new(root.Position - Vector3.new(shieldRadius, shieldRadius, shieldRadius), 
+                        root.Position + Vector3.new(shieldRadius, shieldRadius, shieldRadius)), 
+            nil, 100
+        )
+
+        for _, p in pairs(nearbyParts) do
+            if isValidPart(p) and not grabbed[p] then
+                -- ตรวจสอบว่า Part มีความเร็วพุ่งเข้ามาหาเราหรือไม่
+                local velocity = p.AssemblyLinearVelocity
+                if velocity.Magnitude > shieldSpeedThreshold then
+                    -- ตรวจสอบทิศทาง (ถ้าพุ่งเข้าหาตัว)
+                    local directionToMe = (root.Position - p.Position).Unit
+                    local moveDirection = velocity.Unit
+                    local dot = directionToMe:Dot(moveDirection)
+
+                    if dot > 0.5 then -- ถ้าทิศทางพุ่งเข้าหาตัวมากกว่า 50%
+                        grabPart(p)
+                        frozen[p] = true -- หยุดทันที
+                        setHighlight(p, true)
+                        if highlights[p] then 
+                            highlights[p].OutlineColor = Color3.fromRGB(255, 0, 0) -- โล่จับได้จะเป็นสีแดง
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
