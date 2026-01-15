@@ -998,6 +998,176 @@ RunService.Stepped:Connect(function()
         end
     end
 end)
+-- [[ VARIABLE SETTINGS FOR PUPPET MASTER ]] --
+local puppetList = {} -- เก็บ Model NPC ทั้งหมดใน List
+local selectedPuppets = {} -- เก็บตัวที่ถูกเลือกควบคุม
+local isControlling = false
+local clickToAddActive = false
+local autoNPCScan = false
+local puppetCameraTarget = nil
 
+-- สร้างหน้า Puppet Master
+pages.puppet = createPage()
+btn(pages.main, "PUPPET MASTER MODE", function() showPage("puppet") end)
+
+-- [[ UI COMPONENTS FOR PUPPET MASTER ]] --
+label(pages.puppet, "--- SELECTION SYSTEM ---")
+
+local function refreshPuppetList()
+    -- เคลียร์ปุ่มเก่าใน Dropdown (ใช้ ScrollingFrame)
+    for _, child in ipairs(listPuppet:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    
+    for model in pairs(puppetList) do
+        if model and model.Parent then
+            local b = btn(listPuppet, model.Name, function()
+                selectedPuppets[model] = not selectedPuppets[model]
+                refreshPuppetList()
+            end)
+            b.BackgroundColor3 = selectedPuppets[model] and Color3.fromRGB(0, 120, 0) or Color3.fromRGB(50, 50, 50)
+        end
+    end
+end
+
+-- Dropdown List (ScrollingFrame)
+listPuppet = Instance.new("ScrollingFrame", pages.puppet)
+listPuppet.Size = UDim2.new(1, 0, 0, 100)
+listPuppet.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+listPuppet.BorderSizePixel = 0
+local llp = Instance.new("UIListLayout", listPuppet)
+llp.Padding = UDim.new(0, 2)
+
+btn(pages.puppet, "CLICK TO ADD NPC : OFF", function(b)
+    clickToAddActive = not clickToAddActive
+    b.Text = "CLICK TO ADD NPC : " .. (clickToAddActive and "ON" or "OFF")
+end)
+
+btn(pages.puppet, "AUTO NPC LIST : OFF", function(b)
+    autoNPCScan = not autoNPCScan
+    b.Text = "AUTO NPC LIST : " .. (autoNPCScan and "ON" or "OFF")
+end)
+
+btn(pages.puppet, "SELECT ALL IN LIST", function()
+    for model in pairs(puppetList) do selectedPuppets[model] = true end
+    refreshPuppetList()
+end)
+
+btn(pages.puppet, "UNSELECT ALL", function()
+    selectedPuppets = {}
+    refreshPuppetList()
+end)
+
+label(pages.puppet, "--- CONTROL ---")
+
+local ctrlBtn = btn(pages.puppet, "CONTROL", function(b)
+    isControlling = not isControlling
+    
+    if isControlling then
+        -- เริ่มควบคุม
+        local firstTarget = nil
+        for model in pairs(selectedPuppets) do
+            firstTarget = model
+            -- บังคับ Grab ทุกตัวที่เลือก
+            local primary = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+            if primary then grabPart(primary) end
+        end
+        
+        if firstTarget then
+            b.Text = "UNCONTROL"
+            b.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+            Cam.CameraSubject = firstTarget:FindFirstChild("Humanoid") or firstTarget.PrimaryPart
+            LP.Character.Humanoid.WalkSpeed = 0 -- ตัวผู้รันไม่ขยับ
+        else
+            isControlling = false -- ไม่มีตัวเลือก
+        end
+    else
+        -- ยกเลิกการควบคุม
+        b.Text = "CONTROL"
+        b.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        Cam.CameraSubject = LP.Character.Humanoid
+        LP.Character.Humanoid.WalkSpeed = 16
+    end
+end)
+
+btn(pages.puppet, "BACK", function() showPage("main") end)
+
+-- [[ LOGIC SYSTEM ]] --
+
+-- ฟังก์ชันตรวจสอบและเพิ่ม NPC เข้า List
+local function addModelToList(model)
+    if not model or not model:IsA("Model") then return end
+    if isPlayer(model.PrimaryPart) then return end
+    if not model:FindFirstChild("Humanoid") then return end
+    
+    if not puppetList[model] then
+        puppetList[model] = true
+        refreshPuppetList()
+    end
+end
+
+-- ตรวจสอบการคลิก (Click to Add)
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp or not clickToAddActive then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local target = getMouseTarget()
+        if target then
+            local model = target:FindFirstAncestorOfClass("Model")
+            if model then addModelToList(model) end
+        end
+    end
+end)
+
+-- ระบบ Auto Scan และการจัดการ List อัตโนมัติ
+RunService.Heartbeat:Connect(function()
+    local char = LP.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    -- 1. Auto Scan NPC รอบตัว
+    if autoNPCScan then
+        local parts = workspace:GetPartBoundsInRadius(char.HumanoidRootPart.Position, holdDistance)
+        for _, p in ipairs(parts) do
+            local model = p:FindFirstAncestorOfClass("Model")
+            if model and model:FindFirstChild("Humanoid") and not isPlayer(p) then
+                addModelToList(model)
+            end
+        end
+    end
+
+    -- 2. ตรวจสอบ NPC ตาย หรือหายไป ให้เอาออกจาก List
+    local changed = false
+    for model in pairs(puppetList) do
+        if not model.Parent or (model:FindFirstChild("Humanoid") and model.Humanoid.Health <= 0) then
+            puppetList[model] = nil
+            selectedPuppets[model] = nil
+            changed = true
+            -- ถ้าตัวที่ดูอยู่ตาย ให้คืนกล้อง
+            if Cam.CameraSubject and Cam.CameraSubject:IsDescendantOf(model) then
+                Cam.CameraSubject = LP.Character.Humanoid
+                isControlling = false
+                ctrlBtn.Text = "CONTROL"
+                LP.Character.Humanoid.WalkSpeed = 16
+            end
+        end
+    end
+    if changed then refreshPuppetList() end
+
+    -- 3. การควบคุมการเคลื่อนที่ (Puppet Movement Logic)
+    if isControlling then
+        local moveDir = LP.Character.Humanoid.MoveDirection
+        for model in pairs(selectedPuppets) do
+            local root = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
+            if root and grabbed[root] then
+                -- ขยับ BodyPosition ตามทิศทางการกด WASD/Joystick ของผู้เล่น
+                local speed = 0.5
+                grabbed[root].bp.Position = grabbed[root].bp.Position + (moveDir * speed)
+                -- หมุนหน้าตามทิศทางที่เดิน
+                if moveDir.Magnitude > 0 then
+                    grabbed[root].bg.CFrame = CFrame.new(Vector3.zero, moveDir)
+                end
+            end
+        end
+    end
+end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
