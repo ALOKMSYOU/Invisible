@@ -998,256 +998,150 @@ RunService.Stepped:Connect(function()
         end
     end
 end)
--- ===============================
--- PUPPET MASTER MODE (ADD-ON)
--- ===============================
-
---------------------------------------------------
--- SERVICES
---------------------------------------------------
+-- [[ SERVICES ]] --
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local LP = Players.LocalPlayer
 local Cam = workspace.CurrentCamera
+local Mouse = LP:GetMouse()
 
---------------------------------------------------
--- SETTINGS
---------------------------------------------------
-local PUPPET_GRAB_RADIUS = holdDistance or 25
-local PUPPET_FORCE = 12000
-local PUPPET_SPEED = 25
+-- [[ PUPPET MASTER SETTINGS ]] --
+local puppetList = {}        -- NPC ที่เพิ่มเข้ามา
+local selectedPuppets = {}  -- NPC ที่เลือก
+local controlling = false
+local selectClickMode = false
 
---------------------------------------------------
--- STATES
---------------------------------------------------
-local puppetMode = false
-local puppetAutoList = false
-local puppetDropdownOpen = false
-
-local puppetList = {}        -- NPC ที่ "อยู่ใน list"
-local puppetSelected = {}    -- NPC ที่ "ถูก select"
-local puppetControllers = {} -- BodyMover
-
---------------------------------------------------
--- UTILS
---------------------------------------------------
-local function isNPC(model)
-	if not model or not model:IsA("Model") then return false end
-	if Players:GetPlayerFromCharacter(model) then return false end
-	return model:FindFirstChildOfClass("Humanoid") ~= nil
+-- [[ HELPER ]] --
+local function getPuppetModel(obj)
+	if not obj then return nil end
+	local model = obj:FindFirstAncestorOfClass("Model")
+	if model and model:FindFirstChild("Humanoid") and model ~= LP.Character then
+		return model
+	end
+	return nil
 end
 
-local function getRoot(model)
-	return model:FindFirstChild("HumanoidRootPart")
+local function isInList(tbl, v)
+	return table.find(tbl, v) ~= nil
 end
 
---------------------------------------------------
--- ADD / REMOVE LIST
---------------------------------------------------
-local function addNPC(model)
-	if puppetList[model] then return end
-	if not isNPC(model) then return end
+local function clearTable(t)
+	for i = #t, 1, -1 do
+		t[i] = nil
+	end
+end
 
-	local hrp = getRoot(model)
-	if not hrp then return end
+-- [[ UI ]] --
+if pages and pages.main then
+	label(pages.main, "--- PUPPET MASTER SYSTEM ---")
 
-	puppetList[model] = true
+	-- CLICK TO ADD
+	btn(pages.main, "🖱️ CLICK TO ADD NPC : OFF", function(b)
+		selectClickMode = not selectClickMode
+		b.Text = "🖱️ CLICK TO ADD NPC : " .. (selectClickMode and "ON" or "OFF")
+	end)
 
-	-- ลบอัตโนมัติถ้าตาย
-	local hum = model:FindFirstChildOfClass("Humanoid")
-	if hum then
-		hum.Died:Connect(function()
-			puppetList[model] = nil
-			puppetSelected[model] = nil
-			if puppetControllers[model] then
-				puppetControllers[model].bp:Destroy()
-				puppetControllers[model].bg:Destroy()
-				puppetControllers[model] = nil
+	-- REFRESH
+	btn(pages.main, "🔄 REFRESH LIST", function()
+		for i = #puppetList, 1, -1 do
+			local m = puppetList[i]
+			if not m or not m.Parent or m.Humanoid.Health <= 0 then
+				table.remove(puppetList, i)
 			end
-		end)
+		end
+	end)
+
+	-- SELECT ALL (เฉพาะใน list)
+	btn(pages.main, "SELECT ALL (LIST)", function()
+		clearTable(selectedPuppets)
+		for _, m in ipairs(puppetList) do
+			table.insert(selectedPuppets, m)
+		end
+	end)
+
+	btn(pages.main, "UNSELECT ALL", function()
+		clearTable(selectedPuppets)
+	end)
+
+	-- CONTROL BUTTON
+	btn(pages.main, "🎮 CONTROL / UNCONTROL", function()
+		controlling = not controlling
+
+		if controlling then
+			if #selectedPuppets == 0 then
+				controlling = false
+				return
+			end
+			Cam.CameraSubject = selectedPuppets[1]:FindFirstChild("Humanoid")
+		else
+			Cam.CameraSubject = LP.Character:FindFirstChild("Humanoid")
+		end
+	end)
+end
+
+-- [[ CLICK TO ADD NPC ]] --
+UserInputService.InputBegan:Connect(function(input, gp)
+	if gp or not selectClickMode then return end
+
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		local target = Mouse.Target
+		local model = getPuppetModel(target)
+
+		if model and not isInList(puppetList, model) then
+			table.insert(puppetList, model)
+		end
 	end
-end
+end)
 
-local function removeNPC(model)
-	puppetList[model] = nil
-	puppetSelected[model] = nil
-	if puppetControllers[model] then
-		puppetControllers[model].bp:Destroy()
-		puppetControllers[model].bg:Destroy()
-		puppetControllers[model] = nil
-	end
-end
+-- [[ CLICK TO SELECT NPC (จาก list) ]] --
+UserInputService.InputBegan:Connect(function(input, gp)
+	if gp then return end
 
---------------------------------------------------
--- CONTROL / UNCONTROL
---------------------------------------------------
-local function controlNPC(model)
-	if puppetControllers[model] then return end
-	local hrp = getRoot(model)
-	if not hrp then return end
+	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		local target = Mouse.Target
+		local model = getPuppetModel(target)
 
-	local bp = Instance.new("BodyPosition", hrp)
-	bp.MaxForce = Vector3.new(1e7,1e7,1e7)
-	bp.P = PUPPET_FORCE
-	bp.Position = hrp.Position
-
-	local bg = Instance.new("BodyGyro", hrp)
-	bg.MaxTorque = Vector3.new(1e7,1e7,1e7)
-	bg.P = 8000
-	bg.CFrame = hrp.CFrame
-
-	puppetControllers[model] = {bp = bp, bg = bg}
-end
-
-local function uncontrolNPC(model)
-	if puppetControllers[model] then
-		puppetControllers[model].bp:Destroy()
-		puppetControllers[model].bg:Destroy()
-		puppetControllers[model] = nil
-	end
-end
-
---------------------------------------------------
--- INPUT (PC + MOBILE)
---------------------------------------------------
-local function getMoveVector()
-	if UserInputService.TouchEnabled then
-		return LP.Character and LP.Character:FindFirstChildOfClass("Humanoid") and
-			LP.Character.Humanoid.MoveDirection or Vector3.zero
-	else
-		return LP.Character and LP.Character:FindFirstChildOfClass("Humanoid") and
-			LP.Character.Humanoid.MoveDirection or Vector3.zero
-	end
-end
-
---------------------------------------------------
--- MAIN LOOP
---------------------------------------------------
-RunService.RenderStepped:Connect(function(dt)
-	if not puppetMode then return end
-
-	local moveDir = getMoveVector()
-	if moveDir.Magnitude <= 0 then return end
-
-	for model in pairs(puppetSelected) do
-		if puppetControllers[model] then
-			local hrp = getRoot(model)
-			if hrp then
-				local move = Cam.CFrame:VectorToWorldSpace(moveDir)
-				puppetControllers[model].bp.Position =
-					hrp.Position + (move.Unit * PUPPET_SPEED)
-
-				-- หมุนเฉพาะตัวแรก (มุมกล้องเดียว)
-				puppetControllers[model].bg.CFrame =
-					CFrame.new(hrp.Position, hrp.Position + move)
+		if model and isInList(puppetList, model) then
+			if isInList(selectedPuppets, model) then
+				table.remove(selectedPuppets, table.find(selectedPuppets, model))
+			else
+				table.insert(selectedPuppets, model)
 			end
 		end
 	end
 end)
 
---------------------------------------------------
--- AUTO LIST
---------------------------------------------------
-RunService.Heartbeat:Connect(function()
-	if not puppetAutoList then return end
-	if not LP.Character or not LP.Character.PrimaryPart then return end
+-- [[ PUPPET CONTROL ]] --
+RunService.RenderStepped:Connect(function()
+	if not controlling then return end
+	if #selectedPuppets == 0 then return end
 
-	for _, m in ipairs(workspace:GetChildren()) do
-		if isNPC(m) and not puppetList[m] then
-			local hrp = getRoot(m)
-			if hrp and (hrp.Position - LP.Character.PrimaryPart.Position).Magnitude <= PUPPET_GRAB_RADIUS then
-				addNPC(m)
+	local char = LP.Character
+	if not char or not char:FindFirstChild("Humanoid") then return end
+
+	local moveDir = char.Humanoid.MoveDirection
+	if moveDir.Magnitude == 0 then return end
+
+	for _, model in ipairs(selectedPuppets) do
+		local root = model:FindFirstChild("HumanoidRootPart")
+		local hum = model:FindFirstChild("Humanoid")
+
+		if root and hum and hum.Health > 0 then
+			root.AssemblyLinearVelocity = moveDir * 25
+
+			-- หันหน้าเฉพาะตอนเลือก 1 ตัว
+			if #selectedPuppets == 1 then
+				local look = Cam.CFrame.LookVector
+				root.CFrame = CFrame.new(
+					root.Position,
+					root.Position + Vector3.new(look.X, 0, look.Z)
+				)
 			end
 		end
 	end
 end)
 
---------------------------------------------------
--- UI (PUPPET MASTER PAGE)
---------------------------------------------------
-local puppetPage = createPage()
-pages.puppet = puppetPage
-
-btn(puppetPage, "PUPPET MASTER : OFF", function(b)
-	puppetMode = not puppetMode
-	b.Text = "PUPPET MASTER : "..(puppetMode and "ON" or "OFF")
-
-	if not puppetMode then
-		for m in pairs(puppetControllers) do
-			uncontrolNPC(m)
-		end
-	end
-end)
-
-btn(puppetPage, "AUTO NPC LIST : OFF", function(b)
-	puppetAutoList = not puppetAutoList
-	b.Text = "AUTO NPC LIST : "..(puppetAutoList and "ON" or "OFF")
-end)
-
---------------------------------------------------
--- DROPDOWN LIST
---------------------------------------------------
-local drop = Instance.new("ScrollingFrame", puppetPage)
-drop.Size = UDim2.new(1,0,0,150)
-drop.BackgroundColor3 = Color3.fromRGB(35,35,35)
-drop.BorderSizePixel = 0
-drop.Visible = true
-
-local dl = Instance.new("UIListLayout", drop)
-dl.Padding = UDim.new(0,4)
-
-local function refreshPuppetList()
-	for _,c in ipairs(drop:GetChildren()) do
-		if c:IsA("TextButton") then c:Destroy() end
-	end
-
-	for model in pairs(puppetList) do
-		if model and model.Parent then
-			local b = btn(drop, model.Name, function()
-				if puppetSelected[model] then
-					puppetSelected[model] = nil
-					uncontrolNPC(model)
-				else
-					puppetSelected[model] = true
-					controlNPC(model)
-				end
-				refreshPuppetList()
-			end)
-			b.BackgroundColor3 = puppetSelected[model]
-				and Color3.fromRGB(120,120,0)
-				or Color3.fromRGB(70,70,70)
-		end
-	end
-end
-
-btn(puppetPage, "REFRESH LIST", refreshPuppetList)
-
-btn(puppetPage, "SELECT ALL", function()
-	for m in pairs(puppetList) do
-		puppetSelected[m] = true
-		controlNPC(m)
-	end
-	refreshPuppetList()
-end)
-
-btn(puppetPage, "UNSELECT ALL", function()
-	for m in pairs(puppetSelected) do
-		uncontrolNPC(m)
-	end
-	puppetSelected = {}
-	refreshPuppetList()
-end)
-
-btn(puppetPage, "BACK", function()
-	showPage("main")
-end)
-
--- เพิ่มปุ่มเข้า Puppet Master
-btn(pages.main, "▶ PUPPET MASTER", function()
-	showPage("puppet")
-	refreshPuppetList()
-end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
