@@ -998,5 +998,152 @@ RunService.Stepped:Connect(function()
         end
     end
 end)
+--------------------------------------------------
+-- [[ PUPPET MASTER ADDON (SAFE APPEND VERSION) ]]
+--------------------------------------------------
+
+local puppetList = {}
+local controlling = false
+local currentPuppet = nil
+local selectClickMode = false
+
+--------------------------------------------------
+-- HELPERS
+--------------------------------------------------
+local function getPuppetModel(obj)
+	if not obj then return nil end
+	local model = obj:FindFirstAncestorOfClass("Model")
+	if model and model:FindFirstChild("Humanoid") and not Players:GetPlayerFromCharacter(model) then
+		return model
+	end
+	return nil
+end
+
+local function refreshPuppetListUI(container, layout)
+	for _, c in ipairs(container:GetChildren()) do
+		if c:IsA("TextButton") then c:Destroy() end
+	end
+
+	for i = #puppetList, 1, -1 do
+		local m = puppetList[i]
+		if not m or not m.Parent or not m:FindFirstChild("Humanoid") or m.Humanoid.Health <= 0 then
+			table.remove(puppetList, i)
+		end
+	end
+
+	for _, model in ipairs(puppetList) do
+		local b = btn(container, "NPC : "..model.Name, function()
+			currentPuppet = model
+		end)
+		if currentPuppet == model then
+			b.BackgroundColor3 = Color3.fromRGB(140,140,0)
+		end
+	end
+
+	container.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y + 5)
+end
+
+--------------------------------------------------
+-- UI
+--------------------------------------------------
+if pages and pages.main then
+	label(pages.main, "--- PUPPET MASTER ---")
+
+	-- CLICK MODE
+	btn(pages.main, "🖱️ CLICK ADD NPC : OFF", function(b)
+		selectClickMode = not selectClickMode
+		b.Text = "🖱️ CLICK ADD NPC : "..(selectClickMode and "ON" or "OFF")
+		b.BackgroundColor3 = selectClickMode and Color3.fromRGB(0,120,200) or Color3.fromRGB(70,70,70)
+	end)
+
+	-- LIST
+	local list = Instance.new("ScrollingFrame", pages.main)
+	list.Size = UDim2.new(1,0,0,90)
+	list.BackgroundColor3 = Color3.fromRGB(30,30,30)
+	list.ScrollBarThickness = 4
+	local ll = Instance.new("UIListLayout", list)
+
+	-- REFRESH BUTTON
+	btn(pages.main, "🔄 REFRESH LIST", function()
+		refreshPuppetListUI(list, ll)
+	end)
+
+	-- CONTROL
+	btn(pages.main, "🎮 CONTROL / UNCONTROL", function(b)
+		controlling = not controlling
+		b.Text = controlling and "🚫 UNCONTROL" or "🎮 CONTROL"
+		b.BackgroundColor3 = controlling and Color3.fromRGB(180,0,0) or Color3.fromRGB(70,70,70)
+
+		if controlling and currentPuppet then
+			Cam.CameraSubject = currentPuppet:FindFirstChild("Humanoid")
+		else
+			if LP.Character and LP.Character:FindFirstChild("Humanoid") then
+				Cam.CameraSubject = LP.Character.Humanoid
+			end
+		end
+	end)
+
+	-- SELECT ALL (ONLY IN LIST)
+	btn(pages.main, "SELECT ALL (LIST)", function()
+		for _, m in ipairs(puppetList) do
+			selected[m] = true
+		end
+	end)
+
+	btn(pages.main, "UNSELECT ALL", function()
+		selected = {}
+	end)
+
+	--------------------------------------------------
+	-- CLICK TO ADD
+	--------------------------------------------------
+	UserInputService.InputBegan:Connect(function(input, gp)
+		if gp or not selectClickMode then return end
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			local t = getMouseTarget()
+			local m = getPuppetModel(t)
+			if m and not table.find(puppetList, m) then
+				table.insert(puppetList, m)
+				refreshPuppetListUI(list, ll)
+			end
+		end
+	end)
+
+	refreshPuppetListUI(list, ll)
+end
+
+--------------------------------------------------
+-- CONTROL LOGIC
+--------------------------------------------------
+RunService.RenderStepped:Connect(function()
+	if not controlling then return end
+	if not LP.Character or not LP.Character:FindFirstChild("Humanoid") then return end
+
+	local moveDir = LP.Character.Humanoid.MoveDirection
+	if moveDir.Magnitude == 0 then return end
+
+	-- นับจำนวนที่เลือก
+	local selectedCount = 0
+	for _ in pairs(selected) do selectedCount += 1 end
+
+	for _, model in ipairs(puppetList) do
+		local hum = model:FindFirstChild("Humanoid")
+		local root = model:FindFirstChild("HumanoidRootPart")
+		if hum and root then
+			root.AssemblyLinearVelocity = moveDir * 22
+
+			-- หันหน้าเฉพาะ:
+			-- 1 ตัว = หันเฉพาะตัวนั้น
+			-- หลายตัว = หันพร้อมกัน
+			if selectedCount > 1 or selected[model] or model == currentPuppet then
+				local look = Cam.CFrame.LookVector
+				root.CFrame = CFrame.new(
+					root.Position,
+					root.Position + Vector3.new(look.X, 0, look.Z)
+				)
+			end
+		end
+	end
+end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
