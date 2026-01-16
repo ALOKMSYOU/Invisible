@@ -1186,163 +1186,206 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
--- [[ TEXT MODE VARIABLES ]] --
+-- [[ TEXT PART SYSTEM ]] --
 local textMode = false
-local inputText = "ABC"
-local textParts = {} -- เก็บ Part ที่กำลังใช้งาน
-local textScale = 2 -- ขนาดความห่างของแต่ละจุด
-local fontData = {} -- เก็บข้อมูลรูปทรงตัวอักษร
+local textString = "HELLO"
+local textPartsMap = {} -- เก็บว่า Part ไหนเป็นจุดไหน
+local textScale = 1.5 -- ตัวคูณระยะห่าง (ปรับตามขนาด Part)
 
--- [[ สร้างข้อมูล FONT (5x5 Grid) ]] --
-local function defineChar(char, map)
-    fontData[char] = {}
-    local row = 1
-    local col = 1
-    for i = 1, #map do
-        local c = string.sub(map, i, i)
-        if c == "1" then
-            table.insert(fontData[char], {x = col, y = 5 - row}) -- y กลับด้านเพื่อให้เรียงจากบนลงล่าง
-        end
-        if c ~= " " then
-            col = col + 1
-            if col > 4 then col = 1; row = row + 1 end
-        end
-    end
-end
-
--- นิยามตัวอักษร (A-Z, 0-9 แบบย่อ)
-defineChar("A", "0110 1001 1111 1001 1001")
-defineChar("B", "1110 1001 1110 1001 1110")
-defineChar("C", "0111 1000 1000 1000 0111")
-defineChar("D", "1110 1001 1001 1001 1110")
-defineChar("E", "1111 1000 1110 1000 1111")
-defineChar("F", "1111 1000 1110 1000 1000")
-defineChar("G", "0111 1000 1011 1001 0110")
-defineChar("H", "1001 1001 1111 1001 1001")
-defineChar("I", "0110 0010 0010 0010 0110")
-defineChar("J", "0011 0001 0001 1001 0110")
-defineChar("K", "1001 1010 1100 1010 1001")
-defineChar("L", "1000 1000 1000 1000 1111")
-defineChar("M", "1001 1111 1001 1001 1001")
-defineChar("N", "1001 1101 1011 1001 1001")
-defineChar("O", "0110 1001 1001 1001 0110")
-defineChar("P", "1110 1001 1110 1000 1000")
-defineChar("Q", "0110 1001 1001 1010 0101")
-defineChar("R", "1110 1001 1110 1010 1001")
-defineChar("S", "0111 1000 0110 0001 1110")
-defineChar("T", "1111 0010 0010 0010 0010")
-defineChar("U", "1001 1001 1001 1001 0110")
-defineChar("V", "1001 1001 1001 0110 0010")
-defineChar("W", "1001 1001 1001 1111 1001")
-defineChar("X", "1001 0110 0010 0110 1001")
-defineChar("Y", "1001 0110 0010 0010 0010")
-defineChar("Z", "1111 0001 0010 0100 1111")
-defineChar(" ", "0000 0000 0000 0000 0000") -- เว้นวรรค
--- (สามารถเพิ่มตัวเลข 0-9 ได้ในรูปแบบเดียวกัน)
+-- ตาราง Font อย่างง่าย (3x5 Grid)
+local charMap = {
+    ["A"] = {1,0,1, 1,0,1, 1,1,1, 1,0,1, 0,1,0},
+    ["B"] = {1,1,0, 1,0,1, 1,1,0, 1,0,1, 1,1,0},
+    ["C"] = {0,1,1, 1,0,0, 1,0,0, 1,0,0, 0,1,1},
+    ["D"] = {1,1,0, 1,0,1, 1,0,1, 1,0,1, 1,1,0},
+    ["E"] = {1,1,1, 1,0,0, 1,1,1, 1,0,0, 1,1,1},
+    ["F"] = {1,0,0, 1,0,0, 1,1,1, 1,0,0, 1,1,1},
+    ["G"] = {0,1,1, 1,0,1, 1,0,0, 1,0,0, 0,1,1},
+    ["H"] = {1,0,1, 1,0,1, 1,1,1, 1,0,1, 1,0,1},
+    ["I"] = {1,1,1, 0,1,0, 0,1,0, 0,1,0, 1,1,1},
+    ["J"] = {1,1,0, 1,0,1, 0,0,1, 0,0,1, 0,0,1},
+    ["K"] = {1,0,1, 1,1,0, 1,0,0, 1,1,0, 1,0,1},
+    ["L"] = {1,1,1, 1,0,0, 1,0,0, 1,0,0, 1,0,0},
+    ["M"] = {1,0,1, 1,0,1, 1,1,1, 1,1,1, 1,0,1},
+    ["N"] = {1,0,1, 1,0,1, 1,1,1, 1,0,1, 1,0,1}, -- Simplified
+    ["O"] = {0,1,0, 1,0,1, 1,0,1, 1,0,1, 0,1,0},
+    ["P"] = {1,0,0, 1,0,0, 1,1,1, 1,0,1, 1,1,0},
+    ["Q"] = {1,1,1, 0,1,0, 1,0,1, 1,0,1, 0,1,0},
+    ["R"] = {1,0,1, 1,0,1, 1,1,0, 1,0,1, 1,1,0},
+    ["S"] = {1,1,0, 0,0,1, 0,1,0, 1,0,0, 0,1,1},
+    ["T"] = {0,1,0, 0,1,0, 0,1,0, 0,1,0, 1,1,1},
+    ["U"] = {1,1,1, 1,0,1, 1,0,1, 1,0,1, 1,0,1},
+    ["V"] = {0,1,0, 0,1,0, 1,0,1, 1,0,1, 1,0,1},
+    ["W"] = {1,0,1, 1,1,1, 1,1,1, 1,0,1, 1,0,1},
+    ["X"] = {1,0,1, 0,1,0, 0,1,0, 0,1,0, 1,0,1},
+    ["Y"] = {0,1,0, 0,1,0, 1,1,1, 1,0,1, 1,0,1},
+    ["Z"] = {1,1,1, 1,0,0, 1,1,1, 0,0,1, 1,1,1},
+    ["0"] = {1,1,1, 1,0,1, 1,0,1, 1,0,1, 1,1,1},
+    ["1"] = {1,1,1, 0,1,0, 0,1,0, 1,1,0, 0,1,0},
+    ["2"] = {1,1,1, 1,0,0, 1,1,1, 0,0,1, 1,1,1},
+    ["3"] = {1,1,1, 0,0,1, 1,1,1, 0,0,1, 1,1,1},
+    ["4"] = {0,0,1, 0,0,1, 1,1,1, 1,0,1, 1,0,1},
+    ["5"] = {1,1,1, 0,0,1, 1,1,1, 1,0,0, 1,1,1},
+    ["6"] = {1,1,1, 1,0,1, 1,1,1, 1,0,0, 1,1,1},
+    ["7"] = {0,1,0, 0,1,0, 0,0,1, 0,0,1, 1,1,1},
+    ["8"] = {1,1,1, 1,0,1, 1,1,1, 1,0,1, 1,1,1},
+    ["9"] = {1,1,1, 0,0,1, 1,1,1, 1,0,1, 1,1,1},
+    [" "] = {0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0},
+}
 
 -- [[ UI SETUP ]] --
 if pages and pages.main then
-    label(pages.main, "--- TEXT PART BUILDER ---")
+    label(pages.main, "--- TEXT PART CREATOR ---")
+
+    -- Container สำหรับจัดวางแนวนอน
+    local textFrame = Instance.new("Frame", pages.main)
+    textFrame.Size = UDim2.new(1, 0, 0, 35)
+    textFrame.BackgroundTransparency = 1
+    
+    local tfLayout = Instance.new("UIListLayout", textFrame)
+    tfLayout.FillDirection = Enum.FillDirection.Horizontal
+    tfLayout.Padding = UDim.new(0, 5)
 
     -- ช่องใส่ข้อความ
-    local txtBox = Instance.new("TextBox", pages.main)
-    txtBox.Size = UDim2.new(1, 0, 0, 30)
-    txtBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    txtBox.TextColor3 = Color3.new(1, 1, 1)
-    txtBox.Text = "HELLO"
-    txtBox.PlaceholderText = "Type text here..."
-    txtBox.Font = Enum.Font.GothamBold
-    txtBox.TextSize = 14
+    local textBox = Instance.new("TextBox", textFrame)
+    textBox.Size = UDim2.new(0.65, 0, 1, 0)
+    textBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    textBox.TextColor3 = Color3.new(1, 1, 1)
+    textBox.Text = "HELLO"
+    textBox.PlaceholderText = "TYPE HERE..."
+    textBox.Font = Enum.Font.GothamBold
+    textBox.TextSize = 14
+    textBox.ClearTextOnFocus = false
     
-    txtBox.FocusLost:Connect(function()
-        inputText = string.upper(txtBox.Text)
+    -- อัปเดตข้อความเมื่อพิมพ์
+    textBox:GetPropertyChangedSignal("Text"):Connect(function()
+        textString = string.upper(textBox.Text)
     end)
 
-    -- ปุ่มเปิด/ปิด Text Mode
-    local btnTextMode = btn(pages.main, "📝 TEXT MODE: OFF", function(b)
+    -- ปุ่ม ON/OFF
+    local btnToggle = btn(textFrame, "OFF", function(b)
         textMode = not textMode
-        b.Text = "📝 TEXT MODE: " .. (textMode and "ON" or "OFF")
-        b.BackgroundColor3 = textMode and Color3.fromRGB(0, 150, 150) or Color3.fromRGB(70, 70, 70)
+        b.Text = textMode and "ON" or "OFF"
+        b.BackgroundColor3 = textMode and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(180, 0, 0)
         
+        -- ถ้าปิด ให้ปล่อย Part ทั้งหมด
         if not textMode then
-            -- เมื่อปิด ให้ปล่อย Part ร่วง
-            for _, p in pairs(textParts) do
-                if p:FindFirstChild("TextBP") then p.TextBP:Destroy() end
-                if p:FindFirstChild("TextBG") then p.TextBG:Destroy() end
+            for p, _ in pairs(textPartsMap) do
+                if p and p.Parent then
+                    if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
+                    if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
+                end
             end
-            textParts = {}
+            textPartsMap = {}
         end
     end)
+    btnToggle.Size = UDim2.new(0.32, 0, 1, 0) -- ขนาดที่เหลือ
 end
 
 -- [[ LOGIC ]] --
 RunService.Heartbeat:Connect(function()
-    if not textMode or not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
+    if not textMode then return end
+    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
     
     local root = LP.Character.HumanoidRootPart
     
-    -- 1. หา Part รอบตัวมาใช้งาน (ถ้ายังหาไม่พอ)
-    local radius = 100
-    local neededParts = 0
-    for i = 1, #inputText do
-        local char = string.sub(inputText, i, i)
-        if fontData[char] then neededParts = neededParts + #fontData[char] end
-    end
-    
-    -- เติม Part ใส่ List ถ้าขาด
-    if #textParts < neededParts then
-        local found = workspace:GetPartBoundsInRadius(root.Position, radius)
-        for _, p in ipairs(found) do
-            if p:IsA("BasePart") and not p.Anchored and not p.Parent:FindFirstChild("Humanoid") and not table.find(textParts, p) then
-                table.insert(textParts, p)
-                if #textParts >= neededParts then break end
-            end
+    -- หา Part รอบตัว (ถ้ายังไม่มีในแมพ)
+    local availableParts = {}
+    local nearby = workspace:GetPartBoundsInRadius(root.Position, 100)
+    for _, p in ipairs(nearby) do
+        if p:IsA("BasePart") and not p.Anchored and p.Parent ~= LP.Character and not textPartsMap[p] then
+             -- กรอง Part ที่เล็กหรือใหญ่เกินไป
+             if p.Size.Magnitude < 20 and p.Size.Magnitude > 0.5 then
+                 table.insert(availableParts, p)
+             end
         end
     end
 
-    -- 2. คำนวณตำแหน่งและขยับ Part
-    local originCFrame = root.CFrame * CFrame.new(0, 5, -15) -- ลอยอยู่ข้างหน้า 15 studs สูง 5 studs
-    local currentPartIndex = 1
-    local xOffset = 0
+    -- คำนวณตำแหน่งจุด (Dots) ของข้อความ
+    local startCFrame = root.CFrame * CFrame.new(0, 5, -15) -- เริ่มต้นข้างหน้าตัวละคร
+    local dots = {}
     
-    for i = 1, #inputText do
-        local char = string.sub(inputText, i, i)
-        local dots = fontData[char] or fontData[" "]
+    -- แปลง String เป็น Coordinates
+    local cursorX = 0
+    for i = 1, #textString do
+        local char = string.sub(textString, i, i)
+        local matrix = charMap[char] or charMap[" "]
         
-        if dots then
-            for _, dot in ipairs(dots) do
-                local p = textParts[currentPartIndex]
-                if p and p.Parent then
-                    -- สร้าง BodyPosition ถ้ายังไม่มี
-                    if not p:FindFirstChild("TextBP") then
-                        local bp = Instance.new("BodyPosition", p)
-                        bp.Name = "TextBP"; bp.MaxForce = Vector3.new(1e5,1e5,1e5); bp.D = 500; bp.P = 20000
-                        local bg = Instance.new("BodyGyro", p)
-                        bg.Name = "TextBG"; bg.MaxTorque = Vector3.new(1e5,1e5,1e5); bg.D = 500; bg.P = 3000
-                    end
-                    
-                    -- คำนวณตำแหน่งจุด (Dot Position)
-                    local targetPos = originCFrame * CFrame.new((xOffset + dot.x) * textScale, dot.y * textScale, 0)
-                    
-                    p:SetNetworkOwner(LP)
-                    p.TextBP.Position = targetPos.Position
-                    p.TextBG.CFrame = originCFrame -- หันหน้ามาทางเดียวกับข้อความ
-                    p.CanCollide = false -- ปิดชนเพื่อไม่ให้ part ดีดกันเอง
-                    
-                    currentPartIndex = currentPartIndex + 1
+        -- วาดตัวอักษร 3x5 (เริ่มจากล่างขึ้นบน หรือ บนลงล่าง แล้วแต่ Logic array)
+        -- ใน Array ที่เขียน: 1-3=แถวบน, 4-6=แถว2, ... 13-15=แถวล่างสุด
+        for row = 0, 4 do
+            for col = 0, 2 do
+                local index = (row * 3) + col + 1
+                if matrix[index] == 1 then
+                    -- คำนวณตำแหน่งสัมพัทธ์
+                    -- X เพิ่มไปทางขวา, Y ลดลงข้างล่าง (หรือสลับกัน)
+                    -- เอาแบบง่าย: Row 0 อยู่บนสุด
+                    table.insert(dots, {
+                        x = cursorX + col,
+                        y = 4 - row -- กลับด้านเพื่อให้ index 0 อยู่บน
+                    })
                 end
             end
-            xOffset = xOffset + 5 -- ขยับไปตัวอักษรถัดไป (เว้นช่องไฟ)
+        end
+        cursorX = cursorX + 4 -- เว้นวรรคระหว่างตัวอักษร
+    end
+    
+    -- จัดกึ่งกลาง
+    local totalWidth = cursorX
+    local xOffset = -(totalWidth * textScale) / 2
+
+    -- จับคู่ Part กับจุด (Dots)
+    local usedParts = {}
+    
+    for i, dot in ipairs(dots) do
+        -- หา Part มาใช้งาน
+        local part = nil
+        
+        -- เช็คว่ามี Part เดิมที่เคยจับคู่จุดนี้ไหม (Logic ง่ายๆ คือใช้คิว)
+        -- ในที่นี้เราจะวนลูปหา Part ว่าง
+        for p, targetInd in pairs(textPartsMap) do
+            if targetInd == i then part = p break end
+        end
+        
+        -- ถ้าไม่มี ให้ดึงจาก available
+        if not part and #availableParts > 0 then
+            part = table.remove(availableParts, 1)
+            textPartsMap[part] = i
+        end
+        
+        if part and part.Parent then
+            usedParts[part] = true
+            
+            -- ปรับ Scale ตามขนาด Part เฉลี่ย
+            local pSize = (part.Size.X + part.Size.Y)/2
+            local finalScale = pSize * 1.2 -- ระยะห่างเผื่อช่องว่างนิดหน่อย
+            
+            local targetPos = startCFrame * CFrame.new((dot.x * finalScale) + xOffset, (dot.y * finalScale), 0)
+            
+            -- สร้าง/อัปเดต BodyPosition
+            local bp = part:FindFirstChild("BodyPosition") or Instance.new("BodyPosition", part)
+            bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            bp.P = 3000
+            bp.D = 100
+            bp.Position = targetPos.Position
+            
+            local bg = part:FindFirstChild("BodyGyro") or Instance.new("BodyGyro", part)
+            bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+            bg.CFrame = targetPos -- หันหน้าตามแนวข้อความ
+            
+            -- ดึง Network Ownership
+            pcall(function() part:SetNetworkOwner(LP) end)
+            part.CanCollide = false
         end
     end
     
-    -- ปล่อย Part ส่วนเกินที่ไม่ได้ใช้เป็นตัวอักษร
-    for i = currentPartIndex, #textParts do
-        local p = textParts[i]
-        if p then
-            if p:FindFirstChild("TextBP") then p.TextBP:Destroy() end
-            if p:FindFirstChild("TextBG") then p.TextBG:Destroy() end
-            table.remove(textParts, i)
+    -- Cleanup: ปล่อย Part ที่ไม่ได้ใช้ใน Text รอบนี้ (เช่น ลบตัวอักษรออก)
+    for p, _ in pairs(textPartsMap) do
+        if not usedParts[p] then
+            if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
+            if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
+            textPartsMap[p] = nil
+            p.CanCollide = true
         end
     end
 end)
