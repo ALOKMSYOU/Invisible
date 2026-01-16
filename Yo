@@ -1186,5 +1186,165 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
+-- [[ TEXT MODE VARIABLES ]] --
+local textMode = false
+local inputText = "ABC"
+local textParts = {} -- เก็บ Part ที่กำลังใช้งาน
+local textScale = 2 -- ขนาดความห่างของแต่ละจุด
+local fontData = {} -- เก็บข้อมูลรูปทรงตัวอักษร
+
+-- [[ สร้างข้อมูล FONT (5x5 Grid) ]] --
+local function defineChar(char, map)
+    fontData[char] = {}
+    local row = 1
+    local col = 1
+    for i = 1, #map do
+        local c = string.sub(map, i, i)
+        if c == "1" then
+            table.insert(fontData[char], {x = col, y = 5 - row}) -- y กลับด้านเพื่อให้เรียงจากบนลงล่าง
+        end
+        if c ~= " " then
+            col = col + 1
+            if col > 4 then col = 1; row = row + 1 end
+        end
+    end
+end
+
+-- นิยามตัวอักษร (A-Z, 0-9 แบบย่อ)
+defineChar("A", "0110 1001 1111 1001 1001")
+defineChar("B", "1110 1001 1110 1001 1110")
+defineChar("C", "0111 1000 1000 1000 0111")
+defineChar("D", "1110 1001 1001 1001 1110")
+defineChar("E", "1111 1000 1110 1000 1111")
+defineChar("F", "1111 1000 1110 1000 1000")
+defineChar("G", "0111 1000 1011 1001 0110")
+defineChar("H", "1001 1001 1111 1001 1001")
+defineChar("I", "0110 0010 0010 0010 0110")
+defineChar("J", "0011 0001 0001 1001 0110")
+defineChar("K", "1001 1010 1100 1010 1001")
+defineChar("L", "1000 1000 1000 1000 1111")
+defineChar("M", "1001 1111 1001 1001 1001")
+defineChar("N", "1001 1101 1011 1001 1001")
+defineChar("O", "0110 1001 1001 1001 0110")
+defineChar("P", "1110 1001 1110 1000 1000")
+defineChar("Q", "0110 1001 1001 1010 0101")
+defineChar("R", "1110 1001 1110 1010 1001")
+defineChar("S", "0111 1000 0110 0001 1110")
+defineChar("T", "1111 0010 0010 0010 0010")
+defineChar("U", "1001 1001 1001 1001 0110")
+defineChar("V", "1001 1001 1001 0110 0010")
+defineChar("W", "1001 1001 1001 1111 1001")
+defineChar("X", "1001 0110 0010 0110 1001")
+defineChar("Y", "1001 0110 0010 0010 0010")
+defineChar("Z", "1111 0001 0010 0100 1111")
+defineChar(" ", "0000 0000 0000 0000 0000") -- เว้นวรรค
+-- (สามารถเพิ่มตัวเลข 0-9 ได้ในรูปแบบเดียวกัน)
+
+-- [[ UI SETUP ]] --
+if pages and pages.main then
+    label(pages.main, "--- TEXT PART BUILDER ---")
+
+    -- ช่องใส่ข้อความ
+    local txtBox = Instance.new("TextBox", pages.main)
+    txtBox.Size = UDim2.new(1, 0, 0, 30)
+    txtBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    txtBox.TextColor3 = Color3.new(1, 1, 1)
+    txtBox.Text = "HELLO"
+    txtBox.PlaceholderText = "Type text here..."
+    txtBox.Font = Enum.Font.GothamBold
+    txtBox.TextSize = 14
+    
+    txtBox.FocusLost:Connect(function()
+        inputText = string.upper(txtBox.Text)
+    end)
+
+    -- ปุ่มเปิด/ปิด Text Mode
+    local btnTextMode = btn(pages.main, "📝 TEXT MODE: OFF", function(b)
+        textMode = not textMode
+        b.Text = "📝 TEXT MODE: " .. (textMode and "ON" or "OFF")
+        b.BackgroundColor3 = textMode and Color3.fromRGB(0, 150, 150) or Color3.fromRGB(70, 70, 70)
+        
+        if not textMode then
+            -- เมื่อปิด ให้ปล่อย Part ร่วง
+            for _, p in pairs(textParts) do
+                if p:FindFirstChild("TextBP") then p.TextBP:Destroy() end
+                if p:FindFirstChild("TextBG") then p.TextBG:Destroy() end
+            end
+            textParts = {}
+        end
+    end)
+end
+
+-- [[ LOGIC ]] --
+RunService.Heartbeat:Connect(function()
+    if not textMode or not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local root = LP.Character.HumanoidRootPart
+    
+    -- 1. หา Part รอบตัวมาใช้งาน (ถ้ายังหาไม่พอ)
+    local radius = 100
+    local neededParts = 0
+    for i = 1, #inputText do
+        local char = string.sub(inputText, i, i)
+        if fontData[char] then neededParts = neededParts + #fontData[char] end
+    end
+    
+    -- เติม Part ใส่ List ถ้าขาด
+    if #textParts < neededParts then
+        local found = workspace:GetPartBoundsInRadius(root.Position, radius)
+        for _, p in ipairs(found) do
+            if p:IsA("BasePart") and not p.Anchored and not p.Parent:FindFirstChild("Humanoid") and not table.find(textParts, p) then
+                table.insert(textParts, p)
+                if #textParts >= neededParts then break end
+            end
+        end
+    end
+
+    -- 2. คำนวณตำแหน่งและขยับ Part
+    local originCFrame = root.CFrame * CFrame.new(0, 5, -15) -- ลอยอยู่ข้างหน้า 15 studs สูง 5 studs
+    local currentPartIndex = 1
+    local xOffset = 0
+    
+    for i = 1, #inputText do
+        local char = string.sub(inputText, i, i)
+        local dots = fontData[char] or fontData[" "]
+        
+        if dots then
+            for _, dot in ipairs(dots) do
+                local p = textParts[currentPartIndex]
+                if p and p.Parent then
+                    -- สร้าง BodyPosition ถ้ายังไม่มี
+                    if not p:FindFirstChild("TextBP") then
+                        local bp = Instance.new("BodyPosition", p)
+                        bp.Name = "TextBP"; bp.MaxForce = Vector3.new(1e5,1e5,1e5); bp.D = 500; bp.P = 20000
+                        local bg = Instance.new("BodyGyro", p)
+                        bg.Name = "TextBG"; bg.MaxTorque = Vector3.new(1e5,1e5,1e5); bg.D = 500; bg.P = 3000
+                    end
+                    
+                    -- คำนวณตำแหน่งจุด (Dot Position)
+                    local targetPos = originCFrame * CFrame.new((xOffset + dot.x) * textScale, dot.y * textScale, 0)
+                    
+                    p:SetNetworkOwner(LP)
+                    p.TextBP.Position = targetPos.Position
+                    p.TextBG.CFrame = originCFrame -- หันหน้ามาทางเดียวกับข้อความ
+                    p.CanCollide = false -- ปิดชนเพื่อไม่ให้ part ดีดกันเอง
+                    
+                    currentPartIndex = currentPartIndex + 1
+                end
+            end
+            xOffset = xOffset + 5 -- ขยับไปตัวอักษรถัดไป (เว้นช่องไฟ)
+        end
+    end
+    
+    -- ปล่อย Part ส่วนเกินที่ไม่ได้ใช้เป็นตัวอักษร
+    for i = currentPartIndex, #textParts do
+        local p = textParts[i]
+        if p then
+            if p:FindFirstChild("TextBP") then p.TextBP:Destroy() end
+            if p:FindFirstChild("TextBG") then p.TextBG:Destroy() end
+            table.remove(textParts, i)
+        end
+    end
+end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
