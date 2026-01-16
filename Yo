@@ -1189,67 +1189,91 @@ end)
 -- [[ TEXT PART SYSTEM - FREEZE VERSION ]] --
 local textMode = false
 local textString = "HELLO"
-local activeTextParts = {} -- เก็บ Part ที่กำลังใช้ทำ Text
-
--- ตาราง Font 3x5 (เหมือนเดิม)
+local isFrozen = false -- สถานะสำหรับการ Freeze
+local textPartsMap = {} 
 local charMap = {
-    ["A"] = {1,1,1, 1,0,1, 1,1,1, 1,0,1, 1,0,1},
-    ["B"] = {1,1,0, 1,0,1, 1,1,0, 1,0,1, 1,1,0},
-    ["C"] = {0,1,1, 1,0,0, 1,0,0, 1,0,0, 0,1,1},
-    ["D"] = {1,1,0, 1,0,1, 1,0,1, 1,0,1, 1,1,0},
-    ["E"] = {1,1,1, 1,0,0, 1,1,1, 1,0,0, 1,1,1},
-    ["F"] = {1,1,1, 1,0,0, 1,1,0, 1,0,0, 1,0,0},
-    ["G"] = {0,1,1, 1,0,0, 1,0,1, 1,0,1, 0,1,1},
-    ["H"] = {1,0,1, 1,0,1, 1,1,1, 1,0,1, 1,0,1},
-    ["I"] = {1,1,1, 0,1,0, 0,1,0, 0,1,0, 1,1,1},
-    ["J"] = {0,0,1, 0,0,1, 0,0,1, 1,0,1, 0,1,0},
-    ["K"] = {1,0,1, 1,0,1, 1,1,0, 1,0,1, 1,0,1},
-    ["L"] = {1,0,0, 1,0,0, 1,0,0, 1,0,0, 1,1,1},
-    ["M"] = {1,0,1, 1,1,1, 1,1,1, 1,0,1, 1,0,1},
-    ["N"] = {1,1,1, 1,0,1, 1,0,1, 1,0,1, 1,0,1},
-    ["O"] = {0,1,0, 1,0,1, 1,0,1, 1,0,1, 0,1,0},
-    ["P"] = {1,1,0, 1,0,1, 1,1,0, 1,0,0, 1,0,0},
-    ["Q"] = {0,1,0, 1,0,1, 1,0,1, 1,1,1, 0,1,1},
-    ["R"] = {1,1,0, 1,0,1, 1,1,0, 1,0,1, 1,0,1},
-    ["S"] = {0,1,1, 1,0,0, 0,1,0, 0,0,1, 1,1,0},
-    ["T"] = {1,1,1, 0,1,0, 0,1,0, 0,1,0, 0,1,0},
-    ["U"] = {1,0,1, 1,0,1, 1,0,1, 1,0,1, 1,1,1},
-    ["V"] = {1,0,1, 1,0,1, 1,0,1, 0,1,0, 0,1,0},
-    ["W"] = {1,0,1, 1,0,1, 1,1,1, 1,1,1, 1,0,1},
-    ["X"] = {1,0,1, 1,0,1, 0,1,0, 1,0,1, 1,0,1},
-    ["Y"] = {1,0,1, 1,0,1, 0,1,0, 0,1,0, 0,1,0},
-    ["Z"] = {1,1,1, 0,0,1, 0,1,0, 1,0,0, 1,1,1},
-    ["0"] = {1,1,1, 1,0,1, 1,0,1, 1,0,1, 1,1,1},
-    ["1"] = {0,1,0, 1,1,0, 0,1,0, 0,1,0, 1,1,1},
-    ["2"] = {1,1,1, 0,0,1, 1,1,1, 1,0,0, 1,1,1},
-    ["3"] = {1,1,1, 0,0,1, 1,1,1, 0,0,1, 1,1,1},
-    ["4"] = {1,0,1, 1,0,1, 1,1,1, 0,0,1, 0,0,1},
-    ["5"] = {1,1,1, 1,0,0, 1,1,1, 0,0,1, 1,1,1},
-    ["6"] = {1,1,1, 1,0,0, 1,1,1, 1,0,1, 1,1,1},
-    ["7"] = {1,1,1, 0,0,1, 0,1,0, 0,1,0, 0,1,0},
-    ["8"] = {1,1,1, 1,0,1, 1,1,1, 1,0,1, 1,1,1},
-    ["9"] = {1,1,1, 1,0,1, 1,1,1, 0,0,1, 1,1,1},
+    ["A"] = {1,0,1, 1,0,1, 1,1,1, 1,0,1, 0,1,0}, ["B"] = {1,1,0, 1,0,1, 1,1,0, 1,0,1, 1,1,0},
+    ["C"] = {0,1,1, 1,0,0, 1,0,0, 1,0,0, 0,1,1}, ["D"] = {1,1,0, 1,0,1, 1,0,1, 1,0,1, 1,1,0},
+    ["E"] = {1,1,1, 1,0,0, 1,1,1, 1,0,0, 1,1,1}, ["F"] = {1,0,0, 1,0,0, 1,1,1, 1,0,0, 1,1,1},
+    ["G"] = {0,1,1, 1,0,1, 1,0,0, 1,0,0, 0,1,1}, ["H"] = {1,0,1, 1,0,1, 1,1,1, 1,0,1, 1,0,1},
+    ["I"] = {1,1,1, 0,1,0, 0,1,0, 0,1,0, 1,1,1}, ["J"] = {1,1,0, 1,0,1, 0,0,1, 0,0,1, 0,0,1},
+    ["K"] = {1,0,1, 1,1,0, 1,0,0, 1,1,0, 1,0,1}, ["L"] = {1,1,1, 1,0,0, 1,0,0, 1,0,0, 1,0,0},
+    ["M"] = {1,0,1, 1,0,1, 1,1,1, 1,1,1, 1,0,1}, ["N"] = {1,0,1, 1,0,1, 1,1,1, 1,0,1, 1,0,1},
+    ["O"] = {0,1,0, 1,0,1, 1,0,1, 1,0,1, 0,1,0}, ["P"] = {1,0,0, 1,0,0, 1,1,1, 1,0,1, 1,1,0},
+    ["Q"] = {1,1,1, 0,1,0, 1,0,1, 1,0,1, 0,1,0}, ["R"] = {1,0,1, 1,0,1, 1,1,0, 1,0,1, 1,1,0},
+    ["S"] = {1,1,0, 0,0,1, 0,1,0, 1,0,0, 0,1,1}, ["T"] = {0,1,0, 0,1,0, 0,1,0, 0,1,0, 1,1,1},
+    ["U"] = {1,1,1, 1,0,1, 1,0,1, 1,0,1, 1,0,1}, ["V"] = {0,1,0, 0,1,0, 1,0,1, 1,0,1, 1,0,1},
+    ["W"] = {1,0,1, 1,1,1, 1,1,1, 1,0,1, 1,0,1}, ["X"] = {1,0,1, 0,1,0, 0,1,0, 0,1,0, 1,0,1},
+    ["Y"] = {0,1,0, 0,1,0, 1,1,1, 1,0,1, 1,0,1}, ["Z"] = {1,1,1, 1,0,0, 1,1,1, 0,0,1, 1,1,1},
+    ["0"] = {1,1,1, 1,0,1, 1,0,1, 1,0,1, 1,1,1}, ["1"] = {1,1,1, 0,1,0, 0,1,0, 1,1,0, 0,1,0},
+    ["2"] = {1,1,1, 1,0,0, 1,1,1, 0,0,1, 1,1,1}, ["3"] = {1,1,1, 0,0,1, 1,1,1, 0,0,1, 1,1,1},
+    ["4"] = {0,0,1, 0,0,1, 1,1,1, 1,0,1, 1,0,1}, ["5"] = {1,1,1, 0,0,1, 1,1,1, 1,0,0, 1,1,1},
+    ["6"] = {1,1,1, 1,0,1, 1,1,1, 1,0,0, 1,1,1}, ["7"] = {0,1,0, 0,1,0, 0,0,1, 0,0,1, 1,1,1},
+    ["8"] = {1,1,1, 1,0,1, 1,1,1, 1,0,1, 1,1,1}, ["9"] = {1,1,1, 0,0,1, 1,1,1, 1,0,1, 1,1,1},
     [" "] = {0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0},
 }
 
--- [[ ฟังก์ชันหลักในการสร้าง Text ]] --
-local function createTextPartFreeze()
-    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
+-- ฟังก์ชันตรวจสอบ Part ที่ไม่ใช่ของผู้เล่น หรือ NPC
+local function isCleanPart(p)
+    if not p:IsA("BasePart") or p.Anchored then return false end
+    if p:FindFirstAncestorOfClass("Model") then
+        local model = p:FindFirstAncestorOfClass("Model")
+        if game.Players:GetPlayerFromCharacter(model) then return false end -- ผู้เล่น
+        if model:FindFirstChildOfClass("Humanoid") then return false end -- NPC
+    end
+    return true
+end
+
+-- [[ UI SETUP ]] --
+if pages and pages.main then
+    label(pages.main, "TEXT PART SYSTEM")
+    local textRow = Instance.new("Frame", pages.main)
+    textRow.Size = UDim2.new(1, 0, 0, 35); textRow.BackgroundTransparency = 1
+    Instance.new("UIListLayout", textRow).FillDirection = "Horizontal"
+
+    local textBox = Instance.new("TextBox", textRow)
+    textBox.Size = UDim2.new(0.7, -5, 1, 0); textBox.Text = "HELLO"
+    textBox.BackgroundColor3 = Color3.fromRGB(40,40,40); textBox.TextColor3 = Color3.new(1,1,1)
+
+    local btnToggle = btn(textRow, "OFF", function(b)
+        textMode = not textMode
+        isFrozen = false -- รีเซ็ตสถานะ Freeze เมื่อเปิด/ปิด
+        b.Text = textMode and "ON" or "OFF"
+        b.BackgroundColor3 = textMode and Color3.fromRGB(0,150,0) or Color3.fromRGB(150,0,0)
+        
+        if not textMode then
+            for p, _ in pairs(textPartsMap) do
+                p.Anchored = false
+                if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
+                if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
+            end
+            textPartsMap = {}
+        end
+    end)
+    btnToggle.Size = UDim2.new(0.3, 0, 1, 0)
     
-    local root = LP.Character.HumanoidRootPart
-    -- ล็อกตำแหน่งเป้าหมายไว้ที่หน้าผู้เล่น 3 Studs ณ วินาทีที่กด
-    local centerAnchorCF = root.CFrame * CFrame.new(0, 2, -3) 
+    textBox:GetPropertyChangedSignal("Text"):Connect(function()
+        textString = textBox.Text:upper()
+        isFrozen = false -- พิมพ์ใหม่ให้เริ่มจัดเรียงใหม่
+    end)
+end
+
+-- [[ LOGIC ]] --
+RunService.Heartbeat:Connect(function()
+    if not textMode or isFrozen then return end
+    if not LP.Character or not LP.Character.PrimaryPart then return end
     
-    -- หา Part รอบตัวมาใช้
+    local root = LP.Character.PrimaryPart
+    -- จุดเริ่มต้นคือหน้าผู้เล่น 3 Stud
+    local startCFrame = root.CFrame * CFrame.new(0, 2, -3) 
+    
     local availableParts = {}
-    local nearby = workspace:GetPartBoundsInRadius(root.Position, holdDistance or 60)
-    for _, p in ipairs(nearby) do
-        if p:IsA("BasePart") and not p.Anchored and p.Parent ~= LP.Character then
+    for _, p in ipairs(workspace:GetPartBoundsInRadius(root.Position, 100)) do
+        if isCleanPart(p) and not textPartsMap[p] then
             table.insert(availableParts, p)
         end
     end
 
-    -- คำนวณจุด Dots
     local dots = {}
     local cursorX = 0
     for i = 1, #textString do
@@ -1265,68 +1289,47 @@ local function createTextPartFreeze()
         cursorX = cursorX + 4
     end
 
-    -- คำนวณ Offset ให้ข้อความอยู่ตรงกลาง
     local xOffset = -(cursorX * 1.5) / 2
+    local allReached = true
 
-    -- เริ่มเคลื่อนย้ายและ Freeze
     for i, dot in ipairs(dots) do
-        if #availableParts > 0 then
-            local part = table.remove(availableParts, 1)
-            table.insert(activeTextParts, part)
+        local part = nil
+        for p, idx in pairs(textPartsMap) do if idx == i then part = p break end end
+        if not part and #availableParts > 0 then
+            part = table.remove(availableParts, 1)
+            textPartsMap[part] = i
+        end
 
-            -- คำนวณตำแหน่งแต่ละเม็ดพิกเซล
-            local gap = (part.Size.X + part.Size.Y) / 2 * 1.1
-            local finalPos = centerAnchorCF * CFrame.new((dot.x * gap) + xOffset, dot.y * gap, 0)
-
-            -- ใช้ Tween หรือการวาร์ปแล้ว Anchor
+        if part and part.Parent then
+            local pSize = (part.Size.X + part.Size.Y) / 2
+            local gap = pSize * 1.2
+            local targetPos = startCFrame * CFrame.new((dot.x * gap) + xOffset, (dot.y * gap), 0)
+            
+            local bp = part:FindFirstChild("BodyPosition") or Instance.new("BodyPosition", part)
+            bp.MaxForce = Vector3.new(1,1,1) * 500000; bp.P = 10000; bp.Position = targetPos.Position
+            
+            local bg = part:FindFirstChild("BodyGyro") or Instance.new("BodyGyro", part)
+            bg.MaxTorque = Vector3.new(1,1,1) * 500000; bg.CFrame = targetPos
+            
             pcall(function() part:SetNetworkOwner(LP) end)
-            part.CanCollide = false
-            part.CFrame = finalPos
-            part.Velocity = Vector3.new(0,0,0)
-            part.Anchored = true -- Freeze ทันที
+            
+            -- ตรวจสอบว่า Part ถึงตำแหน่งหรือยัง (ถ้ารัศมีห่างไม่เกิน 0.5 Stud)
+            if (part.Position - targetPos.Position).Magnitude > 0.5 then
+                allReached = false
+            end
         end
     end
-end
 
--- [[ UI ]] --
-if pages and pages.main then
-    label(pages.main, "TEXT PART SYSTEM")
-    
-    local textRow = Instance.new("Frame", pages.main)
-    textRow.Size = UDim2.new(1, 0, 0, 35)
-    textRow.BackgroundTransparency = 1
-    Instance.new("UIListLayout", textRow).FillDirection = "Horizontal"
-
-    local textBox = Instance.new("TextBox", textRow)
-    textBox.Size = UDim2.new(0.7, -5, 1, 0)
-    textBox.Text = "HELLO"
-    textBox.PlaceholderText = "TEXT..."
-    textBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    textBox.TextColor3 = Color3.new(1,1,1)
-    textBox:GetPropertyChangedSignal("Text"):Connect(function()
-        textString = string.upper(textBox.Text)
-    end)
-
-    local toggleBtn = btn(textRow, "OFF", function(b)
-        textMode = not textMode
-        if textMode then
-            b.Text = "ON"
-            b.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-            createTextPartFreeze() -- สั่งทำงานครั้งเดียวตอนเปิด
-        else
-            b.Text = "OFF"
-            b.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-            -- ปลดล็อก Part
-            for _, p in ipairs(activeTextParts) do
-                if p and p.Parent then
-                    p.Anchored = false
-                    p.CanCollide = true
-                end
-            end
-            activeTextParts = {}
+    -- ถ้าเรียงเสร็จแล้ว (Part ทุกชิ้นถึงจุดหมาย) ให้ทำการ Freeze
+    if #dots > 0 and allReached then
+        isFrozen = true
+        for p, _ in pairs(textPartsMap) do
+            p.Anchored = true -- Freeze อยู่กับที่
+            if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
+            if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
         end
-    end)
-    toggleBtn.Size = UDim2.new(0.3, 0, 1, 0)
-end
+    end
+end)
+
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
