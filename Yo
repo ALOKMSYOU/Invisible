@@ -1524,5 +1524,113 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
+-- [[ PUPPET MASTER SETTINGS ]] --
+local puppetMode = false
+local defenseMode = false
+local attackMode = false
+local puppetList = {} -- สมมติว่านี่คือ List ของมอสที่ถูกจับมา
+local grabDist = 5 -- ระยะ Grab ที่คุณปรับไว้
+
+-- สร้างหน้า Puppet Master (ถ้ายังไม่มี)
+pages.puppet = createPage()
+btn(pages.main, "PUPPET MASTER", function() showPage("puppet") end)
+
+-- [[ UI SETUP - PUPPET MASTER PAGE ]] --
+label(pages.puppet, "--- PUPPET MASTER CONTROL ---")
+
+-- ปุ่ม Defense
+local btnDefense = btn(pages.puppet, "DEFENSE MODE: OFF", function(b)
+    defenseMode = not defenseMode
+    attackMode = false -- ปิด Attack ถ้าเปิด Defense
+    b.Text = "DEFENSE MODE: " .. (defenseMode and "ON" or "OFF")
+    b.BackgroundColor3 = defenseMode and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
+end)
+
+-- ปุ่ม Attack
+local btnAttack = btn(pages.puppet, "ATTACK MODE: OFF", function(b)
+    attackMode = not attackMode
+    defenseMode = false -- ปิด Defense ถ้าเปิด Attack
+    b.Text = "ATTACK MODE: " .. (attackMode and "ON" or "OFF")
+    b.BackgroundColor3 = attackMode and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(60, 60, 60)
+end)
+
+btn(pages.puppet, "BACK", function() showPage("main") end)
+
+-- [[ LOGIC SYSTEM ]] --
+
+-- ฟังก์ชันหาผู้เล่นที่ใกล้ที่สุด (ยกเว้นตัวเรา)
+local function getNearestPlayer(range)
+    local closest = nil
+    local dist = range or math.huge
+    for _, v in ipairs(game.Players:GetPlayers()) do
+        if v ~= LP and v.Character and v.Character:FindFirstChild("HumanoidRootPart") then
+            local d = (LP.Character.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
+            if d < dist then
+                dist = d
+                closest = v.Character.HumanoidRootPart
+            end
+        end
+    end
+    return closest
+end
+
+RunService.Heartbeat:Connect(function()
+    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
+    local root = LP.Character.HumanoidRootPart
+    
+    -- จัดการมอสแต่ละตัวใน List
+    for i, moss in ipairs(puppetList) do
+        if moss and moss.Parent then
+            -- 1. ทำให้มอสไม่ทำอันตรายผู้รัน (Ignore Player)
+            -- บังคับ NetworkOwner และปิด Touch Interest ชั่วคราวถ้าจำเป็น
+            pcall(function() 
+                moss:SetNetworkOwner(LP) 
+                if moss:FindFirstChild("TouchInterest") then moss.TouchInterest:Destroy() end
+            end)
+
+            local targetPos = nil
+            local targetCFrame = nil
+
+            if defenseMode then
+                -- โหมดป้องกัน: ตรวจสอบว่ามีคนใกล้ตัวไหม
+                local enemy = getNearestPlayer(15) -- ถ้ามีคนเข้าใกล้ 15 Stud
+                
+                if enemy then
+                    -- พุ่งไปหาศัตรู
+                    targetPos = enemy.Position
+                else
+                    -- เรียงรอบตัวผู้รันตามระยะ Grab
+                    local angle = (i / #puppetList) * math.pi * 2
+                    local offset = Vector3.new(math.cos(angle) * grabDist, 0, math.sin(angle) * grabDist)
+                    targetPos = root.Position + offset
+                end
+                
+            elseif attackMode then
+                -- โหมดโจมตี: หาคนในเซิร์ฟเวอร์แล้วพุ่งใส่
+                local enemy = getNearestPlayer()
+                if enemy then
+                    targetPos = enemy.Position
+                else
+                    -- ถ้าไม่มีใครให้บินอยู่เหนือหัวเรา
+                    targetPos = root.Position + Vector3.new(0, 10, 0)
+                end
+            end
+
+            -- เคลื่อนที่มอส (ใช้ BodyPosition/BodyGyro เพื่อความลื่นไหล)
+            if targetPos then
+                local bp = moss:FindFirstChild("BodyPosition") or Instance.new("BodyPosition", moss)
+                bp.MaxForce = Vector3.new(1,1,1) * math.huge
+                bp.P = 20000
+                bp.Position = targetPos
+
+                local bg = moss:FindFirstChild("BodyGyro") or Instance.new("BodyGyro", moss)
+                bg.MaxTorque = Vector3.new(1,1,1) * math.huge
+                bg.CFrame = CFrame.lookAt(moss.Position, targetPos)
+            end
+        else
+            table.remove(puppetList, i) -- ลบออกจาก List ถ้ามอสหายไป
+        end
+    end
+end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
