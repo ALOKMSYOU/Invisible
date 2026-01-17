@@ -1139,65 +1139,278 @@ UserInputService.InputBegan:Connect(function(input, gp)
         end
     end
 end)
--- [[ ADVANCED 3D GRID & BUILD SYSTEM ]] --
+
+-- Loop การทำงาน
+RunService.Heartbeat:Connect(function()
+    local changed = false
+    -- Auto Remove Dead
+    for i = #puppetList, 1, -1 do
+        local m = puppetList[i]
+        if not m or not m.Parent or (m:FindFirstChildOfClass("Humanoid") and m:FindFirstChildOfClass("Humanoid").Health <= 0) then
+            table.remove(puppetList, i)
+            selectedForControl[m] = nil
+            if currentPuppet == m then currentPuppet = nil end
+            changed = true
+        end
+    end
+    
+    -- Auto Add NPC
+    if autoAddNPC and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        local myPos = LP.Character.HumanoidRootPart.Position
+        local parts = workspace:GetPartBoundsInRadius(myPos, holdDistance)
+        for _, p in ipairs(parts) do
+            local m = getPuppetModel(p)
+            if m and not table.find(puppetList, m) then
+                table.insert(puppetList, m)
+                selectedForControl[m] = true
+                changed = true
+            end
+        end
+    end
+    if changed then refreshPuppetList() end
+
+    -- Control Physics
+    if controlling and LP.Character then
+        local moveDir = LP.Character:FindFirstChildOfClass("Humanoid").MoveDirection
+        for npc, isSelected in pairs(selectedForControl) do
+            if isSelected and npc:FindFirstChild("HumanoidRootPart") then
+                local root = npc.HumanoidRootPart
+                pcall(function() root:SetNetworkOwner(LP) end)
+                if moveDir.Magnitude > 0 then
+                    root.AssemblyLinearVelocity = Vector3.new(moveDir.X * 30, root.AssemblyLinearVelocity.Y, moveDir.Z * 30)
+                    root.CFrame = root.CFrame:Lerp(CFrame.lookAt(root.Position, root.Position + moveDir), 0.2)
+                else
+                    root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+                end
+            end
+        end
+    end
+end)
+-- [[ TEXT PART SYSTEM - PRO VERSION ]] --
+local textMode = false
+local textFrozen = false
+local textString = "HELLO"
+local textPartsMap = {} 
+local frozenAnchorPoints = {} -- เก็บตำแหน่งพิกัดโลกเมื่อกด Freeze
+
+-- ตารางอักษร 3x5 (ปรับให้คมชัดขึ้น)
+local charMap = {
+    ["A"] = {0,1,0, 1,0,1, 1,1,1, 1,0,1, 1,0,1}, ["B"] = {1,1,0, 1,0,1, 1,1,0, 1,0,1, 1,1,0},
+    ["C"] = {0,1,1, 1,0,0, 1,0,0, 1,0,0, 0,1,1}, ["D"] = {1,1,0, 1,0,1, 1,0,1, 1,0,1, 1,1,0},
+    ["E"] = {1,1,1, 1,0,0, 1,1,0, 1,0,0, 1,1,1}, ["F"] = {1,1,1, 1,0,0, 1,1,0, 1,0,0, 1,0,0},
+    ["G"] = {0,1,1, 1,0,0, 1,0,1, 1,0,1, 0,1,1}, ["H"] = {1,0,1, 1,0,1, 1,1,1, 1,0,1, 1,0,1},
+    ["I"] = {1,1,1, 0,1,0, 0,1,0, 0,1,0, 1,1,1}, ["J"] = {0,0,1, 0,0,1, 0,0,1, 1,0,1, 0,1,0},
+    ["K"] = {1,0,1, 1,0,1, 1,1,0, 1,0,1, 1,0,1}, ["L"] = {1,0,0, 1,0,0, 1,0,0, 1,0,0, 1,1,1},
+    ["M"] = {1,0,1, 1,1,1, 1,1,1, 1,0,1, 1,0,1}, ["N"] = {1,1,1, 1,0,1, 1,0,1, 1,0,1, 1,0,1},
+    ["O"] = {0,1,0, 1,0,1, 1,0,1, 1,0,1, 0,1,0}, ["P"] = {1,1,0, 1,0,1, 1,1,0, 1,0,0, 1,0,0},
+    ["Q"] = {0,1,0, 1,0,1, 1,0,1, 1,1,1, 0,0,1}, ["R"] = {1,1,0, 1,0,1, 1,1,0, 1,0,1, 1,0,1},
+    ["S"] = {0,1,1, 1,0,0, 0,1,0, 0,0,1, 1,1,0}, ["T"] = {1,1,1, 0,1,0, 0,1,0, 0,1,0, 0,1,0},
+    ["U"] = {1,0,1, 1,0,1, 1,0,1, 1,0,1, 1,1,1}, ["V"] = {1,0,1, 1,0,1, 1,0,1, 0,1,0, 0,1,0},
+    ["W"] = {1,0,1, 1,0,1, 1,1,1, 1,1,1, 1,0,1}, ["X"] = {1,0,1, 1,0,1, 0,1,0, 1,0,1, 1,0,1},
+    ["Y"] = {1,0,1, 1,0,1, 0,1,0, 0,1,0, 0,1,0}, ["Z"] = {1,1,1, 0,0,1, 0,1,0, 1,0,0, 1,1,1},
+    [" "] = {0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0}, ["0"] = {1,1,1, 1,0,1, 1,0,1, 1,0,1, 1,1,1},
+    ["1"] = {0,1,0, 1,1,0, 0,1,0, 0,1,0, 1,1,1},
+}
+
+-- ตรวจสอบ Part ที่ดึงได้
+local function isValidTextPart(p)
+    if not p:IsA("BasePart") or p.Anchored then return false end
+    if p:FindFirstAncestorOfClass("Model") then
+        local m = p:FindFirstAncestorOfClass("Model")
+        if game.Players:GetPlayerFromCharacter(m) or m:FindFirstChildOfClass("Humanoid") then return false end
+    end
+    return true
+end
+
+-- [[ UI SYSTEM ]] --
+if pages and pages.main then
+    label(pages.main, "TEXT PART CONTROL")
+    
+    local editFrame = Instance.new("Frame", pages.main)
+    editFrame.Size = UDim2.new(1, 0, 0, 35); editFrame.BackgroundTransparency = 1
+    Instance.new("UIListLayout", editFrame).FillDirection = "Horizontal"
+
+    local textBox = Instance.new("TextBox", editFrame)
+    textBox.Size = UDim2.new(0.6, -5, 1, 0); textBox.Text = "HELLO"
+    textBox.BackgroundColor3 = Color3.fromRGB(40,40,40); textBox.TextColor3 = Color3.new(1,1,1)
+
+    -- ปุ่มเปิด/ปิด ระบบรวม Part
+    local btnToggle = btn(editFrame, "MODE: OFF", function(b)
+        textMode = not textMode
+        b.Text = "MODE: " .. (textMode and "ON" or "OFF")
+        b.BackgroundColor3 = textMode and Color3.fromRGB(0,120,200) or Color3.fromRGB(60,60,60)
+        
+        if not textMode then
+            textFrozen = false
+            for p, _ in pairs(textPartsMap) do
+                p.Anchored = false
+                if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
+                if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
+            end
+            textPartsMap = {}
+        end
+    end)
+    btnToggle.Size = UDim2.new(0.4, 0, 1, 0)
+
+    -- ปุ่ม Freeze (วางใกล้ๆ ช่องใส่ข้อความ)
+    local btnFreeze = btn(pages.main, "FREEZE TEXT: OFF", function(b)
+        if not textMode then return end
+        textFrozen = not textFrozen
+        b.Text = "FREEZE TEXT: " .. (textFrozen and "ON" or "OFF")
+        b.BackgroundColor3 = textFrozen and Color3.fromRGB(200,100,0) or Color3.fromRGB(60,60,60)
+        
+        -- ถ้ากด Freeze ให้สั่ง Anchored ทุกตัวที่ถืออยู่
+        for p, _ in pairs(textPartsMap) do
+            p.Anchored = textFrozen
+            if textFrozen then
+                if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
+                if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
+            end
+        end
+    end)
+
+    textBox:GetPropertyChangedSignal("Text"):Connect(function()
+        textString = textBox.Text:upper()
+        if textFrozen then -- ถ้าแก้ข้อความให้หลุด Freeze อัตโนมัติเพื่อจัดใหม่
+            textFrozen = false
+            btnFreeze.Text = "FREEZE TEXT: OFF"
+            btnFreeze.BackgroundColor3 = Color3.fromRGB(60,60,60)
+        end
+    end)
+end
+
+-- [[ CORE LOGIC ]] --
+RunService.Heartbeat:Connect(function()
+    if not textMode or textFrozen then return end
+    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local root = LP.Character.HumanoidRootPart
+    local startCFrame = root.CFrame * CFrame.new(0, 5, -10) -- ระยะห่างเริ่มต้น
+
+    -- ค้นหา Part ว่าง
+    local available = {}
+    for _, p in ipairs(workspace:GetPartBoundsInRadius(root.Position, 100)) do
+        if isValidTextPart(p) and not textPartsMap[p] then table.insert(available, p) end
+    end
+
+    -- คำนวณจุด Grid
+    local dots = {}
+    local cursorX = 0
+    for i = 1, #textString do
+        local char = string.sub(textString, i, i)
+        local matrix = charMap[char] or charMap[" "]
+        for row = 0, 4 do
+            for col = 0, 2 do
+                if matrix[(row * 3) + col + 1] == 1 then
+                    table.insert(dots, {x = cursorX + col, y = 4 - row})
+                end
+            end
+        end
+        cursorX = cursorX + 4 -- ระยะห่างระหว่างตัวอักษร
+    end
+
+    local usedThisFrame = {}
+    for i, dot in ipairs(dots) do
+        local part = nil
+        -- หา Part ที่ครองตำแหน่งนี้อยู่
+        for p, idx in pairs(textPartsMap) do if idx == i then part = p break end end
+        
+        -- ถ้าไม่มีให้ดึงตัวใหม่
+        if not part and #available > 0 then
+            part = table.remove(available, 1)
+            textPartsMap[part] = i
+        end
+
+        if part and part.Parent then
+            usedThisFrame[part] = true
+            -- จัดระเบียบ: ใช้ขนาดเฉลี่ยของ Part เพื่อคำนวณระยะห่าง (Gap)
+            local gap = (part.Size.X + part.Size.Z) / 2 * 1.1 
+            local targetPos = startCFrame * CFrame.new((dot.x * gap) - (cursorX * gap / 2), dot.y * gap, 0)
+            
+            pcall(function() part:SetNetworkOwner(LP) end)
+            part.CanCollide = false
+            part.Anchored = false
+
+            local bp = part:FindFirstChild("BodyPosition") or Instance.new("BodyPosition", part)
+            bp.MaxForce = Vector3.new(1,1,1) * 100000; bp.P = 15000; bp.Position = targetPos.Position
+            
+            local bg = part:FindFirstChild("BodyGyro") or Instance.new("BodyGyro", part)
+            bg.MaxTorque = Vector3.new(1,1,1) * 100000; bg.CFrame = targetPos
+        end
+    end
+
+    -- คืนค่า Part ที่ไม่ถูกใช้
+    for p, _ in pairs(textPartsMap) do
+        if not usedThisFrame[p] then
+            p.Anchored = false
+            p.CanCollide = true
+            if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
+            if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
+            textPartsMap[p] = nil
+        end
+    end
+end)
+-- [[ 3D GRID BUILDER - V2 FIXED ]] --
 local buildMode = false
 local buildFrozen = false
-local buildData = {} -- เก็บพิกัด [x_y_z]
+local buildData = {} 
 local buildPartsMap = {}
-local gridRes = 10 -- ขนาดตาราง 10x10
+local gridRes = 10 -- ปรับเป็น 10 เพื่อให้ช่องใหญ่ขึ้น กดง่ายขึ้นมาก
 
 -- สร้างหน้า Build Mode
 pages.build = createPage()
-btn(pages.main, "BUILD MODE (3D)", function() showPage("build") end)
+btn(pages.main, "BUILDER MODE (3D)", function() showPage("build") end)
 
--- ฟังก์ชันกรอง Part (ไม่ดึงตัวละคร/NPC)
-local function isSelectablePart(p)
+-- ฟังก์ชันกรอง Part (ไม่ดึงคน/NPC/ตัวเรา)
+local function isUsable(p)
     if not p:IsA("BasePart") or p.Anchored then return false end
-    local m = p:FindFirstAncestorOfClass("Model")
-    if m and (game.Players:GetPlayerFromCharacter(m) or m:FindFirstChildOfClass("Humanoid")) then return false end
+    if p:FindFirstAncestorOfClass("Model") then
+        local m = p:FindFirstAncestorOfClass("Model")
+        if game.Players:GetPlayerFromCharacter(m) or m:FindFirstChildOfClass("Humanoid") then return false end
+    end
     if p:IsDescendantOf(LP.Character) then return false end
     return true
 end
 
--- [[ UI SETUP - BUILD PAGE ]] --
-label(pages.build, "3D GRID CONTROLLER")
+-- [[ UI SETUP ]] --
+label(pages.build, "--- 3D GRID BUILDER ---")
 
+-- ขยายตารางวาดให้ใหญ่และชัดเจน
 local canvasFrame = Instance.new("Frame", pages.build)
-canvasFrame.Size = UDim2.new(1, 0, 0, 200)
-canvasFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-canvasFrame.BorderSizePixel = 1
-canvasFrame.BorderColor3 = Color3.fromRGB(50, 50, 50)
+canvasFrame.Size = UDim2.new(1, 0, 0, 280) -- เพิ่มความสูงให้กดง่าย
+canvasFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+canvasFrame.BorderSizePixel = 0
 
 local gridLayout = Instance.new("UIGridLayout", canvasFrame)
-gridLayout.CellSize = UDim2.new(1/gridRes, -1, 1/gridRes, -1)
-gridLayout.CellPadding = UDim2.new(0, 1, 0, 1)
+gridLayout.CellSize = UDim2.new(1/gridRes, -2, 1/gridRes, -2)
+gridLayout.CellPadding = UDim2.new(0, 2, 0, 2)
 
--- สร้างปุ่มตาราง (Toggle System)
+local gridCells = {}
 for y = 1, gridRes do
     for x = 1, gridRes do
         local cell = Instance.new("TextButton", canvasFrame)
         cell.Text = ""
-        cell.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        cell.BackgroundColor3 = Color3.fromRGB(45, 45, 45) -- สีพื้นตาราง
         cell.BorderSizePixel = 0
         
         local key = x .. "_" .. y
-        
         cell.MouseButton1Click:Connect(function()
             if buildData[key] then
-                -- ถ้ามีอยู่แล้วให้ "เอาออก" (Toggle Off)
+                -- ถ้ามีบล็อกอยู่แล้ว -> เอาออก (Toggle Off)
                 buildData[key] = nil
-                cell.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+                cell.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
             else
-                -- ถ้าไม่มีให้ "เพิ่มบล็อก" (Toggle On)
+                -- ถ้ายังไม่มี -> วางบล็อก (Toggle On)
                 buildData[key] = true
-                cell.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+                cell.BackgroundColor3 = Color3.fromRGB(0, 170, 255) -- สีฟ้าเมื่อวาง
             end
         end)
+        gridCells[key] = cell
     end
 end
 
--- ปุ่มควบคุมหลัก
-local modeBtn = btn(pages.build, "BUILD MODE: OFF", function(b)
+-- ปุ่มควบคุม (ข้อความล้วน)
+local btnToggle = btn(pages.build, "BUILD MODE: OFF", function(b)
     buildMode = not buildMode
     b.Text = "BUILD MODE: " .. (buildMode and "ON" or "OFF")
     b.BackgroundColor3 = buildMode and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
@@ -1213,11 +1426,11 @@ local modeBtn = btn(pages.build, "BUILD MODE: OFF", function(b)
     end
 end)
 
-local freezeBtn = btn(pages.build, "FREEZE PICTURE: OFF", function(b)
+local btnFreeze = btn(pages.build, "FREEZE PICTURE: OFF", function(b)
     if not buildMode then return end
     buildFrozen = not buildFrozen
     b.Text = "FREEZE PICTURE: " .. (buildFrozen and "ON" or "OFF")
-    b.BackgroundColor3 = buildFrozen and Color3.fromRGB(180, 0, 0) or Color3.fromRGB(60, 60, 60)
+    b.BackgroundColor3 = buildFrozen and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(60, 60, 60)
     
     for p, _ in pairs(buildPartsMap) do
         p.Anchored = buildFrozen
@@ -1228,27 +1441,31 @@ local freezeBtn = btn(pages.build, "FREEZE PICTURE: OFF", function(b)
     end
 end)
 
-btn(pages.build, "CLEAR ALL", function()
+btn(pages.build, "CLEAR ALL BLOCKS", function()
     buildData = {}
-    for _, c in ipairs(canvasFrame:GetChildren()) do
-        if c:IsA("TextButton") then c.BackgroundColor3 = Color3.fromRGB(40, 40, 40) end
+    for _, cell in pairs(gridCells) do
+        cell.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
     end
 end)
 
-btn(pages.build, "BACK", function() showPage("main") end)
+btn(pages.build, "BACK TO MAIN", function()
+    showPage("main")
+end)
 
--- [[ CORE LOGIC ]] --
+-- [[ BUILDER LOGIC ]] --
 RunService.Heartbeat:Connect(function()
     if not buildMode or buildFrozen then return end
     if not LP.Character or not LP.Character.PrimaryPart then return end
 
     local root = LP.Character.PrimaryPart
-    -- จุดศูนย์กลางคือตัวผู้รัน (สร้างรอบตัวได้)
-    local centerPos = root.CFrame 
+    -- สร้างจุดอ้างอิงให้ขยับตามตัวผู้เล่น แต่ไม่หมุนตามหน้าจอตลอดเวลาเพื่อให้สร้างง่าย
+    local basePos = root.Position
+    local baseCFrame = CFrame.new(basePos) * (root.CFrame - basePos) 
 
+    -- ค้นหา Part ที่ใช้ได้
     local available = {}
     for _, p in ipairs(workspace:GetPartBoundsInRadius(root.Position, 100)) do
-        if isSelectablePart(p) and not buildPartsMap[p] then
+        if isUsable(p) and not buildPartsMap[p] then
             table.insert(available, p)
         end
     end
@@ -1256,29 +1473,34 @@ RunService.Heartbeat:Connect(function()
     local activePoints = {}
     for key, _ in pairs(buildData) do
         local coords = string.split(key, "_")
-        table.insert(activePoints, {x = tonumber(coords[1]), y = tonumber(coords[2])})
+        table.insert(activePoints, {x = tonumber(coords[1]), y = tonumber(coords[2]), key = key})
     end
 
     local usedThisFrame = {}
-    for i, pt in ipairs(activePoints) do
+    for _, pt in ipairs(activePoints) do
         local part = nil
-        for p, idx in pairs(buildPartsMap) do if idx == i then part = p break end end
+        -- หา Part ที่ครองตำแหน่งนี้อยู่
+        for p, k in pairs(buildPartsMap) do if k == pt.key then part = p break end end
         
+        -- ถ้ายังไม่มีให้ดึงตัวใหม่
         if not part and #available > 0 then
             part = table.remove(available, 1)
-            buildPartsMap[part] = i
+            buildPartsMap[part] = pt.key
         end
 
         if part and part.Parent then
             usedThisFrame[part] = true
-            local gap = (part.Size.X + part.Size.Y + part.Size.Z) / 3 * 1.2
+            -- ปรับระยะห่างตามขนาด Part
+            local gap = (part.Size.X + part.Size.Y + part.Size.Z) / 3 * 1.4
             
-            -- คำนวณตำแหน่งรอบตัว (X, Y ตามตาราง และ Z อยู่ด้านหน้าเล็กน้อยหรือปรับให้โอบล้อมได้)
-            local targetPos = centerPos * CFrame.new(
-                (pt.x - (gridRes/2)) * gap, 
-                (pt.y - (gridRes/2)) * gap, 
-                -5 -- ระยะห่างจากตัวผู้รัน
-            )
+            -- แก้ไขการคำนวณแกน Y ให้ไม่กลับหัว
+            -- UI y=1 (บนสุด) -> World offsetY สูงสุด
+            -- UI y=gridRes (ล่างสุด) -> World offsetY ต่ำสุด
+            local offsetX = (pt.x - (gridRes/2)) * gap
+            local offsetY = ((gridRes/2) - pt.y) * gap 
+            
+            -- ตำแหน่งรอบตัว (ระยะหน้า 6 stud)
+            local targetPos = baseCFrame * CFrame.new(offsetX, offsetY, -6)
 
             pcall(function() part:SetNetworkOwner(LP) end)
             part.CanCollide = false
@@ -1292,8 +1514,8 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
-    -- ปล่อย Part ที่ถูกกดออก (Toggle Off)
-    for p, idx in pairs(buildPartsMap) do
+    -- ปล่อย Part ที่ถูกลบออกจาก UI (Toggle Off)
+    for p, key in pairs(buildPartsMap) do
         if not usedThisFrame[p] then
             if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
             if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
