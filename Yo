@@ -1139,221 +1139,166 @@ UserInputService.InputBegan:Connect(function(input, gp)
         end
     end
 end)
+-- [[ ADVANCED 3D GRID & BUILD SYSTEM ]] --
+local buildMode = false
+local buildFrozen = false
+local buildData = {} -- เก็บพิกัด [x_y_z]
+local buildPartsMap = {}
+local gridRes = 10 -- ขนาดตาราง 10x10
 
--- Loop การทำงาน
-RunService.Heartbeat:Connect(function()
-    local changed = false
-    -- Auto Remove Dead
-    for i = #puppetList, 1, -1 do
-        local m = puppetList[i]
-        if not m or not m.Parent or (m:FindFirstChildOfClass("Humanoid") and m:FindFirstChildOfClass("Humanoid").Health <= 0) then
-            table.remove(puppetList, i)
-            selectedForControl[m] = nil
-            if currentPuppet == m then currentPuppet = nil end
-            changed = true
-        end
-    end
-    
-    -- Auto Add NPC
-    if autoAddNPC and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
-        local myPos = LP.Character.HumanoidRootPart.Position
-        local parts = workspace:GetPartBoundsInRadius(myPos, holdDistance)
-        for _, p in ipairs(parts) do
-            local m = getPuppetModel(p)
-            if m and not table.find(puppetList, m) then
-                table.insert(puppetList, m)
-                selectedForControl[m] = true
-                changed = true
-            end
-        end
-    end
-    if changed then refreshPuppetList() end
+-- สร้างหน้า Build Mode
+pages.build = createPage()
+btn(pages.main, "BUILD MODE (3D)", function() showPage("build") end)
 
-    -- Control Physics
-    if controlling and LP.Character then
-        local moveDir = LP.Character:FindFirstChildOfClass("Humanoid").MoveDirection
-        for npc, isSelected in pairs(selectedForControl) do
-            if isSelected and npc:FindFirstChild("HumanoidRootPart") then
-                local root = npc.HumanoidRootPart
-                pcall(function() root:SetNetworkOwner(LP) end)
-                if moveDir.Magnitude > 0 then
-                    root.AssemblyLinearVelocity = Vector3.new(moveDir.X * 30, root.AssemblyLinearVelocity.Y, moveDir.Z * 30)
-                    root.CFrame = root.CFrame:Lerp(CFrame.lookAt(root.Position, root.Position + moveDir), 0.2)
-                else
-                    root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
-                end
-            end
-        end
-    end
-end)
--- [[ DRAW MODE SYSTEM - FIXED & VISIBLE ]] --
-local drawMode = false
-local drawData = {} 
-local drawPartsMap = {}
-local gridRes = 12 -- ลดเหลือ 12x12 ช่อง (จะได้จิ้มง่ายขึ้นบนมือถือ)
+-- ฟังก์ชันกรอง Part (ไม่ดึงตัวละคร/NPC)
+local function isSelectablePart(p)
+    if not p:IsA("BasePart") or p.Anchored then return false end
+    local m = p:FindFirstAncestorOfClass("Model")
+    if m and (game.Players:GetPlayerFromCharacter(m) or m:FindFirstChildOfClass("Humanoid")) then return false end
+    if p:IsDescendantOf(LP.Character) then return false end
+    return true
+end
 
--- สร้างหน้า Draw Mode
-pages.draw = createPage()
+-- [[ UI SETUP - BUILD PAGE ]] --
+label(pages.build, "3D GRID CONTROLLER")
 
--- ปุ่มเข้าหน้า Draw Mode จากหน้าหลัก
-btn(pages.main, "OPEN DRAW MODE", function()
-    showPage("draw")
-end)
-
--- [[ UI SETUP FOR DRAW PAGE ]] --
-label(pages.draw, "--- DRAWING CANVAS ---")
-
--- Container สำหรับจัดกึ่งกลาง Canvas
-local canvasContainer = Instance.new("Frame", pages.draw)
-canvasContainer.Size = UDim2.new(1, 0, 0, 260) -- พื้นที่ความสูงสำหรับวางตาราง
-canvasContainer.BackgroundTransparency = 1
-
--- 1. ตัวกระดานวาดรูป (Canvas)
-local canvasFrame = Instance.new("Frame", canvasContainer)
-canvasFrame.Size = UDim2.new(0, 240, 0, 240) -- กำหนดขนาดเป็น pixel ตายตัว (จัตุรัสแน่นอน)
-canvasFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-canvasFrame.Position = UDim2.new(0.5, 0, 0.5, 0) -- จัดกึ่งกลางจอ
-canvasFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- สีพื้นหลังตาราง (เส้นคั่น)
-canvasFrame.BorderSizePixel = 2
-canvasFrame.BorderColor3 = Color3.fromRGB(255, 255, 255)
+local canvasFrame = Instance.new("Frame", pages.build)
+canvasFrame.Size = UDim2.new(1, 0, 0, 200)
+canvasFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+canvasFrame.BorderSizePixel = 1
+canvasFrame.BorderColor3 = Color3.fromRGB(50, 50, 50)
 
 local gridLayout = Instance.new("UIGridLayout", canvasFrame)
-gridLayout.CellSize = UDim2.new(1/gridRes, -1, 1/gridRes, -1) -- คำนวณขนาดช่องอัตโนมัติ
-gridLayout.CellPadding = UDim2.new(0, 1, 0, 1) -- เว้นระยะห่าง 1 pixel ให้เห็นเส้นตาราง
+gridLayout.CellSize = UDim2.new(1/gridRes, -1, 1/gridRes, -1)
+gridLayout.CellPadding = UDim2.new(0, 1, 0, 1)
 
-local gridCells = {}
-
--- สร้างช่องตาราง
+-- สร้างปุ่มตาราง (Toggle System)
 for y = 1, gridRes do
     for x = 1, gridRes do
         local cell = Instance.new("TextButton", canvasFrame)
         cell.Text = ""
-        cell.BackgroundColor3 = Color3.fromRGB(40, 40, 40) -- สีเทาที่เห็นชัดบนพื้นหลังดำ
-        cell.AutoButtonColor = false
+        cell.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
         cell.BorderSizePixel = 0
         
         local key = x .. "_" .. y
         
-        local function paint()
-            drawData[key] = true
-            cell.BackgroundColor3 = Color3.fromRGB(0, 170, 255) -- สีฟ้าสดเมื่อวาด
-        end
-
-        -- ระบบลากนิ้ว/เมาส์ (Touch & Hover Support)
-        cell.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                paint()
+        cell.MouseButton1Click:Connect(function()
+            if buildData[key] then
+                -- ถ้ามีอยู่แล้วให้ "เอาออก" (Toggle Off)
+                buildData[key] = nil
+                cell.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            else
+                -- ถ้าไม่มีให้ "เพิ่มบล็อก" (Toggle On)
+                buildData[key] = true
+                cell.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
             end
         end)
-        
-        cell.MouseEnter:Connect(function()
-            if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
-                paint()
-            end
-        end)
-        
-        table.insert(gridCells, cell)
     end
 end
 
--- 2. ปุ่มควบคุม
-local btnDrawMode = btn(pages.draw, "SHOW DRAWING: OFF", function(b)
-    drawMode = not drawMode
-    b.Text = "SHOW DRAWING: " .. (drawMode and "ON" or "OFF")
-    b.BackgroundColor3 = drawMode and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(60, 60, 60)
+-- ปุ่มควบคุมหลัก
+local modeBtn = btn(pages.build, "BUILD MODE: OFF", function(b)
+    buildMode = not buildMode
+    b.Text = "BUILD MODE: " .. (buildMode and "ON" or "OFF")
+    b.BackgroundColor3 = buildMode and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
     
-    if not drawMode then
-        -- เคลียร์ Part เมื่อปิด
-        for p, _ in pairs(drawPartsMap) do
+    if not buildMode then
+        buildFrozen = false
+        for p, _ in pairs(buildPartsMap) do
             p.Anchored = false
-            p.CanCollide = true
             if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
             if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
         end
-        drawPartsMap = {}
+        buildPartsMap = {}
     end
 end)
 
-btn(pages.draw, "CLEAR PICTURE", function()
-    drawData = {}
-    -- รีเซ็ตสีตารางทั้งหมด
-    for _, cell in ipairs(gridCells) do
-        cell.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+local freezeBtn = btn(pages.build, "FREEZE PICTURE: OFF", function(b)
+    if not buildMode then return end
+    buildFrozen = not buildFrozen
+    b.Text = "FREEZE PICTURE: " .. (buildFrozen and "ON" or "OFF")
+    b.BackgroundColor3 = buildFrozen and Color3.fromRGB(180, 0, 0) or Color3.fromRGB(60, 60, 60)
+    
+    for p, _ in pairs(buildPartsMap) do
+        p.Anchored = buildFrozen
+        if buildFrozen then
+            if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
+            if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
+        end
     end
 end)
 
-btn(pages.draw, "BACK TO MAIN", function()
-    showPage("main")
+btn(pages.build, "CLEAR ALL", function()
+    buildData = {}
+    for _, c in ipairs(canvasFrame:GetChildren()) do
+        if c:IsA("TextButton") then c.BackgroundColor3 = Color3.fromRGB(40, 40, 40) end
+    end
 end)
 
--- [[ LOGIC FUNCTION ]] --
-local function isValidPart(p)
-    if not p:IsA("BasePart") or p.Anchored then return false end
-    local m = p:FindFirstAncestorOfClass("Model")
-    if m then
-        if game.Players:GetPlayerFromCharacter(m) or m:FindFirstChildOfClass("Humanoid") then return false end
-    end
-    return true
-end
+btn(pages.build, "BACK", function() showPage("main") end)
 
+-- [[ CORE LOGIC ]] --
 RunService.Heartbeat:Connect(function()
-    if not drawMode then return end
-    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
+    if not buildMode or buildFrozen then return end
+    if not LP.Character or not LP.Character.PrimaryPart then return end
 
-    local root = LP.Character.HumanoidRootPart
-    local startCFrame = root.CFrame * CFrame.new(0, 3, -5) -- แสดงผลหน้าตัวผู้เล่น 5 stud
+    local root = LP.Character.PrimaryPart
+    -- จุดศูนย์กลางคือตัวผู้รัน (สร้างรอบตัวได้)
+    local centerPos = root.CFrame 
 
     local available = {}
     for _, p in ipairs(workspace:GetPartBoundsInRadius(root.Position, 100)) do
-        if isValidPart(p) and not drawPartsMap[p] then
+        if isSelectablePart(p) and not buildPartsMap[p] then
             table.insert(available, p)
         end
     end
 
-    local points = {}
-    for key, _ in pairs(drawData) do
+    local activePoints = {}
+    for key, _ in pairs(buildData) do
         local coords = string.split(key, "_")
-        table.insert(points, {x = tonumber(coords[1]), y = tonumber(coords[2])})
+        table.insert(activePoints, {x = tonumber(coords[1]), y = tonumber(coords[2])})
     end
 
     local usedThisFrame = {}
-    for i, pt in ipairs(points) do
+    for i, pt in ipairs(activePoints) do
         local part = nil
-        for p, idx in pairs(drawPartsMap) do if idx == i then part = p break end end
+        for p, idx in pairs(buildPartsMap) do if idx == i then part = p break end end
         
         if not part and #available > 0 then
             part = table.remove(available, 1)
-            drawPartsMap[part] = i
+            buildPartsMap[part] = i
         end
 
         if part and part.Parent then
             usedThisFrame[part] = true
-            local gap = (part.Size.X + part.Size.Y) / 2 * 1.15
+            local gap = (part.Size.X + part.Size.Y + part.Size.Z) / 3 * 1.2
             
-            -- คำนวณตำแหน่ง
-            local offsetX = (pt.x - (gridRes/2)) * gap
-            local offsetY = ((gridRes/2) - pt.y) * gap
-            
-            local targetPos = startCFrame * CFrame.new(offsetX, offsetY, 0)
+            -- คำนวณตำแหน่งรอบตัว (X, Y ตามตาราง และ Z อยู่ด้านหน้าเล็กน้อยหรือปรับให้โอบล้อมได้)
+            local targetPos = centerPos * CFrame.new(
+                (pt.x - (gridRes/2)) * gap, 
+                (pt.y - (gridRes/2)) * gap, 
+                -5 -- ระยะห่างจากตัวผู้รัน
+            )
 
             pcall(function() part:SetNetworkOwner(LP) end)
             part.CanCollide = false
             part.Anchored = false
-            
+
             local bp = part:FindFirstChild("BodyPosition") or Instance.new("BodyPosition", part)
-            bp.MaxForce = Vector3.new(1,1,1) * 400000; bp.P = 20000; bp.Position = targetPos.Position
+            bp.MaxForce = Vector3.new(1,1,1) * 500000; bp.P = 30000; bp.Position = targetPos.Position
             
             local bg = part:FindFirstChild("BodyGyro") or Instance.new("BodyGyro", part)
-            bg.MaxTorque = Vector3.new(1,1,1) * 400000; bg.CFrame = targetPos
+            bg.MaxTorque = Vector3.new(1,1,1) * 500000; bg.CFrame = targetPos
         end
     end
 
-    for p, _ in pairs(drawPartsMap) do
+    -- ปล่อย Part ที่ถูกกดออก (Toggle Off)
+    for p, idx in pairs(buildPartsMap) do
         if not usedThisFrame[p] then
             if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
             if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
             p.CanCollide = true
-            drawPartsMap[p] = nil
+            buildPartsMap[p] = nil
         end
     end
 end)
