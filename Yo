@@ -12,7 +12,7 @@ local AUTO_RADIUS = 30 -- ระยะของระบบ Auto
 local MOVE_SNAP = 1
 local ROT_SNAP = 15
 
-local holdDistance = 25
+local holdDistance = 20
 local throwForce = 200
 
 local grabbed = {}
@@ -83,7 +83,7 @@ Instance.new("UICorner",main).CornerRadius = UDim.new(0,14)
 
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1,0,0,32)
-title.Text = "TELEKINESIS UI 1.5"
+title.Text = "TELEKINESIS UI 1.6"
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 title.TextColor3 = Color3.new(1,1,1)
