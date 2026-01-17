@@ -1350,5 +1350,96 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
+-- [[ DRAW MODE SYSTEM ]] --
+local drawMode = false
+local drawData = {} -- เก็บพิกัดที่วาด { [x_y] = true }
+local drawPartsMap = {}
+local gridRes = 15 -- ความละเอียดของช่องวาด (15x15)
+
+-- [[ UI SETUP ]] --
+if pages and pages.main then
+    label(pages.main, "DRAW MODE SYSTEM")
+
+    -- ปุ่มเปิด/ปิดโหมดวาด (เพื่อให้ Part เริ่มเรียง)
+    local btnDrawToggle = btn(pages.main, "DRAW MODE: OFF", function(b)
+        drawMode = not drawMode
+        b.Text = "DRAW MODE: " .. (drawMode and "ON" or "OFF")
+        b.BackgroundColor3 = drawMode and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
+        
+        if not drawMode then
+            for p, _ in pairs(drawPartsMap) do
+                if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
+                if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
+            end
+            drawPartsMap = {}
+        end
+    end)
+
+    -- ปุ่มเปิด/ปิดหน้าต่างวาดรูป
+    local canvasFrame = Instance.new("Frame", screenGui)
+    canvasFrame.Size = UDim2.new(0, 250, 0, 250)
+    canvasFrame.Position = UDim2.new(0.5, -125, 0.5, -125)
+    canvasFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    canvasFrame.Visible = false
+    canvasFrame.BorderSizePixel = 2
+    
+    btn(pages.main, "SHOW/HIDE CANVAS", function()
+        canvasFrame.Visible = not canvasFrame.Visible
+    end)
+
+    -- ปุ่ม Clear รูปวาด
+    btn(pages.main, "CLEAR PICTURE", function()
+        drawData = {}
+        for _, child in ipairs(canvasFrame:GetChildren()) do
+            if child:IsA("Frame") then child.BackgroundColor3 = Color3.fromRGB(40, 40, 40) end
+        end
+    end)
+
+    -- สร้างตารางสำหรับวาดใน UI
+    for y = 1, gridRes do
+        for x = 1, gridRes do
+            local cell = Instance.new("Frame", canvasFrame)
+            cell.Size = UDim2.new(1/gridRes, -1, 1/gridRes, -1)
+            cell.Position = UDim2.new((x-1)/gridRes, 0, (y-1)/gridRes, 0)
+            cell.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            cell.BorderSizePixel = 0
+            
+            -- ระบบลากเพื่อวาด (รองรับทั้งมือถือและคอม)
+            local function paint()
+                local key = x .. "_" .. y
+                drawData[key] = true
+                cell.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+            end
+            
+            cell.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    paint()
+                end
+            end)
+            cell.InputMouseEnter:Connect(function()
+                if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                    paint()
+                end
+            end)
+        end
+    end
+end
+
+-- [[ LOGIC ]] --
+RunService.Heartbeat:Connect(function()
+    if not drawMode then return end
+    if not LP.Character or not LP.Character.PrimaryPart then return end
+
+    local root = LP.Character.PrimaryPart
+    local startCFrame = root.CFrame * CFrame.new(0, 2, -3) -- ห่างหน้าผู้รัน 3 Stud
+
+    -- หา Part รอบตัว
+    local available = {}
+    for _, p in ipairs(workspace:GetPartBoundsInRadius(root.Position, 100)) do
+        -- ใช้ฟังก์ชัน isValidTextPart เดิมที่กรอง NPC/Player
+        if isValidTextPart(p) and not drawPartsMap[p] and not textPartsMap[p] then
+            table.insert(available, p)
+        end
+    end
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
