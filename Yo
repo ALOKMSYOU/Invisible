@@ -1186,268 +1186,127 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
--- [[ TEXT PART SYSTEM - PRO VERSION ]] --
-local textMode = false
-local textFrozen = false
-local textString = "HELLO"
-local textPartsMap = {} 
-local frozenAnchorPoints = {} -- เก็บตำแหน่งพิกัดโลกเมื่อกด Freeze
+-- [[ DRAW MODE SETTINGS ]] --
+local drawMode = false
+local drawFrozen = false
+local drawData = {} -- เก็บพิกัด [x_y]
+local drawPartsMap = {}
+local gridRes = 12 -- ปรับขนาดตารางวาด (12x12) ให้พอดีกับหน้า UI
 
--- ตารางอักษร 3x5 (ปรับให้คมชัดขึ้น)
-local charMap = {
-    ["A"] = {0,1,0, 1,0,1, 1,1,1, 1,0,1, 1,0,1}, ["B"] = {1,1,0, 1,0,1, 1,1,0, 1,0,1, 1,1,0},
-    ["C"] = {0,1,1, 1,0,0, 1,0,0, 1,0,0, 0,1,1}, ["D"] = {1,1,0, 1,0,1, 1,0,1, 1,0,1, 1,1,0},
-    ["E"] = {1,1,1, 1,0,0, 1,1,0, 1,0,0, 1,1,1}, ["F"] = {1,1,1, 1,0,0, 1,1,0, 1,0,0, 1,0,0},
-    ["G"] = {0,1,1, 1,0,0, 1,0,1, 1,0,1, 0,1,1}, ["H"] = {1,0,1, 1,0,1, 1,1,1, 1,0,1, 1,0,1},
-    ["I"] = {1,1,1, 0,1,0, 0,1,0, 0,1,0, 1,1,1}, ["J"] = {0,0,1, 0,0,1, 0,0,1, 1,0,1, 0,1,0},
-    ["K"] = {1,0,1, 1,0,1, 1,1,0, 1,0,1, 1,0,1}, ["L"] = {1,0,0, 1,0,0, 1,0,0, 1,0,0, 1,1,1},
-    ["M"] = {1,0,1, 1,1,1, 1,1,1, 1,0,1, 1,0,1}, ["N"] = {1,1,1, 1,0,1, 1,0,1, 1,0,1, 1,0,1},
-    ["O"] = {0,1,0, 1,0,1, 1,0,1, 1,0,1, 0,1,0}, ["P"] = {1,1,0, 1,0,1, 1,1,0, 1,0,0, 1,0,0},
-    ["Q"] = {0,1,0, 1,0,1, 1,0,1, 1,1,1, 0,0,1}, ["R"] = {1,1,0, 1,0,1, 1,1,0, 1,0,1, 1,0,1},
-    ["S"] = {0,1,1, 1,0,0, 0,1,0, 0,0,1, 1,1,0}, ["T"] = {1,1,1, 0,1,0, 0,1,0, 0,1,0, 0,1,0},
-    ["U"] = {1,0,1, 1,0,1, 1,0,1, 1,0,1, 1,1,1}, ["V"] = {1,0,1, 1,0,1, 1,0,1, 0,1,0, 0,1,0},
-    ["W"] = {1,0,1, 1,0,1, 1,1,1, 1,1,1, 1,0,1}, ["X"] = {1,0,1, 1,0,1, 0,1,0, 1,0,1, 1,0,1},
-    ["Y"] = {1,0,1, 1,0,1, 0,1,0, 0,1,0, 0,1,0}, ["Z"] = {1,1,1, 0,0,1, 0,1,0, 1,0,0, 1,1,1},
-    [" "] = {0,0,0, 0,0,0, 0,0,0, 0,0,0, 0,0,0}, ["0"] = {1,1,1, 1,0,1, 1,0,1, 1,0,1, 1,1,1},
-    ["1"] = {0,1,0, 1,1,0, 0,1,0, 0,1,0, 1,1,1},
-}
+-- สร้างหน้า Draw Mode
+pages.draw = createPage()
+btn(pages.main, "OPEN DRAW MODE", function() showPage("draw") end)
 
--- ตรวจสอบ Part ที่ดึงได้
-local function isValidTextPart(p)
+-- ฟังก์ชันกรอง Part (ไม่เอาผู้เล่น, NPC, และตัวเรา)
+local function isValidUtilityPart(p)
     if not p:IsA("BasePart") or p.Anchored then return false end
-    if p:FindFirstAncestorOfClass("Model") then
-        local m = p:FindFirstAncestorOfClass("Model")
+    local m = p:FindFirstAncestorOfClass("Model")
+    if m then
         if game.Players:GetPlayerFromCharacter(m) or m:FindFirstChildOfClass("Humanoid") then return false end
     end
+    if p:IsDescendantOf(LP.Character) then return false end
     return true
 end
 
--- [[ UI SYSTEM ]] --
-if pages and pages.main then
-    label(pages.main, "TEXT PART CONTROL")
-    
-    local editFrame = Instance.new("Frame", pages.main)
-    editFrame.Size = UDim2.new(1, 0, 0, 35); editFrame.BackgroundTransparency = 1
-    Instance.new("UIListLayout", editFrame).FillDirection = "Horizontal"
+-- [[ UI SYSTEM - DRAW MODE PAGE ]] --
+label(pages.draw, "DRAWING CANVAS")
 
-    local textBox = Instance.new("TextBox", editFrame)
-    textBox.Size = UDim2.new(0.6, -5, 1, 0); textBox.Text = "HELLO"
-    textBox.BackgroundColor3 = Color3.fromRGB(40,40,40); textBox.TextColor3 = Color3.new(1,1,1)
+-- 1. ช่องสำหรับวาด (Canvas) ฝังในหน้า Draw Mode
+local canvasFrame = Instance.new("Frame", pages.draw)
+canvasFrame.Size = UDim2.new(1, 0, 0, 200) -- ปรับความสูงให้พอดี
+canvasFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+canvasFrame.BorderSizePixel = 0
 
-    -- ปุ่มเปิด/ปิด ระบบรวม Part
-    local btnToggle = btn(editFrame, "MODE: OFF", function(b)
-        textMode = not textMode
-        b.Text = "MODE: " .. (textMode and "ON" or "OFF")
-        b.BackgroundColor3 = textMode and Color3.fromRGB(0,120,200) or Color3.fromRGB(60,60,60)
+local canvasGrid = Instance.new("UIGridLayout", canvasFrame)
+canvasGrid.CellSize = UDim2.new(1/gridRes, -1, 1/gridRes, -1)
+canvasGrid.CellPadding = UDim2.new(0, 1, 0, 1)
+
+for y = 1, gridRes do
+    for x = 1, gridRes do
+        local cell = Instance.new("Frame", canvasFrame)
+        cell.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        cell.BorderSizePixel = 0
         
-        if not textMode then
-            textFrozen = false
-            for p, _ in pairs(textPartsMap) do
-                p.Anchored = false
-                if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
-                if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
-            end
-            textPartsMap = {}
+        local function paint()
+            local key = x .. "_" .. y
+            drawData[key] = true
+            cell.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
         end
-    end)
-    btnToggle.Size = UDim2.new(0.4, 0, 1, 0)
-
-    -- ปุ่ม Freeze (วางใกล้ๆ ช่องใส่ข้อความ)
-    local btnFreeze = btn(pages.main, "FREEZE TEXT: OFF", function(b)
-        if not textMode then return end
-        textFrozen = not textFrozen
-        b.Text = "FREEZE TEXT: " .. (textFrozen and "ON" or "OFF")
-        b.BackgroundColor3 = textFrozen and Color3.fromRGB(200,100,0) or Color3.fromRGB(60,60,60)
         
-        -- ถ้ากด Freeze ให้สั่ง Anchored ทุกตัวที่ถืออยู่
-        for p, _ in pairs(textPartsMap) do
-            p.Anchored = textFrozen
-            if textFrozen then
-                if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
-                if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
+        cell.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                paint()
             end
-        end
-    end)
-
-    textBox:GetPropertyChangedSignal("Text"):Connect(function()
-        textString = textBox.Text:upper()
-        if textFrozen then -- ถ้าแก้ข้อความให้หลุด Freeze อัตโนมัติเพื่อจัดใหม่
-            textFrozen = false
-            btnFreeze.Text = "FREEZE TEXT: OFF"
-            btnFreeze.BackgroundColor3 = Color3.fromRGB(60,60,60)
-        end
-    end)
+        end)
+        cell.InputMouseEnter:Connect(function()
+            if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                paint()
+            end
+        end)
+    end
 end
 
--- [[ CORE LOGIC ]] --
-RunService.Heartbeat:Connect(function()
-    if not textMode or textFrozen then return end
-    if not LP.Character or not LP.Character:FindFirstChild("HumanoidRootPart") then return end
+-- 2. ปุ่มควบคุมต่างๆ
+local drawBtn = btn(pages.draw, "DRAW MODE: OFF", function(b)
+    drawMode = not drawMode
+    b.Text = "DRAW MODE: " .. (drawMode and "ON" or "OFF")
+    b.BackgroundColor3 = drawMode and Color3.fromRGB(0, 120, 200) or Color3.fromRGB(60, 60, 60)
     
-    local root = LP.Character.HumanoidRootPart
-    local startCFrame = root.CFrame * CFrame.new(0, 5, -10) -- ระยะห่างเริ่มต้น
-
-    -- ค้นหา Part ว่าง
-    local available = {}
-    for _, p in ipairs(workspace:GetPartBoundsInRadius(root.Position, 100)) do
-        if isValidTextPart(p) and not textPartsMap[p] then table.insert(available, p) end
-    end
-
-    -- คำนวณจุด Grid
-    local dots = {}
-    local cursorX = 0
-    for i = 1, #textString do
-        local char = string.sub(textString, i, i)
-        local matrix = charMap[char] or charMap[" "]
-        for row = 0, 4 do
-            for col = 0, 2 do
-                if matrix[(row * 3) + col + 1] == 1 then
-                    table.insert(dots, {x = cursorX + col, y = 4 - row})
-                end
-            end
-        end
-        cursorX = cursorX + 4 -- ระยะห่างระหว่างตัวอักษร
-    end
-
-    local usedThisFrame = {}
-    for i, dot in ipairs(dots) do
-        local part = nil
-        -- หา Part ที่ครองตำแหน่งนี้อยู่
-        for p, idx in pairs(textPartsMap) do if idx == i then part = p break end end
-        
-        -- ถ้าไม่มีให้ดึงตัวใหม่
-        if not part and #available > 0 then
-            part = table.remove(available, 1)
-            textPartsMap[part] = i
-        end
-
-        if part and part.Parent then
-            usedThisFrame[part] = true
-            -- จัดระเบียบ: ใช้ขนาดเฉลี่ยของ Part เพื่อคำนวณระยะห่าง (Gap)
-            local gap = (part.Size.X + part.Size.Z) / 2 * 1.1 
-            local targetPos = startCFrame * CFrame.new((dot.x * gap) - (cursorX * gap / 2), dot.y * gap, 0)
-            
-            pcall(function() part:SetNetworkOwner(LP) end)
-            part.CanCollide = false
-            part.Anchored = false
-
-            local bp = part:FindFirstChild("BodyPosition") or Instance.new("BodyPosition", part)
-            bp.MaxForce = Vector3.new(1,1,1) * 100000; bp.P = 15000; bp.Position = targetPos.Position
-            
-            local bg = part:FindFirstChild("BodyGyro") or Instance.new("BodyGyro", part)
-            bg.MaxTorque = Vector3.new(1,1,1) * 100000; bg.CFrame = targetPos
-        end
-    end
-
-    -- คืนค่า Part ที่ไม่ถูกใช้
-    for p, _ in pairs(textPartsMap) do
-        if not usedThisFrame[p] then
+    if not drawMode then
+        drawFrozen = false
+        for p, _ in pairs(drawPartsMap) do
             p.Anchored = false
-            p.CanCollide = true
             if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
             if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
-            textPartsMap[p] = nil
+        end
+        drawPartsMap = {}
+    end
+end)
+
+local freezeBtn = btn(pages.draw, "FREEZE DRAW: OFF", function(b)
+    if not drawMode then return end
+    drawFrozen = not drawFrozen
+    b.Text = "FREEZE DRAW: " .. (drawFrozen and "ON" or "OFF")
+    b.BackgroundColor3 = drawFrozen and Color3.fromRGB(200, 80, 0) or Color3.fromRGB(60, 60, 60)
+    
+    for p, _ in pairs(drawPartsMap) do
+        p.Anchored = drawFrozen
+        if drawFrozen then
+            if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
+            if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
         end
     end
 end)
--- [[ DRAW MODE SYSTEM ]] --
-local drawMode = false
-local drawData = {} -- เก็บพิกัดที่วาด { [x_y] = true }
-local drawPartsMap = {}
-local gridRes = 15 -- ความละเอียดของช่องวาด (15x15)
 
--- [[ UI SETUP ]] --
-if pages and pages.main then
-    label(pages.main, "DRAW MODE SYSTEM")
-
-    -- ปุ่มเปิด/ปิดโหมดวาด (เพื่อให้ Part เริ่มเรียง)
-    local btnDrawToggle = btn(pages.main, "DRAW MODE: OFF", function(b)
-        drawMode = not drawMode
-        b.Text = "DRAW MODE: " .. (drawMode and "ON" or "OFF")
-        b.BackgroundColor3 = drawMode and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(60, 60, 60)
-        
-        if not drawMode then
-            for p, _ in pairs(drawPartsMap) do
-                if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
-                if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
-            end
-            drawPartsMap = {}
-        end
-    end)
-
-    -- ปุ่มเปิด/ปิดหน้าต่างวาดรูป
-    local canvasFrame = Instance.new("Frame", screenGui)
-    canvasFrame.Size = UDim2.new(0, 250, 0, 250)
-    canvasFrame.Position = UDim2.new(0.5, -125, 0.5, -125)
-    canvasFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    canvasFrame.Visible = false
-    canvasFrame.BorderSizePixel = 2
-    
-    btn(pages.main, "SHOW/HIDE CANVAS", function()
-        canvasFrame.Visible = not canvasFrame.Visible
-    end)
-
-    -- ปุ่ม Clear รูปวาด
-    btn(pages.main, "CLEAR PICTURE", function()
-        drawData = {}
-        for _, child in ipairs(canvasFrame:GetChildren()) do
-            if child:IsA("Frame") then child.BackgroundColor3 = Color3.fromRGB(40, 40, 40) end
-        end
-    end)
-
-    -- สร้างตารางสำหรับวาดใน UI
-    for y = 1, gridRes do
-        for x = 1, gridRes do
-            local cell = Instance.new("Frame", canvasFrame)
-            cell.Size = UDim2.new(1/gridRes, -1, 1/gridRes, -1)
-            cell.Position = UDim2.new((x-1)/gridRes, 0, (y-1)/gridRes, 0)
-            cell.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-            cell.BorderSizePixel = 0
-            
-            -- ระบบลากเพื่อวาด (รองรับทั้งมือถือและคอม)
-            local function paint()
-                local key = x .. "_" .. y
-                drawData[key] = true
-                cell.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-            end
-            
-            cell.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                    paint()
-                end
-            end)
-            cell.InputMouseEnter:Connect(function()
-                if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
-                    paint()
-                end
-            end)
-        end
+btn(pages.draw, "CLEAR PICTURE", function()
+    drawData = {}
+    for _, child in ipairs(canvasFrame:GetChildren()) do
+        if child:IsA("Frame") then child.BackgroundColor3 = Color3.fromRGB(40, 40, 40) end
     end
-end
+end)
+
+btn(pages.draw, "BACK TO MAIN", function() showPage("main") end)
 
 -- [[ LOGIC ]] --
 RunService.Heartbeat:Connect(function()
-    if not drawMode then return end
+    if not drawMode or drawFrozen then return end
     if not LP.Character or not LP.Character.PrimaryPart then return end
 
     local root = LP.Character.PrimaryPart
-    local startCFrame = root.CFrame * CFrame.new(0, 2, -3) -- ห่างหน้าผู้รัน 3 Stud
+    -- ตำแหน่งเริ่มต้น: หน้าผู้รัน 3 Stud
+    local startCFrame = root.CFrame * CFrame.new(0, 2, -3)
 
-    -- หา Part รอบตัว
     local available = {}
-    for _, p in ipairs(workspace:GetPartBoundsInRadius(root.Position, 100)) do
-        -- ใช้ฟังก์ชัน isValidTextPart เดิมที่กรอง NPC/Player
-        if isValidTextPart(p) and not drawPartsMap[p] and not textPartsMap[p] then
+    for _, p in ipairs(workspace:GetPartBoundsInRadius(root.Position, 80)) do
+        if isValidUtilityPart(p) and not drawPartsMap[p] then
             table.insert(available, p)
         end
     end
 
-    -- แปลงข้อมูล drawData เป็นตำแหน่งในโลก 3D
     local points = {}
     for key, _ in pairs(drawData) do
         local coords = string.split(key, "_")
-        local x, y = tonumber(coords[1]), tonumber(coords[2])
-        table.insert(points, {x = x, y = y})
+        table.insert(points, {x = tonumber(coords[1]), y = tonumber(coords[2])})
     end
 
     local usedThisFrame = {}
@@ -1463,7 +1322,7 @@ RunService.Heartbeat:Connect(function()
         if part and part.Parent then
             usedThisFrame[part] = true
             local gap = (part.Size.X + part.Size.Z) / 2 * 1.2
-            -- วาดจากซ้ายไปขวา (x) และ บนลงล่าง (y)
+            -- คำนวณตำแหน่งให้กึ่งกลาง grid อยู่ตรงหน้าผู้รันพอดี
             local targetPos = startCFrame * CFrame.new(
                 (pt.x - (gridRes/2)) * gap, 
                 ((gridRes/2) - pt.y) * gap, 
@@ -1472,16 +1331,17 @@ RunService.Heartbeat:Connect(function()
 
             pcall(function() part:SetNetworkOwner(LP) end)
             part.CanCollide = false
-            
+            part.Anchored = false
+
             local bp = part:FindFirstChild("BodyPosition") or Instance.new("BodyPosition", part)
-            bp.MaxForce = Vector3.new(1,1,1) * 100000; bp.P = 15000; bp.Position = targetPos.Position
+            bp.MaxForce = Vector3.new(1,1,1) * 200000; bp.P = 20000; bp.Position = targetPos.Position
             
             local bg = part:FindFirstChild("BodyGyro") or Instance.new("BodyGyro", part)
-            bg.MaxTorque = Vector3.new(1,1,1) * 100000; bg.CFrame = targetPos
+            bg.MaxTorque = Vector3.new(1,1,1) * 200000; bg.CFrame = targetPos
         end
     end
 
-    -- คืนค่า Part ที่ไม่ได้ใช้
+    -- ปล่อย Part ที่ไม่ได้ใช้งาน
     for p, _ in pairs(drawPartsMap) do
         if not usedThisFrame[p] then
             if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
