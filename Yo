@@ -998,10 +998,12 @@ RunService.Stepped:Connect(function()
         end
     end
 end)
--- [[ PUPPET MASTER SETTINGS ]] --
+-- [[ PUPPET MASTER FULL SYSTEM - V2 ]] --
 local puppetList = {}
 local selectedForControl = {} 
 local controlling = false
+local defenseActive = false
+local attackActive = false
 local currentPuppet = nil
 local selectClickMode = false
 local autoAddNPC = false
@@ -1015,6 +1017,23 @@ btn(pages.main, "OPEN PUPPET MASTER", function()
 end)
 
 -- [[ ฟังก์ชันช่วยเหลือ ]] --
+
+-- หาผู้เล่นที่ใกล้ที่สุด (ที่ไม่ใช่เรา)
+local function getNearestEnemy()
+    local target = nil
+    local dist = math.huge
+    for _, v in ipairs(Players:GetPlayers()) do
+        if v ~= LP and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+            local d = (LP.Character.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
+            if d < dist then
+                dist = d
+                target = v.Character.HumanoidRootPart
+            end
+        end
+    end
+    return target
+end
+
 local function getPuppetModel(obj)
     if not obj then return nil end
     local model = obj:FindFirstAncestorOfClass("Model")
@@ -1028,11 +1047,11 @@ local function getPuppetModel(obj)
 end
 
 -- [[ ระบบ UI ในหน้า PUPPET MASTER ]] --
-label(pages.puppet, "PUPPET MASTER CONTROL")
+label(pages.puppet, "--- PUPPET MASTER CONTROL ---")
 
--- Dropdown (ScrollingFrame)
+-- Dropdown แสดงรายชื่อ NPC ที่จับมาได้
 local dropDown = Instance.new("ScrollingFrame", pages.puppet)
-dropDown.Size = UDim2.new(1, 0, 0, 120)
+dropDown.Size = UDim2.new(1, 0, 0, 100)
 dropDown.CanvasSize = UDim2.new(0, 0, 0, 0)
 dropDown.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 dropDown.BorderSizePixel = 0
@@ -1053,72 +1072,95 @@ local function refreshPuppetList()
                 refreshPuppetList()
             end)
             b.BackgroundColor3 = isActive and Color3.fromRGB(50, 70, 100) or Color3.fromRGB(45, 45, 45)
-        else
-            selectedForControl[model] = nil
-            table.remove(puppetList, i)
+            b.TextSize = 10
         end
     end
     dropDown.CanvasSize = UDim2.new(0, 0, 0, dropLayout.AbsoluteContentSize.Y)
 end
 
--- ปุ่ม CLICK TO ADD
-local btnSelectMode = btn(pages.puppet, "CLICK TO ADD NPC: OFF", function(b)
+-- ปุ่มเพิ่ม NPC เข้า List
+local addRow = Instance.new("Frame", pages.puppet)
+addRow.Size = UDim2.new(1, 0, 0, 30); addRow.BackgroundTransparency = 1
+Instance.new("UIListLayout", addRow).FillDirection = Enum.FillDirection.Horizontal
+
+btn(addRow, "CLICK ADD", function(b)
     selectClickMode = not selectClickMode
-    b.Text = "CLICK TO ADD NPC: " .. (selectClickMode and "ON" or "OFF")
     b.BackgroundColor3 = selectClickMode and Color3.fromRGB(0, 100, 180) or Color3.fromRGB(70, 70, 70)
-end)
+end).Size = UDim2.new(0.5, -2, 1, 0)
 
--- ปุ่ม AUTO ADD
-local btnAutoMode = btn(pages.puppet, "AUTO ADD NEARBY: OFF", function(b)
+btn(addRow, "AUTO ADD", function(b)
     autoAddNPC = not autoAddNPC
-    b.Text = "AUTO ADD NEARBY: " .. (autoAddNPC and "ON" or "OFF")
     b.BackgroundColor3 = autoAddNPC and Color3.fromRGB(0, 100, 180) or Color3.fromRGB(70, 70, 70)
-end)
+end).Size = UDim2.new(0.5, -2, 1, 0)
 
--- แถวปุ่ม SELECT ALL / UNSELECT ALL
-local row = Instance.new("Frame", pages.puppet)
-row.Size = UDim2.new(1, 0, 0, 30); row.BackgroundTransparency = 1
-Instance.new("UIListLayout", row).FillDirection = Enum.FillDirection.Horizontal
+-- ปุ่มเลือกทั้งหมด
+local selRow = Instance.new("Frame", pages.puppet)
+selRow.Size = UDim2.new(1, 0, 0, 30); selRow.BackgroundTransparency = 1
+Instance.new("UIListLayout", selRow).FillDirection = Enum.FillDirection.Horizontal
 
-btn(row, "SELECT ALL", function()
+btn(selRow, "SELECT ALL", function()
     for _, m in ipairs(puppetList) do selectedForControl[m] = true end
     refreshPuppetList()
 end).Size = UDim2.new(0.5, -2, 1, 0)
 
-btn(row, "UNSELECT ALL", function()
+btn(selRow, "UNSELECT ALL", function()
     for _, m in ipairs(puppetList) do selectedForControl[m] = false end
     refreshPuppetList()
 end).Size = UDim2.new(0.5, -2, 1, 0)
 
--- ปุ่ม START / STOP CONTROL
-local btnControl = btn(pages.puppet, "START CONTROL", function(b)
+label(pages.puppet, "--- COMBAT MODES ---")
+
+-- ปุ่ม DEFENSE
+local btnDef = btn(pages.puppet, "DEFENSE MODE (CIRCLE): OFF", function(b)
+    defenseActive = not defenseActive
+    attackActive = false
+    controlling = false
+    b.Text = "DEFENSE MODE: " .. (defenseActive and "ON" or "OFF")
+    b.BackgroundColor3 = defenseActive and Color3.fromRGB(0, 150, 200) or Color3.fromRGB(70, 70, 70)
+end)
+
+-- ปุ่ม ATTACK
+local btnAtk = btn(pages.puppet, "ATTACK MODE (HUNT): OFF", function(b)
+    attackActive = not attackActive
+    defenseActive = false
+    controlling = false
+    b.Text = "ATTACK MODE: " .. (attackActive and "ON" or "OFF")
+    b.BackgroundColor3 = attackActive and Color3.fromRGB(200, 50, 50) or Color3.fromRGB(70, 70, 70)
+end)
+
+-- ปุ่ม MANUAL CONTROL
+local btnControl = btn(pages.puppet, "MANUAL CONTROL (WASD): OFF", function(b)
     controlling = not controlling
+    attackActive = false
+    defenseActive = false
     if controlling then
-        if not currentPuppet then 
-            for m, s in pairs(selectedForControl) do if s then currentPuppet = m break end end
-        end
-        if not currentPuppet then controlling = false return end
         b.Text = "STOP CONTROL"
         b.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
-        Cam.CameraSubject = currentPuppet:FindFirstChildOfClass("Humanoid")
+        if currentPuppet and currentPuppet:FindFirstChildOfClass("Humanoid") then
+            Cam.CameraSubject = currentPuppet:FindFirstChildOfClass("Humanoid")
+        end
         if LP.Character then LP.Character.HumanoidRootPart.Anchored = true end 
     else
-        b.Text = "START CONTROL"
+        b.Text = "START MANUAL CONTROL"
         b.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
         Cam.CameraSubject = LP.Character:FindFirstChildOfClass("Humanoid")
         if LP.Character then LP.Character.HumanoidRootPart.Anchored = false end 
     end
 end)
-btnControl.Size = UDim2.new(1, 0, 0, 40)
 
--- ปุ่ม BACK ไปหน้าหลัก
+btn(pages.puppet, "CLEAR ALL PUPPETS", function()
+    puppetList = {}
+    selectedForControl = {}
+    refreshPuppetList()
+end)
+
 btn(pages.puppet, "BACK TO MAIN", function()
     showPage("main")
 end)
 
--- [[ LOGIC ]] --
+-- [[ LOGIC CONTROL ]] --
 
--- ระบบคลิก
+-- ระบบคลิกเลือก NPC
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp or not selectClickMode then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -1126,39 +1168,95 @@ UserInputService.InputBegan:Connect(function(input, gp)
         local res = workspace:Raycast(ray.Origin, ray.Direction * 1000)
         if res and res.Instance then
             local m = getPuppetModel(res.Instance)
-            if m then
-                local root = m:FindFirstChild("HumanoidRootPart")
-                if root and (root.Position - LP.Character.HumanoidRootPart.Position).Magnitude <= holdDistance then
-                    if not table.find(puppetList, m) then
-                        table.insert(puppetList, m)
-                        selectedForControl[m] = true
-                        refreshPuppetList()
-                    end
-                end
+            if m and not table.find(puppetList, m) then
+                table.insert(puppetList, m)
+                selectedForControl[m] = true
+                refreshPuppetList()
             end
         end
     end
 end)
 
--- Loop การทำงาน
+-- หัวใจการทำงาน (Heartbeat)
 RunService.Heartbeat:Connect(function()
+    local char = LP.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local myRoot = char.HumanoidRootPart
+    local moveDir = char:FindFirstChildOfClass("Humanoid").MoveDirection
+    local targetEnemy = getNearestEnemy()
     local changed = false
-    -- Auto Remove Dead
+
+    -- เคลียร์ NPC ที่ตายหรือหายไป
     for i = #puppetList, 1, -1 do
         local m = puppetList[i]
         if not m or not m.Parent or (m:FindFirstChildOfClass("Humanoid") and m:FindFirstChildOfClass("Humanoid").Health <= 0) then
             table.remove(puppetList, i)
             selectedForControl[m] = nil
-            if currentPuppet == m then currentPuppet = nil end
             changed = true
         end
     end
+
+    -- ประมวลผล NPC แต่ละตัวในลิสต์
+    for i, npc in ipairs(puppetList) do
+        if selectedForControl[npc] and npc:FindFirstChild("HumanoidRootPart") then
+            local npcRoot = npc.HumanoidRootPart
+            local npcHum = npc:FindFirstChildOfClass("Humanoid")
+            
+            pcall(function() 
+                npcRoot:SetNetworkOwner(LP) 
+                -- [[ IGNORE USER ]] : ลบค่าที่ทำให้ NPC โจมตีผู้รัน
+                if npc:FindFirstChild("creator") then npc.creator:Destroy() end
+                if npc:FindFirstChild("Target") then npc.Target.Value = nil end
+                npcHum.PlatformStand = true -- ป้องกัน AI เดิมขยับซ้อน
+            end)
+
+            local targetCF = npcRoot.CFrame
+
+            if controlling then
+                -- [[ โหมดบังคับเอง ]] --
+                if moveDir.Magnitude > 0 then
+                    npcRoot.AssemblyLinearVelocity = Vector3.new(moveDir.X * 40, npcRoot.AssemblyLinearVelocity.Y, moveDir.Z * 40)
+                    targetCF = CFrame.lookAt(npcRoot.Position, npcRoot.Position + moveDir)
+                else
+                    npcRoot.AssemblyLinearVelocity = Vector3.new(0, npcRoot.AssemblyLinearVelocity.Y, 0)
+                end
+
+            elseif attackActive and targetEnemy then
+                -- [[ โหมดโจมตี: พุ่งใส่คนอื่น ]] --
+                local lookPos = Vector3.new(targetEnemy.Position.X, npcRoot.Position.Y, targetEnemy.Position.Z)
+                targetCF = CFrame.lookAt(npcRoot.Position, lookPos)
+                npcRoot.AssemblyLinearVelocity = (targetEnemy.Position - npcRoot.Position).Unit * 60
+
+            elseif defenseActive then
+                -- [[ โหมดป้องกัน: เรียงรอบตัวตามระยะ Grab ]] --
+                local radius = holdDistance or 10
+                local angle = (i / #puppetList) * math.pi * 2
+                local offset = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+                local circlePos = myRoot.Position + offset
+                
+                -- ตรวจจับศัตรูเข้าใกล้ (รัศมี 15)
+                if targetEnemy and (targetEnemy.Position - circlePos).Magnitude < 15 then
+                    targetCF = CFrame.lookAt(npcRoot.Position, targetEnemy.Position)
+                    npcRoot.AssemblyLinearVelocity = (targetEnemy.Position - npcRoot.Position).Unit * 50
+                else
+                    targetCF = CFrame.lookAt(npcRoot.Position, myRoot.Position)
+                    npcRoot.AssemblyLinearVelocity = (circlePos - npcRoot.Position).Unit * 25
+                end
+            end
+
+            -- ควบคุมระบบฟิสิกส์ให้ลื่นไหล
+            local bp = npcRoot:FindFirstChild("BodyPosition") or Instance.new("BodyPosition", npcRoot)
+            local bg = npcRoot:FindFirstChild("BodyGyro") or Instance.new("BodyGyro", npcRoot)
+            
+            bp.MaxForce = Vector3.new(1,1,1) * 500000; bp.P = 20000; bp.Position = targetCF.Position
+            bg.MaxTorque = Vector3.new(1,1,1) * 500000; bg.D = 500; bg.CFrame = targetCF
+        end
+    end
     
-    -- Auto Add NPC
-    if autoAddNPC and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
-        local myPos = LP.Character.HumanoidRootPart.Position
-        local parts = workspace:GetPartBoundsInRadius(myPos, holdDistance)
-        for _, p in ipairs(parts) do
+    -- Auto Add รอบๆ ตัว
+    if autoAddNPC then
+        local nearby = workspace:GetPartBoundsInRadius(myRoot.Position, holdDistance or 10)
+        for _, p in ipairs(nearby) do
             local m = getPuppetModel(p)
             if m and not table.find(puppetList, m) then
                 table.insert(puppetList, m)
@@ -1167,25 +1265,10 @@ RunService.Heartbeat:Connect(function()
             end
         end
     end
-    if changed then refreshPuppetList() end
 
-    -- Control Physics
-    if controlling and LP.Character then
-        local moveDir = LP.Character:FindFirstChildOfClass("Humanoid").MoveDirection
-        for npc, isSelected in pairs(selectedForControl) do
-            if isSelected and npc:FindFirstChild("HumanoidRootPart") then
-                local root = npc.HumanoidRootPart
-                pcall(function() root:SetNetworkOwner(LP) end)
-                if moveDir.Magnitude > 0 then
-                    root.AssemblyLinearVelocity = Vector3.new(moveDir.X * 30, root.AssemblyLinearVelocity.Y, moveDir.Z * 30)
-                    root.CFrame = root.CFrame:Lerp(CFrame.lookAt(root.Position, root.Position + moveDir), 0.2)
-                else
-                    root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
-                end
-            end
-        end
-    end
+    if changed then refreshPuppetList() end
 end)
+
 -- [[ TEXT PART SYSTEM - PRO VERSION ]] --
 local textMode = false
 local textFrozen = false
