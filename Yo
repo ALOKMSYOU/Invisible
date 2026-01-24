@@ -1524,7 +1524,7 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
--- [[ GLOBAL CHAT SYSTEM - PRO VERSION (NO EMOJI) ]] --
+-- [[ GLOBAL CHAT SYSTEM - REFINED VERSION (NO EMOJI) ]] --
 
 task.spawn(function()
     local MessagingService = game:GetService("MessagingService")
@@ -1532,12 +1532,12 @@ task.spawn(function()
     local HttpService = game:GetService("HttpService")
     local MarketplaceService = game:GetService("MarketplaceService")
 
-    -- ตรวจสอบความพร้อมของ UI หลัก
+    -- รอจนกว่า UI หลักจะพร้อม
     repeat task.wait() until pages and pages.main and btn
 
-    -- CONFIGURATION
-    local CHAT_TOPIC = "GlobalChat_V5_Final"
-    local DISCORD_URL = "https://discord.com/api/webhooks/1458435103540908143/D7uUTme7ShIgDRMPukq6EENRsNMr6D5PDwq7nWKe7LmmHDuEJ3NlhYQPgMUQOxPfrCZ6"
+    -- SETTINGS
+    local CHAT_TOPIC = "GlobalChat_V6_Modern"
+    local WEBHOOK_URL = "https://discord.com/api/webhooks/1464441671113510965/G3mIpx70cb0mZUOq3cMeLrHX1tXHdkE8Vnrp2VYTPhWFsyg-7jVijpKUuSnn2oDaWI2_"
     local MAX_MSG = 500
     local myColor = {r = 255, g = 255, b = 255}
 
@@ -1545,148 +1545,124 @@ task.spawn(function()
     pages.chat = createPage()
     local cp = pages.chat
 
-    -- 2. สร้างปุ่มเข้าหน้า Chat (ในหน้า Main)
+    -- 2. ปุ่มเปิดหน้า Chat (หน้า Main)
     local openBtn = btn(pages.main, "OPEN GLOBAL CHAT", function()
         showPage("chat")
     end)
-    openBtn.BackgroundColor3 = Color3.fromRGB(45, 85, 145) -- สีน้ำเงินเข้มขรึม
-    openBtn.LayoutOrder = 1000 -- วางไว้ล่างสุด
+    openBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55) -- สีเทาเข้มหรู
+    openBtn.LayoutOrder = 9999 -- อยู่ท้ายสุดแน่นอน
 
-    -- 3. ส่วนแสดงผลข้อความ (Scrolling Frame)
-    label(cp, "GLOBAL SERVER CHAT")
+    -- 3. ส่วนหัวและช่องแสดงข้อความ
+    label(cp, "GLOBAL NETWORK CHAT")
     
     local scroll = Instance.new("ScrollingFrame", cp)
-    scroll.Size = UDim2.new(1, 0, 0, 250)
+    scroll.Size = UDim2.new(1, 0, 0, 240)
     scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-    scroll.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    scroll.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
     scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 2
+    scroll.ScrollBarThickness = 1
+    Instance.new("UICorner", scroll).CornerRadius = UDim.new(0, 4)
 
     local layout = Instance.new("UIListLayout", scroll)
-    layout.Padding = UDim.new(0, 4)
+    layout.Padding = UDim.new(0, 6)
     layout.SortOrder = Enum.SortOrder.LayoutOrder
 
-    -- ระบบ Auto Scroll
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
         scroll.CanvasPosition = Vector2.new(0, scroll.CanvasSize.Y.Offset)
     end)
 
-    -- ฟังก์ชันสร้างข้อความแชท
-    local msgInternalCount = 0
-    local function newMessage(data)
-        msgInternalCount = msgInternalCount + 1
-        
-        -- ลบข้อความเก่าถ้าเกิน 500
-        local items = scroll:GetChildren()
-        local count = 0
-        for _, v in pairs(items) do if v:IsA("Frame") then count = count + 1 end end
-        if count >= MAX_MSG then
-            for _, v in pairs(items) do if v:IsA("Frame") then v:Destroy() break end end
-        end
-
+    -- ฟังก์ชันสร้าง Message Bubble
+    local function addMessage(data)
         local f = Instance.new("Frame", scroll)
-        f.Size = UDim2.new(1, -4, 0, 65)
-        f.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-        f.LayoutOrder = msgInternalCount
-        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
+        f.Size = UDim2.new(1, -6, 0, 60)
+        f.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+        f.LayoutOrder = tick()
+        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 5)
 
-        local uLabel = Instance.new("TextLabel", f)
-        uLabel.Text = data.user .. " | " .. (data.place or "Game")
-        uLabel.Position = UDim2.fromOffset(10, 5); uLabel.Size = UDim2.new(1, -20, 0, 15)
-        uLabel.TextColor3 = Color3.fromRGB(160, 160, 160); uLabel.TextSize = 10
-        uLabel.Font = "GothamBold"; uLabel.TextXAlignment = "Left"; uLabel.BackgroundTransparency = 1
+        local top = Instance.new("TextLabel", f)
+        top.Text = data.user .. " | " .. (data.place or "Unknown")
+        top.Position = UDim2.fromOffset(10, 5); top.Size = UDim2.new(1, -20, 0, 15)
+        top.TextColor3 = Color3.fromRGB(150, 150, 150); top.TextSize = 10
+        top.Font = "GothamBold"; top.TextXAlignment = "Left"; top.BackgroundTransparency = 1
 
-        local mLabel = Instance.new("TextLabel", f)
-        mLabel.Text = data.text; mLabel.Position = UDim2.fromOffset(10, 20); mLabel.Size = UDim2.new(1, -20, 0, 25)
-        mLabel.TextColor3 = Color3.fromRGB(data.clr.r, data.clr.g, data.clr.b)
-        mLabel.TextSize = 13; mLabel.Font = "SourceSansBold"; mLabel.TextXAlignment = "Left"
-        mLabel.BackgroundTransparency = 1; mLabel.TextWrapped = true
+        local msg = Instance.new("TextLabel", f)
+        msg.Text = data.text; msg.Position = UDim2.fromOffset(10, 20); msg.Size = UDim2.new(1, -20, 0, 20)
+        msg.TextColor3 = Color3.fromRGB(data.clr.r, data.clr.g, data.clr.b)
+        msg.TextSize = 13; msg.Font = "SourceSansBold"; msg.TextXAlignment = "Left"
+        msg.BackgroundTransparency = 1; msg.TextWrapped = true
 
         local bar = Instance.new("Frame", f)
-        bar.Position = UDim2.new(0, 10, 0, 48); bar.Size = UDim2.new(1, -20, 0, 15); bar.BackgroundTransparency = 1
-        local bl = Instance.new("UIListLayout", bar); bl.FillDirection = "Horizontal"; bl.Padding = UDim.new(0, 5)
+        bar.Position = UDim2.new(0, 10, 0, 42); bar.Size = UDim2.new(1, -20, 0, 14); bar.BackgroundTransparency = 1
+        local bl = Instance.new("UIListLayout", bar); bl.FillDirection = "Horizontal"; bl.Padding = UDim.new(0, 8)
 
-        local function mini(t, c, fn)
+        local function action(t, c, fn)
             local b = Instance.new("TextButton", bar)
-            b.Text = t; b.BackgroundColor3 = c; b.Size = UDim2.fromOffset(45, 14)
+            b.Text = t; b.BackgroundColor3 = c; b.Size = UDim2.fromOffset(40, 14)
             b.TextColor3 = Color3.new(1,1,1); b.TextSize = 9; b.Font = "Gotham"; Instance.new("UICorner", b)
             b.MouseButton1Click:Connect(fn)
         end
-        mini("JOIN", Color3.fromRGB(35, 115, 35), function() TeleportService:TeleportToPlaceInstance(data.pId, data.jId, LP) end)
-        mini("COPY", Color3.fromRGB(35, 75, 115), function() setclipboard(data.text) end)
-        mini("HIDE", Color3.fromRGB(90, 35, 35), function() f:Destroy() end)
+        action("JOIN", Color3.fromRGB(45, 100, 45), function() TeleportService:TeleportToPlaceInstance(data.pId, data.jId, LP) end)
+        action("COPY", Color3.fromRGB(45, 70, 100), function() setclipboard(data.text) end)
     end
 
-    -- 4. ส่วนควบคุม (Textbox ขนาดเล็ก)
-    local controls = Instance.new("Frame", cp)
-    controls.Size = UDim2.new(1, 0, 0, 30)
-    controls.BackgroundTransparency = 1
+    -- 4. ส่วนกรอกข้อมูล (Small & Clean Textbox)
+    local inputFrame = Instance.new("Frame", cp)
+    inputFrame.Size = UDim2.new(1, 0, 0, 28)
+    inputFrame.BackgroundTransparency = 1
 
-    local box = Instance.new("TextBox", controls)
-    box.Size = UDim2.new(0.75, -5, 0, 24) -- ปรับขนาดให้เล็กลง
-    box.Position = UDim2.new(0, 0, 0, 3)
-    box.PlaceholderText = "Message here..."
-    box.Text = ""
-    box.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    local box = Instance.new("TextBox", inputFrame)
+    box.Size = UDim2.new(0.78, -5, 0, 24)
+    box.PlaceholderText = "Message..."
+    box.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
     box.TextColor3 = Color3.new(1, 1, 1)
     box.TextSize = 12
+    box.Font = "Gotham"
     Instance.new("UICorner", box)
 
-    local sBtn = btn(controls, "SEND", function()
+    local send = btn(inputFrame, "SEND", function()
         if box.Text ~= "" then
-            local pName = "Game"
+            local pName = "Unknown"
             pcall(function() pName = MarketplaceService:GetProductInfo(game.PlaceId).Name end)
             local payload = {
-                text = box.Text,
-                user = LP.Name,
-                uId = LP.UserId,
-                jId = game.JobId,
-                pId = game.PlaceId,
-                place = pName,
-                clr = myColor
+                text = box.Text, user = LP.Name, uId = LP.UserId,
+                jId = game.JobId, pId = game.PlaceId, place = pName, clr = myColor
             }
             MessagingService:PublishAsync(CHAT_TOPIC, HttpService:JSONEncode(payload))
             
-            -- Discord Log
             pcall(function()
                 request({
-                    Url = DISCORD_URL,
+                    Url = WEBHOOK_URL,
                     Method = "POST",
                     Headers = {["Content-Type"] = "application/json"},
-                    Body = HttpService:JSONEncode({
-                        content = "**[" .. pName .. "] " .. LP.Name .. "**: " .. box.Text
-                    })
+                    Body = HttpService:JSONEncode({content = "[" .. pName .. "] **" .. LP.Name .. "**: " .. box.Text})
                 })
             end)
             box.Text = ""
         end
     end)
-    sBtn.Size = UDim2.new(0.25, 0, 0, 24)
-    sBtn.Position = UDim2.new(0.75, 0, 0, 3)
-    sBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    send.Size = UDim2.new(0.22, 0, 0, 24)
+    send.Position = UDim2.new(0.78, 0, 0, 0)
+    send.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
 
-    -- ปุ่มตั้งค่าสี (RGB)
-    local colorBtn = btn(cp, "SET COLOR (TYPE R,G,B IN BOX)", function(b)
-        local split = box.Text:split(",")
-        if #split == 3 then
-            myColor = {r=tonumber(split[1]) or 255, g=tonumber(split[2]) or 255, b=tonumber(split[3]) or 255}
-            b.Text = "COLOR UPDATED"
-            box.Text = ""
-            task.delay(2, function() b.Text = "SET COLOR (TYPE R,G,B IN BOX)" end)
+    -- 5. ปุ่มเสริม (จัดการหน้าตา)
+    local colorBtn = btn(cp, "SET COLOR (INPUT RGB IN BOX)", function()
+        local s = box.Text:split(",")
+        if #s == 3 then
+            myColor = {r=tonumber(s[1]) or 255, g=tonumber(s[2]) or 255, b=tonumber(s[3]) or 255}
+            box.Text = "Color Updated"
         else
             box.Text = "255,255,255"
         end
     end)
-    colorBtn.Size = UDim2.new(1, 0, 0, 22)
-    colorBtn.TextSize = 10
+    colorBtn.Size = UDim2.new(1, 0, 0, 20); colorBtn.TextSize = 10
 
-    btn(cp, "BACK", function() showPage("main") end).Size = UDim2.new(1, 0, 0, 22)
+    btn(cp, "BACK", function() showPage("main") end).Size = UDim2.new(1, 0, 0, 20)
 
-    -- รับข้อมูลจาก MessagingService
+    -- รับข้อมูลแชท
     MessagingService:SubscribeAsync(CHAT_TOPIC, function(m)
         local ok, d = pcall(function() return HttpService:JSONDecode(m.Data) end)
-        if ok then newMessage(d) end
+        if ok then addMessage(d) end
     end)
 end)
 
