@@ -1524,145 +1524,202 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
--- [[ GLOBAL CHAT SYSTEM - REFINED VERSION (NO EMOJI) ]] --
+-- [[ GLOBAL CHAT - ULTIMATE FIX & MODERN UI ]] --
 
 task.spawn(function()
     local MessagingService = game:GetService("MessagingService")
     local TeleportService = game:GetService("TeleportService")
     local HttpService = game:GetService("HttpService")
     local MarketplaceService = game:GetService("MarketplaceService")
+    local Players = game:GetService("Players")
+    local LP = Players.LocalPlayer
 
-    -- รอจนกว่า UI หลักจะพร้อม
-    repeat task.wait() until pages and pages.main and btn
-
-    -- SETTINGS
-    local CHAT_TOPIC = "GlobalChat_V6_Modern"
-    local WEBHOOK_URL = "https://discord.com/api/webhooks/1464441671113510965/G3mIpx70cb0mZUOq3cMeLrHX1tXHdkE8Vnrp2VYTPhWFsyg-7jVijpKUuSnn2oDaWI2_"
-    local MAX_MSG = 500
-    local myColor = {r = 255, g = 255, b = 255}
-
-    -- 1. สร้างหน้า Chat
-    pages.chat = createPage()
-    local cp = pages.chat
-
-    -- 2. ปุ่มเปิดหน้า Chat (หน้า Main)
-    local openBtn = btn(pages.main, "OPEN GLOBAL CHAT", function()
-        showPage("chat")
-    end)
-    openBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 55) -- สีเทาเข้มหรู
-    openBtn.LayoutOrder = 9999 -- อยู่ท้ายสุดแน่นอน
-
-    -- 3. ส่วนหัวและช่องแสดงข้อความ
-    label(cp, "GLOBAL NETWORK CHAT")
+    -- ค้นหา UI หลักของสคริปต์คุณ (พยายามหาหน้า Main)
+    local MainFrame = nil
+    local ScreenGui = LP:WaitForChild("PlayerGui"):FindFirstChildOfClass("ScreenGui")
     
-    local scroll = Instance.new("ScrollingFrame", cp)
-    scroll.Size = UDim2.new(1, 0, 0, 240)
-    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-    scroll.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-    scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 1
-    Instance.new("UICorner", scroll).CornerRadius = UDim.new(0, 4)
-
-    local layout = Instance.new("UIListLayout", scroll)
-    layout.Padding = UDim.new(0, 6)
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-
-    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
-        scroll.CanvasPosition = Vector2.new(0, scroll.CanvasSize.Y.Offset)
-    end)
-
-    -- ฟังก์ชันสร้าง Message Bubble
-    local function addMessage(data)
-        local f = Instance.new("Frame", scroll)
-        f.Size = UDim2.new(1, -6, 0, 60)
-        f.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
-        f.LayoutOrder = tick()
-        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 5)
-
-        local top = Instance.new("TextLabel", f)
-        top.Text = data.user .. " | " .. (data.place or "Unknown")
-        top.Position = UDim2.fromOffset(10, 5); top.Size = UDim2.new(1, -20, 0, 15)
-        top.TextColor3 = Color3.fromRGB(150, 150, 150); top.TextSize = 10
-        top.Font = "GothamBold"; top.TextXAlignment = "Left"; top.BackgroundTransparency = 1
-
-        local msg = Instance.new("TextLabel", f)
-        msg.Text = data.text; msg.Position = UDim2.fromOffset(10, 20); msg.Size = UDim2.new(1, -20, 0, 20)
-        msg.TextColor3 = Color3.fromRGB(data.clr.r, data.clr.g, data.clr.b)
-        msg.TextSize = 13; msg.Font = "SourceSansBold"; msg.TextXAlignment = "Left"
-        msg.BackgroundTransparency = 1; msg.TextWrapped = true
-
-        local bar = Instance.new("Frame", f)
-        bar.Position = UDim2.new(0, 10, 0, 42); bar.Size = UDim2.new(1, -20, 0, 14); bar.BackgroundTransparency = 1
-        local bl = Instance.new("UIListLayout", bar); bl.FillDirection = "Horizontal"; bl.Padding = UDim.new(0, 8)
-
-        local function action(t, c, fn)
-            local b = Instance.new("TextButton", bar)
-            b.Text = t; b.BackgroundColor3 = c; b.Size = UDim2.fromOffset(40, 14)
-            b.TextColor3 = Color3.new(1,1,1); b.TextSize = 9; b.Font = "Gotham"; Instance.new("UICorner", b)
-            b.MouseButton1Click:Connect(fn)
+    -- ค้นหา Frame ที่มีปุ่มเยอะๆ (หน้า Main)
+    if ScreenGui then
+        for _, v in pairs(ScreenGui:GetDescendants()) do
+            if v:IsA("ScrollingFrame") or v:IsA("Frame") then
+                if v.Name:lower():find("main") or v:FindFirstChildOfClass("UIListLayout") then
+                    MainFrame = v
+                    break
+                end
+            end
         end
-        action("JOIN", Color3.fromRGB(45, 100, 45), function() TeleportService:TeleportToPlaceInstance(data.pId, data.jId, LP) end)
-        action("COPY", Color3.fromRGB(45, 70, 100), function() setclipboard(data.text) end)
     end
 
-    -- 4. ส่วนกรอกข้อมูล (Small & Clean Textbox)
-    local inputFrame = Instance.new("Frame", cp)
-    inputFrame.Size = UDim2.new(1, 0, 0, 28)
-    inputFrame.BackgroundTransparency = 1
+    -- CONFIG
+    local WEBHOOK = "https://discord.com/api/webhooks/1464441671113510965/G3mIpx70cb0mZUOq3cMeLrHX1tXHdkE8Vnrp2VYTPhWFsyg-7jVijpKUuSnn2oDaWI2_"
+    local TOPIC = "GlobalChat_v10_Modern"
+    local myChatColor = Color3.fromRGB(255, 255, 255)
 
-    local box = Instance.new("TextBox", inputFrame)
-    box.Size = UDim2.new(0.78, -5, 0, 24)
-    box.PlaceholderText = "Message..."
-    box.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-    box.TextColor3 = Color3.new(1, 1, 1)
-    box.TextSize = 12
-    box.Font = "Gotham"
-    Instance.new("UICorner", box)
+    -- ฟังก์ชันสร้างปุ่มแบบสวยๆ (Modern Style)
+    local function createModernBtn(parent, text, callback)
+        local b = Instance.new("TextButton")
+        b.Name = "GlobalChatBtn"
+        b.Parent = parent
+        b.Size = UDim2.new(1, -10, 0, 32)
+        b.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+        b.BorderSizePixel = 0
+        b.Text = text
+        b.TextColor3 = Color3.fromRGB(230, 230, 230)
+        b.Font = Enum.Font.GothamMedium
+        b.TextSize = 13
+        b.AutoButtonColor = true
+        
+        local corner = Instance.new("UICorner", b)
+        corner.CornerRadius = UDim.new(0, 6)
+        
+        b.MouseButton1Click:Connect(callback)
+        return b
+    end
 
-    local send = btn(inputFrame, "SEND", function()
-        if box.Text ~= "" then
-            local pName = "Unknown"
-            pcall(function() pName = MarketplaceService:GetProductInfo(game.PlaceId).Name end)
-            local payload = {
-                text = box.Text, user = LP.Name, uId = LP.UserId,
-                jId = game.JobId, pId = game.PlaceId, place = pName, clr = myColor
+    -- 1. สร้างหน้า Chat ใหม่ (แยกอิสระ)
+    local ChatFrame = Instance.new("Frame")
+    ChatFrame.Name = "GlobalChatPage"
+    ChatFrame.Parent = MainFrame and MainFrame.Parent or ScreenGui
+    ChatFrame.Size = UDim2.new(1, 0, 1, 0)
+    ChatFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    ChatFrame.Visible = false
+    ChatFrame.ZIndex = 10
+    Instance.new("UICorner", ChatFrame)
+
+    -- 2. สร้างปุ่มเปิดในหน้า Main
+    if MainFrame then
+        local openBtn = createModernBtn(MainFrame, "OPEN GLOBAL CHAT", function()
+            for _, v in pairs(MainFrame.Parent:GetChildren()) do
+                if v:IsA("Frame") or v:IsA("ScrollingFrame") then v.Visible = false end
+            end
+            ChatFrame.Visible = true
+        end)
+        openBtn.LayoutOrder = 99999 -- อยู่ล่างสุด
+    end
+
+    -- 3. UI ภายในหน้า Chat
+    local Title = Instance.new("TextLabel", ChatFrame)
+    Title.Text = "GLOBAL NETWORK"
+    Title.Size = UDim2.new(1, 0, 0, 30)
+    Title.BackgroundTransparency = 1
+    Title.TextColor3 = Color3.fromRGB(150, 150, 150)
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 14
+
+    local Scroll = Instance.new("ScrollingFrame", ChatFrame)
+    Scroll.Size = UDim2.new(1, -15, 1, -85)
+    Scroll.Position = UDim2.new(0, 7, 0, 35)
+    Scroll.BackgroundTransparency = 1
+    Scroll.ScrollBarThickness = 1
+    Scroll.CanvasSize = UDim2.new(0,0,0,0)
+    
+    local List = Instance.new("UIListLayout", Scroll)
+    List.Padding = UDim.new(0, 5)
+    List.SortOrder = Enum.SortOrder.LayoutOrder
+
+    -- ระบบเลื่อนล่างสุดอัติโนมัติ
+    List:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        Scroll.CanvasSize = UDim2.new(0,0,0, List.AbsoluteContentSize.Y)
+        Scroll.CanvasPosition = Vector2.new(0, Scroll.CanvasSize.Y.Offset)
+    end)
+
+    -- ส่วนพิมพ์ข้อความ (เล็กและสวย)
+    local InputBar = Instance.new("Frame", ChatFrame)
+    InputBar.Size = UDim2.new(1, -14, 0, 26)
+    InputBar.Position = UDim2.new(0, 7, 1, -45)
+    InputBar.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    Instance.new("UICorner", InputBar)
+
+    local Box = Instance.new("TextBox", InputBar)
+    Box.Size = UDim2.new(0.8, -5, 1, 0)
+    Box.Position = UDim2.new(0, 5, 0, 0)
+    Box.BackgroundTransparency = 1
+    Box.PlaceholderText = "Type message..."
+    Box.Text = ""
+    Box.TextColor3 = Color3.new(1,1,1)
+    Box.TextSize = 12
+    Box.Font = Enum.Font.Gotham
+    Box.TextXAlignment = "Left"
+
+    -- ฟังก์ชันส่งข้อความ
+    local function sendMessage()
+        if Box.Text ~= "" then
+            local data = {
+                u = LP.Name,
+                m = Box.Text,
+                p = MarketplaceService:GetProductInfo(game.PlaceId).Name,
+                uid = LP.UserId,
+                jid = game.JobId,
+                pid = game.PlaceId,
+                c = {myChatColor.r, myChatColor.g, myChatColor.b}
             }
-            MessagingService:PublishAsync(CHAT_TOPIC, HttpService:JSONEncode(payload))
+            MessagingService:PublishAsync(TOPIC, HttpService:JSONEncode(data))
             
             pcall(function()
                 request({
-                    Url = WEBHOOK_URL,
+                    Url = WEBHOOK,
                     Method = "POST",
                     Headers = {["Content-Type"] = "application/json"},
-                    Body = HttpService:JSONEncode({content = "[" .. pName .. "] **" .. LP.Name .. "**: " .. box.Text})
+                    Body = HttpService:JSONEncode({content = "**["..data.p.."] "..data.u.."**: "..data.m})
                 })
             end)
-            box.Text = ""
+            Box.Text = ""
         end
+    end
+
+    local SendBtn = Instance.new("TextButton", InputBar)
+    SendBtn.Size = UDim2.new(0.2, 0, 1, 0)
+    SendBtn.Position = UDim2.new(0.8, 0, 0, 0)
+    SendBtn.BackgroundTransparency = 1
+    SendBtn.Text = "SEND"
+    SendBtn.TextColor3 = Color3.fromRGB(0, 150, 255)
+    SendBtn.Font = Enum.Font.GothamBold
+    SendBtn.TextSize = 11
+    SendBtn.MouseButton1Click:Connect(sendMessage)
+
+    -- ปุ่มย้อนกลับ
+    local BackBtn = createModernBtn(ChatFrame, "BACK", function()
+        ChatFrame.Visible = false
+        MainFrame.Visible = true
     end)
-    send.Size = UDim2.new(0.22, 0, 0, 24)
-    send.Position = UDim2.new(0.78, 0, 0, 0)
-    send.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+    BackBtn.Size = UDim2.new(1, -14, 0, 25)
+    BackBtn.Position = UDim2.new(0, 7, 1, -15)
+    BackBtn.BackgroundColor3 = Color3.fromRGB(50, 30, 30)
 
-    -- 5. ปุ่มเสริม (จัดการหน้าตา)
-    local colorBtn = btn(cp, "SET COLOR (INPUT RGB IN BOX)", function()
-        local s = box.Text:split(",")
-        if #s == 3 then
-            myColor = {r=tonumber(s[1]) or 255, g=tonumber(s[2]) or 255, b=tonumber(s[3]) or 255}
-            box.Text = "Color Updated"
-        else
-            box.Text = "255,255,255"
-        end
-    end)
-    colorBtn.Size = UDim2.new(1, 0, 0, 20); colorBtn.TextSize = 10
+    -- ฟังก์ชันรับข้อความมาโชว์
+    local function addChat(data)
+        local f = Instance.new("Frame", Scroll)
+        f.Size = UDim2.new(1, -5, 0, 50)
+        f.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+        f.BorderSizePixel = 0
+        Instance.new("UICorner", f)
+        
+        local user = Instance.new("TextLabel", f)
+        user.Text = data.u .. " | " .. data.p
+        user.Size = UDim2.new(1, -10, 0, 15)
+        user.Position = UDim2.new(0, 8, 0, 5)
+        user.TextColor3 = Color3.fromRGB(150, 150, 150)
+        user.Font = Enum.Font.GothamBold
+        user.TextSize = 10
+        user.TextXAlignment = "Left"
+        user.BackgroundTransparency = 1
 
-    btn(cp, "BACK", function() showPage("main") end).Size = UDim2.new(1, 0, 0, 20)
+        local msg = Instance.new("TextLabel", f)
+        msg.Text = data.m
+        msg.Size = UDim2.new(1, -10, 0, 25)
+        msg.Position = UDim2.new(0, 8, 0, 18)
+        msg.TextColor3 = Color3.new(data.c[1], data.c[2], data.c[3])
+        msg.Font = Enum.Font.Gotham
+        msg.TextSize = 13
+        msg.TextXAlignment = "Left"
+        msg.BackgroundTransparency = 1
+        msg.TextWrapped = true
+    end
 
-    -- รับข้อมูลแชท
-    MessagingService:SubscribeAsync(CHAT_TOPIC, function(m)
-        local ok, d = pcall(function() return HttpService:JSONDecode(m.Data) end)
-        if ok then addMessage(d) end
+    -- เชื่อมต่อระบบรับส่ง
+    MessagingService:SubscribeAsync(TOPIC, function(msg)
+        local success, data = pcall(function() return HttpService:JSONDecode(msg.Data) end)
+        if success then addChat(data) end
     end)
 end)
 
