@@ -1561,7 +1561,8 @@ local function copyToClipboard(str)
 end
 
 -- สร้างหน้า Chat
-local chatPage = createPage() -- (สมมติว่าใช้ฟังก์ชัน createPage จากสคริปต์หลักของคุณ)
+pages.chat = createPage()
+local chatPage = pages.chat -- เพื่อให้โค้ดส่วนอื่นทำงานต่อได้
 label(chatPage, "--- GLOBAL CHAT & SETTINGS ---")
 
 -- Container หลัก
@@ -1817,5 +1818,11 @@ MessagingService:SubscribeAsync("GlobalChat_Ultimate", function(message)
 end)
 
 btn(chatPage, "BACK TO MAIN", function() showPage("main") end)
+-- [[ BUTTON TO OPEN GLOBAL CHAT ]] --
+if pages and pages.main then
+    btn(pages.main, "💬 OPEN GLOBAL CHAT", function()
+        showPage("chat")
+    end).BackgroundColor3 = Color3.fromRGB(0, 100, 200) -- สีฟ้าให้เด่นๆ หน่อย
+end
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
