@@ -858,9 +858,9 @@ if pages and pages.main then
 
     -- ปุ่ม Part Follow Owner (วางไว้ในโซน Actions)
     label(pages.main, "--- OWNER PHYSICS ---")
-    local btnFollow = btn(pages.main, "👤 FOLLOW OWNER : OFF", function(b)
+    local btnFollow = btn(pages.main, "FOLLOW OWNER : OFF", function(b)
         followOwner = not followOwner
-        b.Text = "👤 FOLLOW OWNER : " .. (followOwner and "ON" or "OFF")
+        b.Text = "FOLLOW OWNER : " .. (followOwner and "ON" or "OFF")
         b.BackgroundColor3 = followOwner and Color3.fromRGB(100, 0, 150) or Color3.fromRGB(70, 70, 70)
         
         -- เมื่อกดเปิด จะทำการ Freeze Part ที่ถืออยู่ทันทีตามคำขอ
@@ -1524,5 +1524,298 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
+-- [[ GLOBAL CHAT: ULTIMATE EDITION (Settings, Color, Copy, Delete) ]] --
+local MessagingService = game:GetService("MessagingService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local MarketplaceService = game:GetService("MarketplaceService")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- Webhook ที่คุณให้มา
+local DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1458435103540908143/D7uUTme7ShIgDRMPukq6EENRsNMr6D5PDwq7nWKe7LmmHDuEJ3NlhYQPgMUQOxPfrCZ6"
+
+-- ตัวแปรสีเริ่มต้น (สีขาว)
+local myChatColor = {r = 255, g = 255, b = 255}
+
+-- ดึงชื่อแมพ
+local currentPlaceName = "Unknown Place"
+task.spawn(function()
+    pcall(function()
+        local info = MarketplaceService:GetProductInfo(game.PlaceId)
+        if info then currentPlaceName = info.Name end
+    end)
+end)
+
+-- ฟังก์ชัน Helper: Set Clipboard (รองรับ Executor ส่วนใหญ่)
+local function copyToClipboard(str)
+    if setclipboard then
+        setclipboard(str)
+    elseif toclipboard then
+        toclipboard(str)
+    else
+        -- กรณีรันใน Studio หรือไม่มีฟังก์ชันนี้
+        print("Clipboard function not supported: " .. str)
+    end
+end
+
+-- สร้างหน้า Chat
+local chatPage = createPage() -- (สมมติว่าใช้ฟังก์ชัน createPage จากสคริปต์หลักของคุณ)
+label(chatPage, "--- GLOBAL CHAT & SETTINGS ---")
+
+-- Container หลัก
+local mainContainer = Instance.new("Frame", chatPage)
+mainContainer.Size = UDim2.new(1, -10, 0, 250)
+mainContainer.BackgroundTransparency = 1
+
+-- [[ 1. ส่วนแสดงข้อความ (Chat Area) ]] --
+local chatScroll = Instance.new("ScrollingFrame", mainContainer)
+chatScroll.Size = UDim2.new(1, 0, 1, -40) -- เว้นที่ด้านล่างไว้พิมพ์
+chatScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+chatScroll.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+chatScroll.ScrollBarThickness = 4
+local chatLayout = Instance.new("UIListLayout", chatScroll)
+chatLayout.Padding = UDim.new(0, 5)
+
+-- ฟังก์ชันสร้างกล่องข้อความ
+local function createMessageBubble(data)
+    local msgFrame = Instance.new("Frame", chatScroll)
+    msgFrame.Size = UDim2.new(1, -5, 0, 75) -- เพิ่มความสูงเผื่อปุ่มเครื่องมือ
+    msgFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    msgFrame.BorderSizePixel = 0
+    
+    -- รูปโปรไฟล์
+    local profileImg = Instance.new("ImageLabel", msgFrame)
+    profileImg.Size = UDim2.new(0, 45, 0, 45)
+    profileImg.Position = UDim2.new(0, 5, 0, 5)
+    profileImg.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    task.spawn(function()
+        local content = Players:GetUserThumbnailAsync(data.userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+        profileImg.Image = content
+    end)
+    Instance.new("UICorner", profileImg).CornerRadius = UDim.new(1, 0)
+
+    -- ชื่อและแมพ
+    local nameLabel = Instance.new("TextLabel", msgFrame)
+    nameLabel.Text = data.userName .. " @ " .. (data.placeName or "Unknown")
+    nameLabel.Size = UDim2.new(1, -60, 0, 15)
+    nameLabel.Position = UDim2.new(0, 60, 0, 5)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextSize = 11
+
+    -- ข้อความ (ใช้สีที่ส่งมา)
+    local msgLabel = Instance.new("TextLabel", msgFrame)
+    msgLabel.Text = data.msg
+    msgLabel.Size = UDim2.new(1, -60, 0, 30)
+    msgLabel.Position = UDim2.new(0, 60, 0, 20)
+    msgLabel.BackgroundTransparency = 1
+    
+    -- แปลงสีจาก Table เป็น Color3
+    local txtColor = Color3.fromRGB(255, 255, 255)
+    if data.color then
+        txtColor = Color3.fromRGB(data.color.r, data.color.g, data.color.b)
+    end
+    msgLabel.TextColor3 = txtColor
+    
+    msgLabel.TextXAlignment = Enum.TextXAlignment.Left
+    msgLabel.TextWrapped = true
+    msgLabel.TextSize = 14
+    msgLabel.Font = Enum.Font.SourceSansBold
+
+    -- [[ TOOLBAR BUTTONS ]] --
+    local btnRow = Instance.new("Frame", msgFrame)
+    btnRow.Size = UDim2.new(1, -60, 0, 20)
+    btnRow.Position = UDim2.new(0, 60, 0, 50)
+    btnRow.BackgroundTransparency = 1
+    local btnLayout = Instance.new("UIListLayout", btnRow)
+    btnLayout.FillDirection = Enum.FillDirection.Horizontal
+    btnLayout.Padding = UDim.new(0, 5)
+
+    -- ปุ่ม JOIN
+    local function makeToolBtn(text, color, callback)
+        local b = Instance.new("TextButton", btnRow)
+        b.Text = text
+        b.Size = UDim2.new(0, 50, 1, 0)
+        b.BackgroundColor3 = color
+        b.TextColor3 = Color3.new(1, 1, 1)
+        b.Font = Enum.Font.GothamBold
+        b.TextSize = 10
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+        b.MouseButton1Click:Connect(callback)
+        return b
+    end
+
+    -- Join Button
+    local joinBtn = makeToolBtn("JOIN", Color3.fromRGB(0, 150, 0), function()
+        if data.jobId == game.JobId then
+            -- อยู่เซิฟเดียวกัน
+        else
+            TeleportService:TeleportToPlaceInstance(data.placeId, data.jobId, LP)
+        end
+    end)
+    if data.jobId == game.JobId then joinBtn.Text = "HERE" joinBtn.BackgroundTransparency = 0.5 end
+
+    -- Copy Button
+    makeToolBtn("COPY", Color3.fromRGB(0, 100, 200), function()
+        copyToClipboard(data.msg)
+    end)
+
+    -- Delete Button (Local)
+    makeToolBtn("DEL", Color3.fromRGB(180, 50, 50), function()
+        msgFrame:Destroy()
+        -- จัด Canvas Size ใหม่
+        chatScroll.CanvasSize = UDim2.new(0, 0, 0, chatLayout.AbsoluteContentSize.Y)
+    end)
+
+    -- ปรับขนาด Scroll
+    chatScroll.CanvasSize = UDim2.new(0, 0, 0, chatLayout.AbsoluteContentSize.Y)
+    chatScroll.CanvasPosition = Vector2.new(0, chatScroll.CanvasSize.Y.Offset)
+end
+
+-- [[ 2. Settings Panel (Custom Color) ]] --
+local settingFrame = Instance.new("Frame", mainContainer)
+settingFrame.Size = UDim2.new(1, 0, 0, 100)
+settingFrame.Position = UDim2.new(0, 0, 0, 0) -- ซ้อนอยู่ข้างบน
+settingFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+settingFrame.Visible = false -- ซ่อนไว้ก่อน
+settingFrame.ZIndex = 5
+
+label(settingFrame, "CUSTOM TEXT COLOR (RGB)").Size = UDim2.new(1, 0, 0, 20)
+
+local colorPreview = Instance.new("Frame", settingFrame)
+colorPreview.Size = UDim2.new(0, 40, 0, 40)
+colorPreview.Position = UDim2.new(0.8, 0, 0.4, 0)
+colorPreview.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", colorPreview)
+
+local rInput = Instance.new("TextBox", settingFrame)
+rInput.PlaceholderText = "R (0-255)"
+rInput.Size = UDim2.new(0.2, 0, 0, 30); rInput.Position = UDim2.new(0.05, 0, 0.4, 0)
+
+local gInput = Instance.new("TextBox", settingFrame)
+gInput.PlaceholderText = "G (0-255)"
+gInput.Size = UDim2.new(0.2, 0, 0, 30); gInput.Position = UDim2.new(0.3, 0, 0.4, 0)
+
+local bInput = Instance.new("TextBox", settingFrame)
+bInput.PlaceholderText = "B (0-255)"
+bInput.Size = UDim2.new(0.2, 0, 0, 30); bInput.Position = UDim2.new(0.55, 0, 0.4, 0)
+
+-- ฟังก์ชันอัปเดตสี
+local function updateColor()
+    local r = tonumber(rInput.Text) or 255
+    local g = tonumber(gInput.Text) or 255
+    local b = tonumber(bInput.Text) or 255
+    -- Clamp ค่าให้อยู่ระหว่าง 0-255
+    r = math.clamp(r, 0, 255); g = math.clamp(g, 0, 255); b = math.clamp(b, 0, 255)
+    
+    myChatColor = {r = r, g = g, b = b}
+    colorPreview.BackgroundColor3 = Color3.fromRGB(r, g, b)
+end
+
+rInput.FocusLost:Connect(updateColor)
+gInput.FocusLost:Connect(updateColor)
+bInput.FocusLost:Connect(updateColor)
+
+local closeSetBtn = Instance.new("TextButton", settingFrame)
+closeSetBtn.Text = "CLOSE SETTINGS"
+closeSetBtn.Size = UDim2.new(1, 0, 0, 20)
+closeSetBtn.Position = UDim2.new(0, 0, 1, -20)
+closeSetBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+closeSetBtn.TextColor3 = Color3.new(1,1,1)
+closeSetBtn.MouseButton1Click:Connect(function() settingFrame.Visible = false end)
+
+
+-- [[ 3. Input & Controls ]] --
+local controlsFrame = Instance.new("Frame", mainContainer)
+controlsFrame.Size = UDim2.new(1, 0, 0, 35)
+controlsFrame.Position = UDim2.new(0, 0, 1, -35)
+controlsFrame.BackgroundTransparency = 1
+
+local inputField = Instance.new("TextBox", controlsFrame)
+inputField.Size = UDim2.new(0.6, 0, 1, 0)
+inputField.PlaceholderText = "Type message..."
+inputField.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+inputField.TextColor3 = Color3.new(1, 1, 1)
+
+local sendBtn = Instance.new("TextButton", controlsFrame)
+sendBtn.Text = "SEND"
+sendBtn.Size = UDim2.new(0.2, -5, 1, 0)
+sendBtn.Position = UDim2.new(0.6, 5, 0, 0)
+sendBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+sendBtn.TextColor3 = Color3.new(1, 1, 1)
+
+local settingBtn = Instance.new("TextButton", controlsFrame)
+settingBtn.Text = "⚙" -- ไอคอน Settings
+settingBtn.Size = UDim2.new(0.2, -5, 1, 0)
+settingBtn.Position = UDim2.new(0.8, 5, 0, 0)
+settingBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+settingBtn.TextColor3 = Color3.new(1, 1, 1)
+
+settingBtn.MouseButton1Click:Connect(function()
+    settingFrame.Visible = not settingFrame.Visible
+end)
+
+-- ฟังก์ชันส่งข้อความ
+sendBtn.MouseButton1Click:Connect(function()
+    local text = inputField.Text
+    if text ~= "" then
+        local payload = {
+            msg = text,
+            userName = LP.Name,
+            userId = LP.UserId,
+            jobId = game.JobId,
+            placeId = game.PlaceId,
+            placeName = currentPlaceName,
+            color = myChatColor -- ส่งสีไปด้วย
+        }
+        
+        local jsonPayload = HttpService:JSONEncode(payload)
+        
+        pcall(function()
+            MessagingService:PublishAsync("GlobalChat_Ultimate", jsonPayload)
+        end)
+        
+        -- ส่งเข้า Discord
+        if DISCORD_WEBHOOK_URL ~= "" then
+            pcall(function()
+                local discordData = {
+                    ["content"] = "",
+                    ["embeds"] = {{
+                        ["title"] = "Global Chat Log",
+                        ["description"] = text,
+                        ["color"] = (myChatColor.r * 65536) + (myChatColor.g * 256) + myChatColor.b, -- แปลง RGB เป็น Decimal คร่าวๆ
+                        ["fields"] = {
+                            {["name"] = "User", ["value"] = LP.Name, ["inline"] = true},
+                            {["name"] = "Place", ["value"] = currentPlaceName, ["inline"] = true},
+                            {["name"] = "Job ID", ["value"] = "```" .. game.JobId .. "```", ["inline"] = false}
+                        },
+                        ["thumbnail"] = { ["url"] = "https://www.roblox.com/headshot-thumbnail/image?userId="..LP.UserId.."&width=420&height=420&format=png" }
+                    }}
+                }
+                request({
+                    Url = DISCORD_WEBHOOK_URL,
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = HttpService:JSONEncode(discordData)
+                })
+            end)
+        end
+        inputField.Text = ""
+    end
+end)
+
+-- รับข้อความ
+MessagingService:SubscribeAsync("GlobalChat_Ultimate", function(message)
+    local success, data = pcall(function() return HttpService:JSONDecode(message.Data) end)
+    if success and data then
+        createMessageBubble(data)
+    end
+end)
+
+btn(chatPage, "BACK TO MAIN", function() showPage("main") end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
