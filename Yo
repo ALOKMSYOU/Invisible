@@ -1524,8 +1524,8 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
- -- [[ ------------------------------------------------------------------ ]] --
--- [[ GLOBAL CHAT ULTIMATE SYSTEM (INTEGRATED VERSION) ]] --
+-- [[ ------------------------------------------------------------------ ]] --
+-- [[ GLOBAL CHAT SYSTEM - FIXED INTEGRATION ]] --
 -- [[ ------------------------------------------------------------------ ]] --
 
 local MessagingService = game:GetService("MessagingService")
@@ -1533,186 +1533,134 @@ local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local MarketplaceService = game:GetService("MarketplaceService")
 
--- CONFIGURATION
+-- CONFIG
 local DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1458435103540908143/D7uUTme7ShIgDRMPukq6EENRsNMr6D5PDwq7nWKe7LmmHDuEJ3NlhYQPgMUQOxPfrCZ6"
 local MAX_MESSAGES = 500
 local myChatColor = {r = 255, g = 255, b = 255}
-local currentPlaceName = "Unknown Place"
 
--- Get Place Name
-task.spawn(function()
-    pcall(function()
-        local info = MarketplaceService:GetProductInfo(game.PlaceId)
-        if info then currentPlaceName = info.Name end
+-- สร้างหน้า Chat ใหม่
+local chatPage = createPage()
+pages.chat = chatPage -- เชื่อมเข้ากับระบบ Page หลัก
+
+-- [[ 1. สร้างปุ่มทางเข้าที่หน้า Main ]] --
+-- ค้นหาหน้า Main จาก table pages
+if pages.main then
+    local enterBtn = btn(pages.main, "💬 GLOBAL CHAT (CROSS-SERVER)", function()
+        showPage("chat")
     end)
-end)
+    enterBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+    enterBtn.Font = Enum.Font.GothamBold
+    enterBtn.LayoutOrder = -100 -- พยายามให้อยู่บนสุด
+end
 
--- Create Chat Page
-pages.chat = createPage()
-local chatPage = pages.chat
-
--- UI Elements for Chat
-label(chatPage, "--- GLOBAL CROSS-SERVER CHAT ---")
+-- [[ 2. โครงสร้างหน้า Chat ]] --
+label(chatPage, "--- GLOBAL CHAT (MAX 500 MSG) ---")
 
 local chatScroll = Instance.new("ScrollingFrame", chatPage)
-chatScroll.Size = UDim2.new(1, -10, 0, 220)
+chatScroll.Size = UDim2.new(1, -10, 0, 200)
 chatScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-chatScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+chatScroll.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 chatScroll.ScrollBarThickness = 4
 local chatLayout = Instance.new("UIListLayout", chatScroll)
 chatLayout.Padding = UDim.new(0, 5)
 
--- Function to handle message limit
-local function checkMessageLimit()
-    local currentMessages = chatScroll:GetChildren()
-    local msgCount = 0
-    for _, v in pairs(currentMessages) do
-        if v:IsA("Frame") then msgCount = msgCount + 1 end
-    end
-    
-    if msgCount > MAX_MESSAGES then
-        -- ลบข้อความเก่าสุด (ตัวแรกที่เจอ)
-        for _, v in pairs(currentMessages) do
-            if v:IsA("Frame") then
-                v:Destroy()
-                break
-            end
+-- จัดการการเลื่อนอัติโนมัติเมื่อมีข้อความใหม่
+chatLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    chatScroll.CanvasSize = UDim2.new(0, 0, 0, chatLayout.AbsoluteContentSize.Y)
+    chatScroll.CanvasPosition = Vector2.new(0, chatScroll.CanvasSize.Y.Offset)
+end)
+
+-- ฟังก์ชันสร้างกล่องแชท
+local function createMessageBubble(data)
+    -- ลบข้อความเก่าถ้าเกิน 500
+    local children = chatScroll:GetChildren()
+    local count = 0
+    for _, v in pairs(children) do if v:IsA("Frame") then count = count + 1 end end
+    if count >= MAX_MESSAGES then
+        for _, v in pairs(children) do
+            if v:IsA("Frame") then v:Destroy() break end
         end
     end
-end
 
--- Create Message Bubble
-local function createMessageBubble(data)
-    checkMessageLimit()
-    
     local msgFrame = Instance.new("Frame", chatScroll)
     msgFrame.Size = UDim2.new(1, -5, 0, 75)
-    msgFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    msgFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     Instance.new("UICorner", msgFrame)
     
-    -- Profile Image
     local pImg = Instance.new("ImageLabel", msgFrame)
-    pImg.Size = UDim2.new(0, 45, 0, 45)
+    pImg.Size = UDim2.new(0, 40, 0, 40)
     pImg.Position = UDim2.new(0, 5, 0, 5)
-    pImg.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     task.spawn(function()
         pImg.Image = Players:GetUserThumbnailAsync(data.userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
     end)
     Instance.new("UICorner", pImg).CornerRadius = UDim.new(1, 0)
 
-    -- Name & Place
     local nameLabel = Instance.new("TextLabel", msgFrame)
-    nameLabel.Text = data.userName .. " @ " .. (data.placeName or "Game")
-    nameLabel.Size = UDim2.new(1, -60, 0, 15)
-    nameLabel.Position = UDim2.new(0, 60, 0, 5)
+    nameLabel.Text = data.userName .. " [" .. (data.placeName or "Game") .. "]"
+    nameLabel.Size = UDim2.new(1, -55, 0, 15)
+    nameLabel.Position = UDim2.new(0, 50, 0, 5)
     nameLabel.BackgroundTransparency = 1
-    nameLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-    nameLabel.Font = Enum.Font.GothamBold
-    nameLabel.TextSize = 11
-    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    nameLabel.TextXAlignment = "Left"
+    nameLabel.Font = "GothamBold"
+    nameLabel.TextSize = 10
 
-    -- Message Text
     local msgLabel = Instance.new("TextLabel", msgFrame)
     msgLabel.Text = data.msg
-    msgLabel.Size = UDim2.new(1, -60, 0, 30)
-    msgLabel.Position = UDim2.new(0, 60, 0, 20)
+    msgLabel.Size = UDim2.new(1, -55, 0, 30)
+    msgLabel.Position = UDim2.new(0, 50, 0, 20)
     msgLabel.BackgroundTransparency = 1
     msgLabel.TextColor3 = Color3.fromRGB(data.color.r, data.color.g, data.color.b)
     msgLabel.TextWrapped = true
-    msgLabel.Font = Enum.Font.SourceSansBold
+    msgLabel.TextXAlignment = "Left"
+    msgLabel.Font = "SourceSansBold"
     msgLabel.TextSize = 14
-    msgLabel.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- Buttons Row
-    local row = Instance.new("Frame", msgFrame)
-    row.Size = UDim2.new(1, -65, 0, 20)
-    row.Position = UDim2.new(0, 60, 0, 50)
-    row.BackgroundTransparency = 1
-    local rl = Instance.new("UIListLayout", row)
-    rl.FillDirection = Enum.FillDirection.Horizontal
-    rl.Padding = UDim.new(0, 5)
+    local btnRow = Instance.new("Frame", msgFrame)
+    btnRow.Size = UDim2.new(1, -55, 0, 18)
+    btnRow.Position = UDim2.new(0, 50, 0, 52)
+    btnRow.BackgroundTransparency = 1
+    Instance.new("UIListLayout", btnRow).FillDirection = "Horizontal"
 
-    local function miniBtn(txt, clr, func)
-        local b = Instance.new("TextButton", row)
+    local function toolBtn(txt, clr, func)
+        local b = Instance.new("TextButton", btnRow)
         b.Text = txt
-        b.Size = UDim2.new(0, 50, 1, 0)
+        b.Size = UDim2.new(0, 45, 1, 0)
         b.BackgroundColor3 = clr
         b.TextColor3 = Color3.new(1,1,1)
-        b.Font = Enum.Font.GothamBold
-        b.TextSize = 10
+        b.TextSize = 9
         Instance.new("UICorner", b)
         b.MouseButton1Click:Connect(func)
     end
 
-    miniBtn("JOIN", Color3.fromRGB(0, 150, 0), function()
-        if data.jobId ~= game.JobId then
-            TeleportService:TeleportToPlaceInstance(data.placeId, data.jobId, LP)
-        end
-    end)
-
-    miniBtn("COPY", Color3.fromRGB(0, 100, 200), function()
-        if setclipboard then setclipboard(data.msg) end
-    end)
-
-    miniBtn("DEL", Color3.fromRGB(150, 0, 0), function()
-        msgFrame:Destroy()
-    end)
-
-    chatScroll.CanvasSize = UDim2.new(0, 0, 0, chatLayout.AbsoluteContentSize.Y)
-    chatScroll.CanvasPosition = Vector2.new(0, chatScroll.CanvasSize.Y.Offset)
+    toolBtn("JOIN", Color3.fromRGB(0, 120, 0), function() TeleportService:TeleportToPlaceInstance(data.placeId, data.jobId, LP) end)
+    toolBtn("COPY", Color3.fromRGB(0, 80, 150), function() if setclipboard then setclipboard(data.msg) end end)
+    toolBtn("DEL", Color3.fromRGB(120, 0, 0), function() msgFrame:Destroy() end)
 end
 
--- Settings Frame (Color Picker)
-local setFrame = Instance.new("Frame", chatPage)
-setFrame.Size = UDim2.new(1, 0, 0, 80)
-setFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-setFrame.Visible = false
-label(setFrame, "CHAT COLOR (RGB)").Size = UDim2.new(1,0,0,20)
+-- [[ 3. ส่วนควบคุมแชท ]] --
+local chatControls = Instance.new("Frame", chatPage)
+chatControls.Size = UDim2.new(1, 0, 0, 35)
+chatControls.BackgroundTransparency = 1
 
-local function createRGBInput(p, placeholder, xPos)
-    local i = Instance.new("TextBox", setFrame)
-    i.PlaceholderText = placeholder
-    i.Size = UDim2.new(0.25, -5, 0, 30)
-    i.Position = UDim2.new(xPos, 0, 0.4, 0)
-    i.BackgroundColor3 = Color3.fromRGB(60,60,60)
-    i.TextColor3 = Color3.new(1,1,1)
-    return i
-end
+local input = Instance.new("TextBox", chatControls)
+input.Size = UDim2.new(0.7, -5, 1, 0)
+input.PlaceholderText = "Message..."
+input.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+input.TextColor3 = Color3.new(1, 1, 1)
 
-local ri = createRGBInput(setFrame, "R", 0.05)
-local gi = createRGBInput(setFrame, "G", 0.35)
-local bi = createRGBInput(setFrame, "B", 0.65)
-
-local function updateMyColor()
-    myChatColor = {r = tonumber(ri.Text) or 255, g = tonumber(gi.Text) or 255, b = tonumber(bi.Text) or 255}
-end
-ri.FocusLost:Connect(updateMyColor)
-gi.FocusLost:Connect(updateMyColor)
-bi.FocusLost:Connect(updateMyColor)
-
--- Input & Buttons
-local inputArea = Instance.new("Frame", chatPage)
-inputArea.Size = UDim2.new(1, 0, 0, 40)
-inputArea.BackgroundTransparency = 1
-
-local chatInput = Instance.new("TextBox", inputArea)
-chatInput.Size = UDim2.new(0.6, -5, 1, 0)
-chatInput.PlaceholderText = "Type message..."
-chatInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-chatInput.TextColor3 = Color3.new(1, 1, 1)
-
-btn(inputArea, "SEND", function()
-    if chatInput.Text ~= "" then
-        local payload = {
-            msg = chatInput.Text,
+local send = btn(chatControls, "SEND", function()
+    if input.Text ~= "" then
+        local data = {
+            msg = input.Text,
             userName = LP.Name,
             userId = LP.UserId,
             jobId = game.JobId,
             placeId = game.PlaceId,
-            placeName = currentPlaceName,
+            placeName = (MarketplaceService:GetProductInfo(game.PlaceId)).Name,
             color = myChatColor
         }
-        MessagingService:PublishAsync("GlobalChat_V3", HttpService:JSONEncode(payload))
+        MessagingService:PublishAsync("GlobalChat_Final", HttpService:JSONEncode(data))
         
         -- Webhook
         pcall(function()
@@ -1722,34 +1670,36 @@ btn(inputArea, "SEND", function()
                 Headers = {["Content-Type"] = "application/json"},
                 Body = HttpService:JSONEncode({
                     embeds = {{
-                        title = "Global Chat",
-                        description = chatInput.Text,
+                        title = "Global Chat Log",
+                        description = input.Text,
                         color = (myChatColor.r*65536)+(myChatColor.g*256)+myChatColor.b,
-                        fields = {{name="User", value=LP.Name, inline=true}, {name="Game", value=currentPlaceName, inline=true}},
-                        thumbnail = {url = "https://www.roblox.com/headshot-thumbnail/image?userId="..LP.UserId.."&width=420&height=420&format=png"}
+                        fields = {{name="User", value=LP.Name, inline=true}}
                     }}
                 })
             })
         end)
-        chatInput.Text = ""
+        input.Text = ""
     end
-end).Size = UDim2.new(0.2, -5, 1, 0)
+end)
+send.Size = UDim2.new(0.3, 0, 1, 0)
+send.Position = UDim2.new(0.7, 0, 0, 0)
 
-btn(inputArea, "⚙", function() setFrame.Visible = not setFrame.Visible end).Size = UDim2.new(0.2, -5, 1, 0)
-
--- Subscribe to Global Chat
-MessagingService:SubscribeAsync("GlobalChat_V3", function(message)
-    local data = HttpService:JSONDecode(message.Data)
-    createMessageBubble(data)
+-- [[ 4. ปุ่ม Settings (เปลี่ยนสี) ]] --
+local settingsBtn = btn(chatPage, "🎨 SET CHAT COLOR (RGB)", function()
+    -- ระบบถาม RGB แบบง่าย
+    local r = tonumber(input.Text:split(",")[1]) or 255
+    local g = tonumber(input.Text:split(",")[2]) or 255
+    local b = tonumber(input.Text:split(",")[3]) or 255
+    myChatColor = {r=r, g=g, b=b}
+    input.Text = "Color Set: "..r..","..g..","..b
 end)
 
-btn(chatPage, "BACK TO MAIN", function() showPage("main") end)
+-- รับข้อความ
+MessagingService:SubscribeAsync("GlobalChat_Final", function(message)
+    local success, data = pcall(function() return HttpService:JSONDecode(message.Data) end)
+    if success then createMessageBubble(data) end
+end)
 
--- [[ ADD BUTTON TO MAIN PAGE ]] --
-if pages.main then
-    btn(pages.main, "💬 OPEN GLOBAL CHAT", function()
-        showPage("chat")
-    end).BackgroundColor3 = Color3.fromRGB(0, 120, 200)
-end
+btn(chatPage, "◀ BACK", function() showPage("main") end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
