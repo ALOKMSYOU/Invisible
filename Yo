@@ -1524,5 +1524,158 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
+-- [[ CAR FLY SYSTEM & SEAT MANAGEMENT ]] --
+local carFlyActive = false
+local currentVehicle = nil
+local currentSeat = nil
+local seatHighlights = {}
+local deleteSeatMode = false
+
+-- ค่าเริ่มต้นการขับขี่
+local flySpeed = 50
+local flyRotationSpeed = 3
+local velocity = Vector3.new(0,0,0)
+
+-- หน้าเมนูใหม่สำหรับ CAR FLY
+pages.carfly = createPage()
+btn(pages.main, "CAR FLY & SEAT SYSTEM", function() showPage("carfly") end)
+
+-- [[ ฟังก์ชันสร้างที่นั่งและระบบขับขี่ ]] --
+local function createVehicleSeat(targetPart)
+    if not targetPart or not targetPart:IsA("BasePart") then return end
+    
+    -- สร้าง Seat
+    local seat = Instance.new("VehicleSeat")
+    seat.Size = Vector3.new(2, 0.5, 2)
+    seat.CFrame = targetPart.CFrame * CFrame.new(0, targetPart.Size.Y/2 + 0.5, 0)
+    seat.Parent = workspace
+    seat.Transparency = 0.5
+    seat.BrickColor = BrickColor.new("Bright blue")
+    
+    -- เชื่อม Seat กับ Part เป้าหมาย (Weld)
+    local weld = Instance.new("WeldConstraint")
+    weld.Part0 = seat
+    weld.Part1 = targetPart
+    weld.Parent = seat
+    
+    -- เพิ่ม Highlight ให้ Seat เพื่อให้รู้ว่าอันไหนลบได้
+    local hl = Instance.new("Highlight", gui)
+    hl.Adornee = seat
+    hl.FillColor = Color3.fromRGB(0, 255, 255)
+    hl.Enabled = deleteSeatMode
+    seatHighlights[seat] = hl
+
+    return seat
+end
+
+-- [[ UI ในหน้า CAR FLY ]] --
+label(pages.carfly, "--- VEHICLE CONTROLS ---")
+
+local btnFly = btn(pages.carfly, "CAR FLY MODE: OFF", function(b)
+    carFlyActive = not carFlyActive
+    b.Text = "CAR FLY MODE: " .. (carFlyActive and "ON" or "OFF")
+    b.BackgroundColor3 = carFlyActive and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(70, 70, 70)
+end)
+
+label(pages.carfly, "Double Click Part to Place Seat")
+
+local btnDelSeat = btn(pages.carfly, "DELETE SEAT MODE: OFF", function(b)
+    deleteSeatMode = not deleteSeatMode
+    b.Text = "DELETE SEAT MODE: " .. (deleteSeatMode and "ON" or "OFF")
+    b.BackgroundColor3 = deleteSeatMode and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(70, 70, 70)
+    
+    -- เปิด/ปิด Highlight ของที่นั่งทั้งหมด
+    for seat, hl in pairs(seatHighlights) do
+        if seat.Parent then hl.Enabled = deleteSeatMode else seatHighlights[seat] = nil end
+    end
+end)
+
+btn(pages.carfly, "BACK TO MAIN", function() showPage("main") end)
+
+-- [[ ระบบควบคุมการขับขี่ (UI Driving) ]] --
+local driveUI = Instance.new("Frame", gui)
+driveUI.Size = UDim2.fromOffset(200, 100)
+driveUI.Position = UDim2.new(0.5, -100, 0.8, 0)
+driveUI.BackgroundTransparency = 1
+driveUI.Visible = false
+
+local speedLabel = label(driveUI, "SPEED: 0")
+speedLabel.TextColor3 = Color3.new(1,1,1)
+
+-- [[ LOGIC: การตรวจจับการคลิกวาง Seat ]] --
+local lastClickTime = 0
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    
+    -- ระบบ Double Click เพื่อวางที่นั่ง
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local now = tick()
+        if now - lastClickTime < 0.3 then
+            local target = (isPC and getMouseTarget() or getTarget())
+            if target then
+                createVehicleSeat(target)
+            end
+        end
+        lastClickTime = now
+        
+        -- ระบบลบที่นั่ง (เมื่อเปิดโหมด)
+        if deleteSeatMode then
+            local target = (isPC and getMouseTarget() or getTarget())
+            if target and target:IsA("VehicleSeat") then
+                if seatHighlights[target] then seatHighlights[target]:Destroy() end
+                target:Destroy()
+            end
+        end
+    end
+end)
+
+-- [[ CORE PHYSICS: ระบบขับเคลื่อน Car Fly ]] --
+RunService.Heartbeat:Connect(function()
+    if not carFlyActive then 
+        driveUI.Visible = false
+        return 
+    end
+
+    local char = LP.Character
+    if not char or not char:FindFirstChild("Humanoid") then return end
+    
+    local seat = char.Humanoid.SeatPart
+    if seat and seat:IsA("VehicleSeat") then
+        driveUI.Visible = true
+        local part = seat
+        
+        -- ป้องกันการร่วง
+        pcall(function()
+            if part:GetNetworkOwner() ~= LP then part:SetNetworkOwner(LP) end
+        end)
+        
+        -- อ่านค่าการกดปุ่มจาก VehicleSeat
+        local moveInput = seat.Throttle -- 1 (W), -1 (S)
+        local steerInput = seat.Steer -- 1 (D), -1 (A)
+        
+        -- ระบบขึ้น/ลง (Space = ขึ้น, LeftCtrl = ลง)
+        local upInput = UserInputService:IsKeyDown(Enum.KeyCode.Space) and 1 or 0
+        local downInput = UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and -1 or 0
+        local vertical = upInput + downInput
+        
+        -- คำนวณความเร็ว
+        local driveDir = (seat.CFrame.LookVector * moveInput) + (seat.CFrame.RightVector * steerInput) + (Vector3.new(0,1,0) * vertical)
+        
+        if driveDir.Magnitude > 0 then
+            velocity = velocity:Lerp(driveDir * flySpeed, 0.1)
+        else
+            velocity = velocity:Lerp(Vector3.new(0,0,0), 0.1) -- Brake อัตโนมัติเมื่อปล่อยปุ่ม
+        end
+        
+        part.AssemblyLinearVelocity = velocity
+        part.AssemblyAngularVelocity = Vector3.new(0, -steerInput * flyRotationSpeed, 0)
+        
+        speedLabel.Text = "FLY SPEED: " .. math.floor(part.AssemblyLinearVelocity.Magnitude)
+    else
+        driveUI.Visible = false
+    end
+end)
+
+-- [[ END LIST ]] --
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
