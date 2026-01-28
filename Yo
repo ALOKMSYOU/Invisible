@@ -1524,141 +1524,165 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
--- [[ 1. เพิ่มชื่อหน้าใหม่เข้าไปในระบบเดิม ]] --
-pages.carfly = createPage()
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
+local Mouse = LP:GetMouse()
+local Cam = workspace.CurrentCamera
 
--- [[ 2. สร้างปุ่มเปิดจากหน้า Main ]] --
-btn(pages.main, "🚀 OPEN CAR FLY SYSTEM", function()
-    showPage("carfly")
-end)
-
--- [[ 3. ตั้งค่าตัวแปรสำหรับระบบ Car Fly ]] --
-local carFlyActive = false
-local carDeleteMode = false
+-- [[ CONFIGURATION ]] --
+local flySpeed = 70
+local carModeActive = false
+local deleteModeActive = false
 local mySeats = {}
-local currentFlightSeat = nil
-local flightConn = nil
-local carControls = {F=0, B=0, L=0, R=0, U=0, D=0}
+local currentFlight = nil
+local controls = {W = 0, S = 0, A = 0, D = 0, Up = 0, Down = 0}
 
--- [[ 4. สร้าง UI ควบคุมการขับ (Drive UI) ]] --
-local driveUIFrame = Instance.new("Frame", gui)
-driveUIFrame.Size = UDim2.fromOffset(200, 150)
-driveUIFrame.Position = UDim2.new(0.5, -100, 0.8, -20)
-driveUIFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-driveUIFrame.Visible = false
-Instance.new("UICorner", driveUIFrame)
+-- [[ UI SETUP ]] --
+local gui = Instance.new("ScreenGui", LP.PlayerGui)
+gui.Name = "CarFly_Standalone"
 
-local function createDriveBtn(txt, pos, size, key)
-    local b = btn(driveUIFrame, txt, function() end)
+-- Main Menu Frame
+local menu = Instance.new("Frame", gui)
+menu.Size = UDim2.fromOffset(180, 110)
+menu.Position = UDim2.new(0.02, 0, 0.4, 0)
+menu.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+Instance.new("UICorner", menu)
+
+local title = Instance.new("TextLabel", menu)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Text = "CAR FLY SYSTEM"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.BackgroundTransparency = 1
+
+-- Driving HUD (จะปรากฏเมื่อนั่ง)
+local hud = Instance.new("Frame", gui)
+hud.Size = UDim2.fromOffset(220, 160)
+hud.Position = UDim2.new(0.5, -110, 0.8, -20)
+hud.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+hud.Visible = false
+Instance.new("UICorner", hud)
+
+-- [[ HELPER FUNCTIONS ]] --
+local function createBtn(name, text, pos, size, parent, color, cb)
+    local b = Instance.new("TextButton", parent)
+    b.Name = name
+    b.Text = text
     b.Position = pos
     b.Size = size
-    b.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    b.MouseButton1Down:Connect(function() carControls[key] = 1 end)
-    b.MouseButton1Up:Connect(function() carControls[key] = 0 end)
-    b.MouseLeave:Connect(function() carControls[key] = 0 end)
+    b.BackgroundColor3 = color
+    b.TextColor3 = Color3.new(1,1,1)
+    b.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", b)
+    b.MouseButton1Click:Connect(function() cb(b) end)
     return b
 end
 
--- ผังปุ่มขับรถ
-createDriveBtn("W", UDim2.new(0.4, 0, 0.05, 0), UDim2.new(0.2, 0, 0.25, 0), "F")
-createDriveBtn("S", UDim2.new(0.4, 0, 0.35, 0), UDim2.new(0.2, 0, 0.25, 0), "B")
-createDriveBtn("A", UDim2.new(0.15, 0, 0.35, 0), UDim2.new(0.2, 0, 0.25, 0), "L")
-createDriveBtn("D", UDim2.new(0.65, 0, 0.35, 0), UDim2.new(0.2, 0, 0.25, 0), "R")
-createDriveBtn("UP", UDim2.new(0.05, 0, 0.05, 0), UDim2.new(0.25, 0, 0.2, 0), "U")
-createDriveBtn("DOWN", UDim2.new(0.7, 0, 0.05, 0), UDim2.new(0.25, 0, 0.2, 0), "D")
-local brakeBtn = btn(driveUIFrame, "STOP / BRAKE", function() 
-    for k,v in pairs(carControls) do carControls[k] = 0 end
-end)
-brakeBtn.Position = UDim2.new(0.1, 0, 0.7, 0); brakeBtn.Size = UDim2.new(0.8, 0, 0.25, 0)
-brakeBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+local function driveBtn(text, pos, key)
+    local b = createBtn("Btn"..key, text, pos, UDim2.fromOffset(45, 45), hud, Color3.fromRGB(50, 50, 60), function() end)
+    b.MouseButton1Down:Connect(function() controls[key] = 1 end)
+    b.MouseButton1Up:Connect(function() controls[key] = 0 end)
+    b.MouseLeave:Connect(function() controls[key] = 0 end)
+end
 
--- [[ 5. หน้าเมนูควบคุมในหน้ารวม ]] --
-label(pages.carfly, "--- CAR FLY SETTINGS ---")
-
-local btnToggleCar = btn(pages.carfly, "CAR FLY MODE: OFF", function(b)
-    carFlyActive = not carFlyActive
-    carDeleteMode = false
-    b.Text = "CAR FLY MODE: " .. (carFlyActive and "ON (DBL CLICK)" or "OFF")
-    b.BackgroundColor3 = carFlyActive and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(70, 70, 70)
+-- [[ CREATE HUD BUTTONS ]] --
+driveBtn("W", UDim2.new(0.4, 0, 0.05, 0), "W")
+driveBtn("S", UDim2.new(0.4, 0, 0.4, 0), "S")
+driveBtn("A", UDim2.new(0.15, 0, 0.4, 0), "A")
+driveBtn("D", UDim2.new(0.65, 0, 0.4, 0), "D")
+driveBtn("▲", UDim2.new(0.05, 0, 0.05, 0), "Up")
+driveBtn("▼", UDim2.new(0.75, 0, 0.05, 0), "Down")
+local brake = createBtn("Brake", "BRAKE / STOP", UDim2.new(0.1, 0, 0.75, 0), UDim2.new(0.8, 0, 0.2, 0), hud, Color3.fromRGB(180, 40, 40), function()
+    for k in pairs(controls) do controls[k] = 0 end
 end)
 
-local btnToggleDel = btn(pages.carfly, "DELETE SEAT MODE: OFF", function(b)
-    carDeleteMode = not carDeleteMode
-    carFlyActive = false
-    b.Text = "DELETE SEAT MODE: " .. (carDeleteMode and "ON" or "OFF")
-    b.BackgroundColor3 = carDeleteMode and Color3.fromRGB(200, 100, 0) or Color3.fromRGB(70, 70, 70)
-    -- แสดง Highlight ของเบาะทั้งหมด
-    for seat, hl in pairs(mySeats) do
-        if seat and seat.Parent then hl.Enabled = carDeleteMode end
-    end
-end)
+-- [[ MAIN LOGIC ]] --
 
-btn(pages.carfly, "BACK TO MAIN", function() showPage("main") end)
-
--- [[ 6. LOGIC ระบบฟิสิกส์การบิน ]] --
-local function runFlight(seat)
-    currentFlightSeat = seat
-    driveUIFrame.Visible = true
+-- ระบบการบิน
+local function startFlight(seat)
+    hud.Visible = true
     local bv = Instance.new("BodyVelocity", seat)
-    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6); bv.Velocity = Vector3.new(0,0,0)
+    bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
     local bg = Instance.new("BodyGyro", seat)
-    bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6); bg.P = 5000
+    bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+    bg.P = 4000
 
-    flightConn = RunService.RenderStepped:Connect(function()
+    currentFlight = RunService.RenderStepped:Connect(function()
         if not seat or not seat.Parent or LP.Character.Humanoid.SeatPart ~= seat then
-            driveUIFrame.Visible = false
-            bv:Destroy(); bg:Destroy(); flightConn:Disconnect()
+            hud.Visible = false
+            bv:Destroy() bg:Destroy()
+            currentFlight:Disconnect()
             return
         end
-        local camCF = workspace.CurrentCamera.CFrame
-        local dir = Vector3.new(0,0,0)
-        if carControls.F == 1 then dir = dir + camCF.LookVector end
-        if carControls.B == 1 then dir = dir - camCF.LookVector end
-        if carControls.L == 1 then dir = dir - camCF.RightVector end
-        if carControls.R == 1 then dir = dir + camCF.RightVector end
-        if carControls.U == 1 then dir = dir + Vector3.new(0, 1, 0) end
-        if carControls.D == 1 then dir = dir - Vector3.new(0, 1, 0) end
-        
-        bv.Velocity = dir * 60
-        bg.CFrame = (dir.Magnitude > 0) and CFrame.lookAt(seat.Position, seat.Position + dir) or seat.CFrame
+
+        local look = Cam.CFrame.LookVector
+        local right = Cam.CFrame.RightVector
+        local moveDir = Vector3.new(0,0,0)
+
+        if controls.W == 1 then moveDir = moveDir + look end
+        if controls.S == 1 then moveDir = moveDir - look end
+        if controls.A == 1 then moveDir = moveDir - right end
+        if controls.D == 1 then moveDir = moveDir + right end
+        if controls.Up == 1 then moveDir = moveDir + Vector3.new(0, 1, 0) end
+        if controls.Down == 1 then moveDir = moveDir - Vector3.new(0, 1, 0) end
+
+        bv.Velocity = moveDir * flySpeed
+        if moveDir.Magnitude > 0 then
+            bg.CFrame = CFrame.lookAt(seat.Position, seat.Position + moveDir)
+        end
     end)
 end
 
--- [[ 7. ระบบ Click ตรวจสอบ ]] --
+-- Toggle Buttons
+createBtn("ToggleCar", "CAR FLY: OFF", UDim2.new(0.05, 0, 0.3, 0), UDim2.new(0.9, 0, 0.3, 0), menu, Color3.fromRGB(60, 60, 60), function(b)
+    carModeActive = not carModeActive
+    deleteModeActive = false
+    b.Text = "CAR FLY: " .. (carModeActive and "ON" or "OFF")
+    b.BackgroundColor3 = carModeActive and Color3.fromRGB(0, 140, 0) or Color3.fromRGB(60, 60, 60)
+end)
+
+createBtn("ToggleDel", "DEL SEAT: OFF", UDim2.new(0.05, 0, 0.65, 0), UDim2.new(0.9, 0, 0.3, 0), menu, Color3.fromRGB(60, 60, 60), function(b)
+    deleteModeActive = not deleteModeActive
+    carModeActive = false
+    b.Text = "DEL SEAT: " .. (deleteModeActive and "ON" or "OFF")
+    b.BackgroundColor3 = deleteModeActive and Color3.fromRGB(180, 80, 0) or Color3.fromRGB(60, 60, 60)
+    for seat, hl in pairs(mySeats) do if seat and seat.Parent then hl.Enabled = deleteModeActive end end
+end)
+
+-- Double Click & Interaction
 local lastClick = 0
-UserInputService.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        local now = tick()
-        local target = getMouseTarget() -- ใช้ฟังก์ชันเดิมของคุณ
-        
-        -- Double Click เพื่อวางเบาะ
-        if carFlyActive and (now - lastClick < 0.3) then
-            if target then
-                local seat = Instance.new("VehicleSeat", workspace)
-                seat.Size = Vector3.new(2, 1, 2); seat.CFrame = target.CFrame * CFrame.new(0, 2, 0)
-                seat.Transparency = 0.5
-                local w = Instance.new("WeldConstraint", seat)
-                w.Part0 = seat; w.Part1 = target
-                target.Anchored = false
-                
-                local hl = Instance.new("Highlight", seat)
-                hl.FillColor = Color3.new(1,0,0); hl.Enabled = false
-                mySeats[seat] = hl
-                
-                LP.Character.Humanoid:GetPropertyChangedSignal("SeatPart"):Wait()
-                runFlight(seat)
-            end
-        -- คลิกเพื่อลบเบาะ
-        elseif carDeleteMode and target then
-            if target:IsA("VehicleSeat") and mySeats[target] then
-                mySeats[target] = nil; target:Destroy()
-            elseif target.Parent:IsA("VehicleSeat") and mySeats[target.Parent] then
-                mySeats[target.Parent] = nil; target.Parent:Destroy()
-            end
+Mouse.Button1Down:Connect(function()
+    local now = tick()
+    local target = Mouse.Target
+
+    if carModeActive and (now - lastClick < 0.3) then
+        if target and not target.Anchored then
+            local seat = Instance.new("VehicleSeat", workspace)
+            seat.Size = Vector3.new(2, 0.5, 2)
+            seat.CFrame = target.CFrame * CFrame.new(0, target.Size.Y/2 + 1, 0)
+            seat.Transparency = 0.5
+            
+            local w = Instance.new("WeldConstraint", seat)
+            w.Part0 = seat; w.Part1 = target
+            
+            local hl = Instance.new("Highlight", seat)
+            hl.FillColor = Color3.new(1, 0, 0); hl.Enabled = false
+            mySeats[seat] = hl
+
+            task.wait(0.1)
+            seat:Sit(LP.Character.Humanoid)
+            startFlight(seat)
         end
-        lastClick = now
+    elseif deleteModeActive and target then
+        local s = target:IsA("VehicleSeat") and target or (target.Parent:IsA("VehicleSeat") and target.Parent)
+        if s and mySeats[s] then
+            mySeats[s] = nil
+            s:Destroy()
+        end
     end
+    lastClick = now
 end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
