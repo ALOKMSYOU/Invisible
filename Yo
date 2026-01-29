@@ -1524,127 +1524,213 @@ RunService.Heartbeat:Connect(function()
         end
     end
 end)
--- [[ 1. VARIABLES & SETTINGS ]] --
+-- [[ 1. CAR MODE VARIABLES ]] --
 local LP = game:GetService("Players").LocalPlayer
 local Cam = workspace.CurrentCamera
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local carModeEnabled = false -- สถานะเปิด/ปิดระบบ (ต้องเปิดก่อนถึงจะคลิกขับได้)
+local isDriving = false
 local currentCarPart = nil
 local carWeld = nil
 local carBV = nil
 local carBG = nil
-local driving = false
 
-local speed = 60
-local turnSpeed = 4
+local speed = 80
+local turnSpeed = 3
 local moveState = {forward = 0, side = 0, up = 0}
 
--- [[ 2. UI SYSTEM (SEPARATE FROM MAIN UI) ]] --
+-- [[ 2. DRIVING UI (STYLE LIKE IMAGE) ]] --
+-- สร้าง UI แยกสำหรับตอนขับรถโดยเฉพาะ
 local carGui = Instance.new("ScreenGui")
-carGui.Name = "CarControlUI"
+carGui.Name = "RealCarUI"
 carGui.ResetOnSpawn = false
-carGui.Enabled = false -- เริ่มต้นปิดไว้
+carGui.Enabled = false
 pcall(function() carGui.Parent = game:GetService("CoreGui") end)
 
-local mainFrame = Instance.new("Frame", carGui)
-mainFrame.Size = UDim2.fromOffset(250, 200)
-mainFrame.Position = UDim2.new(0.5, -125, 0.7, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-mainFrame.BackgroundTransparency = 0.3
-Instance.new("UICorner", mainFrame)
-
--- ฟังก์ชันสร้างปุ่มควบคุม
-local function createBtn(text, pos, size, color)
-    local b = Instance.new("TextButton", mainFrame)
-    b.Text = text
-    b.Position = pos
-    b.Size = size
-    b.BackgroundColor3 = color or Color3.fromRGB(50, 50, 50)
-    b.TextColor3 = Color3.new(1, 1, 1)
-    b.Font = Enum.Font.GothamBold
-    Instance.new("UICorner", b)
-    return b
+-- ฟังก์ชันสร้างปุ่มสไตล์แป้นเหยียบ/ปุ่มกด
+local function createPedal(parent, text, position, size, color)
+    local btn = Instance.new("TextButton", parent)
+    btn.Text = text
+    btn.Position = position
+    btn.Size = size
+    btn.BackgroundColor3 = color or Color3.fromRGB(20, 20, 20)
+    btn.BackgroundTransparency = 0.2
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 18
+    
+    local corner = Instance.new("UICorner", btn)
+    corner.CornerRadius = UDim.new(0, 10)
+    
+    local stroke = Instance.new("UIStroke", btn)
+    stroke.Color = Color3.fromRGB(200, 200, 200)
+    stroke.Thickness = 2
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    
+    return btn
 end
 
-local btnRise = createBtn("RISE", UDim2.fromScale(0.05, 0.1), UDim2.fromScale(0.25, 0.2))
-local btnW = createBtn("UP", UDim2.fromScale(0.375, 0.1), UDim2.fromScale(0.25, 0.2))
-local btnSink = createBtn("SINK", UDim2.fromScale(0.7, 0.1), UDim2.fromScale(0.25, 0.2))
-local btnA = createBtn("LEFT", UDim2.fromScale(0.05, 0.4), UDim2.fromScale(0.25, 0.2))
-local btnS = createBtn("DOWN", UDim2.fromScale(0.375, 0.4), UDim2.fromScale(0.25, 0.2))
-local btnD = createBtn("RIGHT", UDim2.fromScale(0.7, 0.4), UDim2.fromScale(0.25, 0.2))
-local btnExit = createBtn("EXIT CAR", UDim2.fromScale(0.1, 0.75), UDim2.fromScale(0.8, 0.2), Color3.fromRGB(150, 0, 0))
+-- โซนซ้ายล่าง (เลี้ยว)
+local leftZone = Instance.new("Frame", carGui)
+leftZone.Size = UDim2.fromOffset(250, 150)
+leftZone.Position = UDim2.new(0, 20, 1, -180)
+leftZone.BackgroundTransparency = 1
 
--- [[ 3. CORE FUNCTIONS ]] --
+local btnLeft = createPedal(leftZone, "<", UDim2.new(0, 0, 0.3, 0), UDim2.new(0, 80, 0, 80))
+local btnRight = createPedal(leftZone, ">", UDim2.new(0, 100, 0.3, 0), UDim2.new(0, 80, 0, 80))
 
-local function stopDriving()
-    driving = false
+-- โซนขวาล่าง (คันเร่ง/เบรก/บิน)
+local rightZone = Instance.new("Frame", carGui)
+rightZone.Size = UDim2.fromOffset(250, 250)
+rightZone.Position = UDim2.new(1, -270, 1, -280)
+rightZone.BackgroundTransparency = 1
+
+-- จัดวางให้เหมือนแป้นเหยียบ
+local btnGas = createPedal(rightZone, "GAS", UDim2.new(0.5, 0, 0.3, 0), UDim2.new(0, 70, 0, 120), Color3.fromRGB(0, 100, 0)) -- สีเขียวแก่
+local btnBrake = createPedal(rightZone, "BRAKE", UDim2.new(0.1, 0, 0.5, 0), UDim2.new(0, 80, 0, 60), Color3.fromRGB(100, 0, 0)) -- สีแดงแก่
+
+-- ปุ่มบิน (Rise/Sink) แทรกไว้ด้านบน
+local btnRise = createPedal(rightZone, "RISE", UDim2.new(0.1, 0, 0, 0), UDim2.new(0, 60, 0, 40), Color3.fromRGB(0, 150, 255))
+local btnSink = createPedal(rightZone, "SINK", UDim2.new(0.6, 0, 0, 0), UDim2.new(0, 60, 0, 40), Color3.fromRGB(0, 150, 255))
+
+-- ปุ่ม Exit (ตรงกลางบน)
+local btnExit = createPedal(carGui, "EXIT CAR", UDim2.new(0.5, -60, 0.85, 0), UDim2.new(0, 120, 0, 40), Color3.fromRGB(200, 50, 50))
+
+-- [[ 3. INTEGRATION WITH MAIN UI ]] --
+-- เพิ่มปุ่มในหน้า Main ของ UI เดิมของคุณ
+if pages and pages.main then
+    label(pages.main, "--- CAR MODE SETTINGS ---")
+    
+    -- ปุ่มเปิด/ปิด โหมดรถ (Toggle Switch)
+    local toggleBtn = btn(pages.main, "ENABLE CAR MODE: OFF", function(b)
+        carModeEnabled = not carModeEnabled
+        b.Text = "ENABLE CAR MODE: " .. (carModeEnabled and "ON" or "OFF")
+        b.BackgroundColor3 = carModeEnabled and Color3.fromRGB(0, 180, 0) or Color3.fromRGB(70, 70, 70)
+        
+        -- ถ้าปิดโหมดขณะขับอยู่ ให้เลิกขับทันที
+        if not carModeEnabled and isDriving then
+            stopDriving()
+        end
+    end)
+end
+
+-- [[ 4. LOGIC FUNCTIONS ]] --
+
+-- ฟังก์ชันหยุดขับ (แก้บัคตัวติด)
+function stopDriving()
+    isDriving = false
     carGui.Enabled = false
     
-    if carWeld then carWeld:Destroy() carWeld = nil end
+    -- ลบแรงฟิสิกส์
     if carBV then carBV:Destroy() carBV = nil end
     if carBG then carBG:Destroy() carBG = nil end
     
+    -- ลบตัวเชื่อม (สำคัญมากสำหรับการแก้บัคตัวติด)
+    if carWeld then carWeld:Destroy() carWeld = nil end
+    
+    -- คืนค่า Part
     if currentCarPart then
         currentCarPart.Anchored = false
         currentCarPart = nil
     end
     
+    -- คืนค่าตัวละครและวาร์ปหนีออกมา
     if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
-        LP.Character.HumanoidRootPart.Anchored = false
-        -- วาร์ปออกมากันบัคติดใน Part
-        LP.Character.HumanoidRootPart.CFrame = LP.Character.HumanoidRootPart.CFrame * CFrame.new(0, 7, 0)
+        local root = LP.Character.HumanoidRootPart
+        root.Anchored = false
+        -- วาร์ปขึ้นข้างบน 10 หน่วย เพื่อไม่ให้ติดในเนื้อ Part
+        root.CFrame = root.CFrame + Vector3.new(0, 10, 0)
+        
+        -- แก้ Humanoid Sit
+        local hum = LP.Character:FindFirstChild("Humanoid")
+        if hum then hum.Sit = false end
     end
 end
 
-local function startDriving(part)
-    if not part or not part:IsA("BasePart") then return end
-    currentCarPart = part
-    driving = true
-    carGui.Enabled = true
+-- ฟังก์ชันเริ่มขับ
+function startDriving(part)
+    if not part or not part:IsA("BasePart") or part.Anchored then return end
     
-    -- ตั้งค่า Network Owner
+    currentCarPart = part
+    isDriving = true
+    carGui.Enabled = true -- โชว์ UI ขับรถ
+    
+    -- ยึด Network Ownership
     pcall(function() part:SetNetworkOwner(LP) end)
     
-    -- ล็อกตัวละครไว้บน Part
-    LP.Character.HumanoidRootPart.CFrame = part.CFrame * CFrame.new(0, part.Size.Y/2 + 3, 0)
-    carWeld = Instance.new("WeldConstraint", part)
-    carWeld.Part0 = part
-    carWeld.Part1 = LP.Character.HumanoidRootPart
+    -- วาร์ปตัวละครไปนั่งบน Part
+    local char = LP.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local root = char.HumanoidRootPart
+        -- วาร์ปไปตำแหน่งบน Part
+        root.CFrame = part.CFrame * CFrame.new(0, part.Size.Y/2 + 3, 0)
+        
+        -- สร้าง Weld เชื่อมตัวเรากับรถ
+        carWeld = Instance.new("WeldConstraint")
+        carWeld.Part0 = part
+        carWeld.Part1 = root
+        carWeld.Parent = part
+        
+        -- ทำให้ตัวละครนั่ง (เพื่อความสมจริง)
+        local hum = char:FindFirstChild("Humanoid")
+        if hum then hum.Sit = true end
+    end
     
-    -- สร้างแรงขับเคลื่อน
+    -- สร้างระบบฟิสิกส์
     carBV = Instance.new("BodyVelocity", part)
     carBV.MaxForce = Vector3.new(1e6, 1e6, 1e6)
     carBV.Velocity = Vector3.new(0, 0, 0)
     
     carBG = Instance.new("BodyGyro", part)
     carBG.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+    carBG.P = 10000
     carBG.CFrame = part.CFrame
 end
 
--- [[ 4. INPUT LOGIC ]] --
+-- [[ 5. CONTROLS ]] --
 
--- ตรวจสอบการคลิก Part (ใช้ควบคู่กับ Telekinesis ของคุณ)
+-- ตรวจสอบการคลิก Part (ต้องเปิด Mode ก่อนถึงจะทำงาน)
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        if not driving then
-            local ray = Cam:ScreenPointToRay(input.Position.X, input.Position.Y)
+    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        -- เช็คว่าเปิดโหมดอยู่ไหม และยังไม่ได้ขับรถ
+        if carModeEnabled and not isDriving then
+            local mousePos = UserInputService:GetMouseLocation()
+            local ray = Cam:ViewportPointToRay(mousePos.X, mousePos.Y)
             local res = workspace:Raycast(ray.Origin, ray.Direction * 1000)
-            if res and res.Instance and not res.Instance.Anchored then
-                -- ตรวจสอบว่าเป็น Part ทั่วไป ไม่ใช่คน
-                local model = res.Instance:FindFirstAncestorOfClass("Model")
+            
+            if res and res.Instance then
+                local p = res.Instance
+                -- ตรวจสอบว่าไม่ใช่คน
+                local model = p:FindFirstAncestorOfClass("Model")
                 if not (model and model:FindFirstChild("Humanoid")) then
-                    startDriving(res.Instance)
+                    startDriving(p)
                 end
             end
         end
     end
 end)
 
--- คีย์บอร์ด (PC)
+-- ควบคุมผ่าน UI (Mobile Style)
+local function linkBtn(btn, axis, val)
+    btn.MouseButton1Down:Connect(function() moveState[axis] = val end)
+    btn.MouseButton1Up:Connect(function() moveState[axis] = 0 end)
+    btn.MouseLeave:Connect(function() moveState[axis] = 0 end)
+end
+
+linkBtn(btnGas, "forward", 1)    -- คันเร่ง
+linkBtn(btnBrake, "forward", -1) -- เบรก/ถอย
+linkBtn(btnLeft, "side", 1)      -- ซ้าย
+linkBtn(btnRight, "side", -1)    -- ขวา
+linkBtn(btnRise, "up", 1)        -- บินขึ้น
+linkBtn(btnSink, "up", -1)       -- บินลง
+btnExit.MouseButton1Click:Connect(stopDriving)
+
+-- ควบคุมผ่าน PC Keybinds
 UserInputService.InputBegan:Connect(function(input, gp)
-    if gp or not driving then return end
+    if gp or not isDriving then return end
     if input.KeyCode == Enum.KeyCode.W then moveState.forward = 1
     elseif input.KeyCode == Enum.KeyCode.S then moveState.forward = -1
     elseif input.KeyCode == Enum.KeyCode.A then moveState.side = 1
@@ -1655,46 +1741,33 @@ UserInputService.InputBegan:Connect(function(input, gp)
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if not driving then return end
+    if not isDriving then return end
     if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.S then moveState.forward = 0
     elseif input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.D then moveState.side = 0
     elseif input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.Q then moveState.up = 0 end
 end)
 
--- ปุ่ม UI (Mobile/Touch)
-local function setupControl(btn, axis, val)
-    btn.MouseButton1Down:Connect(function() moveState[axis] = val end)
-    btn.MouseButton1Up:Connect(function() moveState[axis] = 0 end)
-end
-
-setupControl(btnW, "forward", 1)
-setupControl(btnS, "forward", -1)
-setupControl(btnA, "side", 1)
-setupControl(btnD, "side", -1)
-setupControl(btnRise, "up", 1)
-setupControl(btnSink, "up", -1)
-btnExit.MouseButton1Click:Connect(stopDriving)
-
--- [[ 5. PHYSICS LOOP ]] --
+-- [[ 6. PHYSICS LOOP ]] --
 RunService.Heartbeat:Connect(function()
-    if driving and currentCarPart and carBV and carBG then
-        -- การเลี้ยว
+    if isDriving and currentCarPart and currentCarPart.Parent then
+        if not carBV or not carBG then return end -- ป้องกัน Error
+        
+        -- คำนวณการหมุน
         if moveState.side ~= 0 then
             carBG.CFrame = carBG.CFrame * CFrame.Angles(0, math.rad(moveState.side * turnSpeed), 0)
         end
         
-        -- การเคลื่อนที่ (หน้า-หลัง + ขึ้น-ลง)
-        local forwardVel = carBG.CFrame.LookVector * (moveState.forward * speed)
-        local verticalVel = Vector3.new(0, moveState.up * speed, 0)
+        -- คำนวณความเร็ว (หน้า-หลัง + ขึ้น-ลง)
+        local fwd = carBG.CFrame.LookVector * (moveState.forward * speed)
+        local up = Vector3.new(0, moveState.up * (speed * 0.8), 0)
         
-        carBV.Velocity = forwardVel + verticalVel
+        carBV.Velocity = fwd + up
         
-        -- ตรวจสอบสิทธิ์ Network ตลอดเวลา
-        pcall(function()
-            if currentCarPart:GetNetworkOwner() ~= LP then
-                currentCarPart:SetNetworkOwner(LP)
-            end
-        end)
+        -- บังคับ Network Ownership ตลอดเวลา (กันแลค)
+        pcall(function() currentCarPart:SetNetworkOwner(LP) end)
+    elseif isDriving and (not currentCarPart or not currentCarPart.Parent) then
+        -- ถ้า Part หายไปดื้อๆ ให้หยุดขับทันที
+        stopDriving()
     end
 end)
 
