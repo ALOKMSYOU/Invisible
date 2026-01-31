@@ -1740,5 +1740,114 @@ RunService.Heartbeat:Connect(function()
         stopDriving()
     end
 end)
+-- [[ SEAL & LOOP MODE SETTINGS ]] --
+local sealActive = false
+local sealTargetPlayer = nil
+local sealParts = {} -- เก็บรายการ Part ที่ใช้ผนึก
+local sealRadius = 8 -- ความกว้างของกรงผนึก
+local gatherRadius = 50 -- ระยะที่ไปดึงของรอบตัวมาผนึก
+
+-- สร้างหน้า UI ใหม่สำหรับ Seal Mode
+pages.seal = createPage()
+btn(pages.main, "OPEN SEAL MODE", function() showPage("seal") end)
+
+label(pages.seal, "--- SEALING SYSTEM ---")
+
+local targetLabel = label(pages.seal, "TARGET: NONE")
+
+-- ปุ่มเปิด/ปิดโหมดผนึก
+local btnSealToggle = btn(pages.seal, "SEAL MODE: OFF", function(b)
+    sealActive = not sealActive
+    if not sealActive then
+        -- ล้างค่าเมื่อปิดโหมด
+        for p, _ in pairs(sealParts) do
+            if p:FindFirstChild("BodyPosition") then p.BodyPosition:Destroy() end
+            if p:FindFirstChild("BodyGyro") then p.BodyGyro:Destroy() end
+            p.CanCollide = true
+        end
+        sealParts = {}
+        sealTargetPlayer = nil
+        targetLabel.Text = "TARGET: NONE"
+    end
+    b.Text = "SEAL MODE: " .. (sealActive and "ON" or "OFF")
+    b.BackgroundColor3 = sealActive and Color3.fromRGB(200, 0, 100) or Color3.fromRGB(70, 70, 70)
+end)
+
+label(pages.seal, "Click a player to Seal them")
+
+-- [[ ฟังก์ชันค้นหาผู้เล่นจากการคลิก ]] --
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp or not sealActive then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        local ray = Cam:ScreenPointToRay(input.Position.X, input.Position.Y)
+        local res = workspace:Raycast(ray.Origin, ray.Direction * 1000)
+        
+        if res and res.Instance then
+            local model = res.Instance:FindFirstAncestorOfClass("Model")
+            local targetLP = Players:GetPlayerFromCharacter(model)
+            
+            if targetLP and targetLP ~= LP then
+                sealTargetPlayer = targetLP
+                targetLabel.Text = "TARGET: " .. targetLP.Name
+                -- เคลียร์ของเก่าเพื่อเริ่มผนึกเป้าหมายใหม่
+                sealParts = {} 
+            end
+        end
+    end
+end)
+
+-- [[ LOOP LOGIC: ผนึกและดึงกลับหากตก ]] --
+RunService.Heartbeat:Connect(function()
+    if not sealActive or not sealTargetPlayer or not sealTargetPlayer.Character then return end
+    
+    local targetChar = sealTargetPlayer.Character
+    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+    if not targetRoot then return end
+
+    -- 1. ค้นหาวัตถุรอบตัวผู้รัน (เรา) มาเพิ่มเข้าลิสต์ผนึก (ถ้ายังมีไม่พอ)
+    if #table.create(0) < 15 then -- จำกัดไว้สัก 15 ชิ้นกันแลค
+        local nearby = workspace:GetPartBoundsInRadius(LP.Character.PrimaryPart.Position, gatherRadius)
+        for _, p in ipairs(nearby) do
+            if isValidPart(p) and not sealParts[p] and not grabbed[p] then
+                sealParts[p] = true
+            end
+        end
+    end
+
+    -- 2. คำนวณตำแหน่งผนึกแบบวงกลมรอบตัวเป้าหมาย
+    local partCount = 0
+    for _ in pairs(sealParts) do partCount = partCount + 1 end
+    
+    local i = 0
+    for p, _ in pairs(sealParts) do
+        if p and p.Parent and not p.Anchored then
+            i = i + 1
+            -- คำนวณพิกัดวงกลม (Spiral/Circle)
+            local angle = i * (math.pi * 2 / partCount) + (tick() * 2) -- เพิ่ม tick เพื่อให้หมุนรอบตัว
+            local offset = Vector3.new(math.cos(angle) * sealRadius, (i % 3) * 3, math.sin(angle) * sealRadius)
+            local targetPos = targetRoot.Position + offset
+
+            -- บังคับ Network Ownership
+            pcall(function() p:SetNetworkOwner(LP) end)
+            
+            p.CanCollide = true -- ให้ของมีแรงปะทะเพื่อขังผู้เล่น
+
+            -- ระบบดึงกลับ (The Loop): ใช้ BodyPosition คุมตำแหน่งตลอดเวลา
+            local bp = p:FindFirstChild("BodyPosition") or Instance.new("BodyPosition", p)
+            bp.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+            bp.P = 20000 -- ความแรงในการดึงกลับ
+            bp.D = 500   -- ความนิ่ง
+            bp.Position = targetPos
+
+            local bg = p:FindFirstChild("BodyGyro") or Instance.new("BodyGyro", p)
+            bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+            bg.CFrame = CFrame.lookAt(p.Position, targetRoot.Position) -- หันหน้าเข้าหาเป้าหมายตลอด
+        else
+            sealParts[p] = nil -- ลบออกถ้า Part หายไปจากเกม
+        end
+    end
+end)
+
+btn(pages.seal, "BACK TO MAIN", function() showPage("main") end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
