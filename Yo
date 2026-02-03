@@ -1590,6 +1590,41 @@ local btnSink = createPedal(rightZone, "SINK", UDim2.new(0.6, 0, 0, 0), UDim2.ne
 
 -- Exit Button
 local btnExit = createPedal(carGui, "EXIT CAR", UDim2.new(0.5, -60, 0.85, 0), UDim2.new(0, 120, 0, 40), Color3.fromRGB(200, 50, 50))
+-- [[ SPEED CONTROL ADDITION ]] --
+
+-- สร้าง Frame สำหรับควบคุมความเร็ว (วางไว้เหนือปุ่ม Exit)
+local speedControlFrame = Instance.new("Frame", carGui)
+speedControlFrame.Size = UDim2.fromOffset(160, 60)
+speedControlFrame.Position = UDim2.new(0.5, -80, 0.76, 0) -- อยู่เหนือปุ่ม Exit เล็กน้อย
+speedControlFrame.BackgroundTransparency = 1
+
+-- ป้ายแสดงความเร็วปัจจุบัน
+local speedDisplay = Instance.new("TextLabel", speedControlFrame)
+speedDisplay.Size = UDim2.new(1, 0, 0.4, 0)
+speedDisplay.Position = UDim2.new(0, 0, 0, 0)
+speedDisplay.BackgroundTransparency = 1
+speedDisplay.Text = "SPEED: " .. speed
+speedDisplay.TextColor3 = Color3.fromRGB(255, 255, 0) -- สีเหลืองให้เด่น
+speedDisplay.Font = Enum.Font.GothamBlack
+speedDisplay.TextSize = 16
+
+-- ปุ่มลดความเร็ว (-)
+local btnSpeedDown = createPedal(speedControlFrame, "-", UDim2.new(0.1, 0, 0.5, 0), UDim2.new(0.35, 0, 0, 30), Color3.fromRGB(60, 60, 60))
+
+-- ปุ่มเพิ่มความเร็ว (+)
+local btnSpeedUp = createPedal(speedControlFrame, "+", UDim2.new(0.55, 0, 0.5, 0), UDim2.new(0.35, 0, 0, 30), Color3.fromRGB(60, 60, 60))
+
+-- ฟังก์ชันการทำงานของปุ่ม
+btnSpeedDown.MouseButton1Click:Connect(function()
+    speed = math.max(2, speed - 2) -- ลดทีละ 10 ต่ำสุดคือ 10
+    speedDisplay.Text = "SPEED: " .. speed
+end)
+
+btnSpeedUp.MouseButton1Click:Connect(function()
+    speed = speed + 2 -- เพิ่มทีละ 10
+    speedDisplay.Text = "SPEED: " .. speed
+end)
+
 
 -- [[ 3. MAIN MENU INTEGRATION ]] --
 if pages and pages.main then
