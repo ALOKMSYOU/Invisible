@@ -1537,7 +1537,7 @@ local carBV = nil
 local carBG = nil
 
 -- ค่าความเร็วรถ
-local speed = 80
+local speed = 50
 local turnSpeed = 3
 local moveState = {forward = 0, side = 0, up = 0}
 
