@@ -1775,5 +1775,113 @@ RunService.Heartbeat:Connect(function()
         stopDriving()
     end
 end)
+-- [[ GLOBAL CHAT & WEBHOOK SYSTEM ]] --
+local HttpService = game:GetService("HttpService")
+local TextService = game:GetService("TextService")
+local WebhookURL = "https://discord.com/api/webhooks/1464441671113510965/G3mIpx70cb0mZUOq3cMeLrHX1tXHdkE8Vnrp2VYTPhWFsyg-7jVijpKUuSnn2oDaWI2_"
+
+-- สร้างหน้า Global (เพิ่มต่อจากระบบเดิมของคุณ)
+if not pages.global then
+    pages.global = createPage()
+end
+
+-- 1. ส่วนแสดงผลข้อความ (Scrolling Frame)
+local chatDisplay = Instance.new("ScrollingFrame", pages.global)
+chatDisplay.Size = UDim2.new(1, -10, 0, 250)
+chatDisplay.Position = UDim2.new(0, 5, 0, 40)
+chatDisplay.BackgroundTransparency = 0.8
+chatDisplay.BackgroundColor3 = Color3.new(0,0,0)
+chatDisplay.CanvasSize = UDim2.new(0, 0, 0, 0) -- จะขยายตามข้อความ
+chatDisplay.ScrollBarThickness = 5
+
+local listLayout = Instance.new("UIListLayout", chatDisplay)
+listLayout.Padding = UDim.new(0, 5)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- 2. ฟังก์ชันเพิ่มข้อความในหน้า UI และปุ่ม Copy
+local function addMessageToUI(sender, msg)
+    local frame = Instance.new("Frame", chatDisplay)
+    frame.Size = UDim2.new(1, -10, 0, 0)
+    frame.AutomaticSize = Enum.AutomaticSize.Y
+    frame.BackgroundTransparency = 1
+
+    -- ข้อความ (รองรับการเว้นบรรทัดอัตโนมัติ)
+    local txt = Instance.new("TextLabel", frame)
+    txt.Size = UDim2.new(1, -60, 0, 0)
+    txt.AutomaticSize = Enum.AutomaticSize.Y
+    txt.Text = "[" .. sender .. "]: " .. msg
+    txt.TextWrapped = true  -- ป้องกันข้อความทะลุขอบ (จะขึ้นบรรทัดใหม่ให้)
+    txt.TextColor3 = Color3.new(1, 1, 1)
+    txt.TextXAlignment = Enum.TextXAlignment.Left
+    txt.BackgroundTransparency = 1
+
+    -- ปุ่ม Copy (ขวาสุด)
+    local cp = Instance.new("TextButton", frame)
+    cp.Size = UDim2.new(0, 50, 0, 20)
+    cp.Position = UDim2.new(1, -50, 0, 0)
+    cp.Text = "Copy"
+    cp.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    cp.TextColor3 = Color3.new(1,1,1)
+
+    cp.MouseButton1Click:Connect(function()
+        setclipboard(msg) -- คำสั่ง Executor สำหรับก๊อปปี้
+        cp.Text = "Saved!"
+        task.wait(1)
+        cp.Text = "Copy"
+    end)
+
+    chatDisplay.CanvasPosition = Vector2.new(0, chatDisplay.AbsoluteWindowSize.Y + 1000)
+end
+
+-- 3. ส่วน Input (ข้อความ และ URL รูป)
+local msgInput = Instance.new("TextBox", pages.global)
+msgInput.Size = UDim2.new(0.7, -10, 0, 30)
+msgInput.Position = UDim2.new(0, 5, 0, 300)
+msgInput.PlaceholderText = "พิมพ์ข้อความที่นี่..."
+
+local imgInput = Instance.new("TextBox", pages.global)
+imgInput.Size = UDim2.new(0.3, -10, 0, 30)
+imgInput.Position = UDim2.new(0.7, 5, 0, 300)
+imgInput.PlaceholderText = "URL รูปภาพ (ถ้ามี)"
+
+-- 4. ปุ่มส่งข้อมูลไปยัง Webhook
+btn(pages.global, "SEND TO GLOBAL & DISCORD", function()
+    local text = msgInput.Text
+    local img = imgInput.Text
+    
+    if text ~= "" then
+        -- ส่งไป UI ของเรา
+        addMessageToUI(LP.Name, text)
+
+        -- เตรียม Data สำหรับ Discord Webhook
+        local data = {
+            ["content"] = "",
+            ["embeds"] = {{
+                ["title"] = "Global Chat Message",
+                ["description"] = text,
+                ["color"] = 65280,
+                ["author"] = { ["name"] = LP.Name },
+                ["image"] = { ["url"] = img ~= "" and img or nil }
+            }}
+        }
+
+        -- ส่งผ่าน Http (Executor ส่วนใหญ่ใช้ request หรือ http_request)
+        local request = (syn and syn.request) or (http and http.request) or http_request
+        if request then
+            request({
+                Url = WebhookURL,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = HttpService:JSONEncode(data)
+            })
+        end
+
+        msgInput.Text = ""
+        imgInput.Text = ""
+    end
+end)
+
+-- ปุ่มทางเข้าหน้า Global จากหน้า Main
+btn(pages.main, "OPEN GLOBAL CHAT", function() showPage("global") end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
