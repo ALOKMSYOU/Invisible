@@ -1775,7 +1775,7 @@ RunService.Heartbeat:Connect(function()
         stopDriving()
     end
 end)
--- [[ GLOBAL CHAT SYSTEM - FIXED & REFINED ]] --
+-- [[ GLOBAL CHAT SYSTEM - V2 FIXED ]] --
 local HttpService = game:GetService("HttpService")
 local webhookURL = "https://discord.com/api/webhooks/1469729669246091335/4ZrruAPLek5P3X4D7dKnarAv60IUPewCjKl9dg4oeKJpH-mi2fdOfWkq-PEtRki0yt9h"
 
@@ -1785,23 +1785,23 @@ local chatContainer = pages.chat
 
 -- [[ UI SETUP ]] --
 
--- Top Bar
+-- Top Bar Frame (Container สำหรับปุ่มด้านบน)
 local topBar = Instance.new("Frame", chatContainer)
 topBar.Size = UDim2.new(1, -20, 0, 35)
-topBar.Position = UDim2.new(0, 10, 0, 10)
+topBar.Position = UDim2.new(0, 10, 0, 5)
 topBar.BackgroundTransparency = 1
 
--- แก้ไขปุ่ม BACK: กลับหน้า Main
+-- ปุ่ม BACK (ฝั่งซ้าย)
 local btnBack = btn(topBar, "BACK", function()
     showPage("main")
 end)
 btnBack.Size = UDim2.new(0.3, 0, 1, 0)
+btnBack.Position = UDim2.new(0, 0, 0, 0)
 btnBack.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 
--- แก้ไขปุ่ม CLEAR: ลบข้อความ (Fix ให้ทำงานแน่นอน)
+-- ปุ่ม CLEAR (ฝั่งขวา - แก้ให้ทำงาน 100%)
 local btnClear = btn(topBar, "CLEAR CHAT", function()
-    -- หา ScrollingFrame ที่อยู่ใน chatContainer
-    local scroll = chatContainer:FindFirstChild("ChatScroll")
+    local scroll = chatContainer:FindFirstChild("GlobalScrollingFrame")
     if scroll then
         for _, v in pairs(scroll:GetChildren()) do
             if v:IsA("Frame") then
@@ -1812,50 +1812,46 @@ local btnClear = btn(topBar, "CLEAR CHAT", function()
 end)
 btnClear.Size = UDim2.new(0.65, 0, 1, 0)
 btnClear.Position = UDim2.new(0.35, 0, 0, 0)
-btnClear.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+btnClear.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 
--- Chat Log (ScrollingFrame)
+-- Chat Log (เพิ่มชื่อเฉพาะเพื่อป้องกันการลบผิดตัว)
 local chatScroll = Instance.new("ScrollingFrame", chatContainer)
-chatScroll.Name = "ChatScroll" -- ตั้งชื่อเพื่อให้ปุ่ม Clear หาเจอ
-chatScroll.Position = UDim2.new(0.05, 0, 0, 55)
+chatScroll.Name = "GlobalScrollingFrame"
+chatScroll.Position = UDim2.new(0.05, 0, 0, 45)
 chatScroll.Size = UDim2.new(0.9, 0, 0.55, 0)
 chatScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 chatScroll.BorderSizePixel = 0
 chatScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-chatScroll.ScrollBarThickness = 3
+chatScroll.ScrollBarThickness = 2
 
 local chatLayout = Instance.new("UIListLayout", chatScroll)
 chatLayout.Padding = UDim.new(0, 5)
 chatLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-local chatPad = Instance.new("UIPadding", chatScroll)
-chatPad.PaddingLeft = UDim.new(0, 8)
-chatPad.PaddingRight = UDim.new(0, 8)
-chatPad.PaddingTop = UDim.new(0, 8)
+-- Input Area (ส่วนพิมพ์ข้อความ)
+local inputArea = Instance.new("Frame", chatContainer)
+inputArea.Size = UDim2.new(0.9, 0, 0.3, 0)
+inputArea.Position = UDim2.new(0.05, 0, 0.65, 0)
+inputArea.BackgroundTransparency = 1
 
--- Input Area
-local inputFrame = Instance.new("Frame", chatContainer)
-inputFrame.Size = UDim2.new(0.9, 0, 0.25, 0)
-inputFrame.Position = UDim2.new(0.05, 0, 0.7, 0)
-inputFrame.BackgroundTransparency = 1
-
-local txtMsg = Instance.new("TextBox", inputFrame)
+local txtMsg = Instance.new("TextBox", inputArea)
 txtMsg.Size = UDim2.new(1, 0, 0, 35)
 txtMsg.PlaceholderText = "Type your message here..."
-txtMsg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+txtMsg.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 txtMsg.TextColor3 = Color3.new(1,1,1)
 txtMsg.Font = Enum.Font.Gotham
 txtMsg.TextSize = 14
 txtMsg.ClearTextOnFocus = false
 Instance.new("UICorner", txtMsg)
 
-local btnSend = btn(inputFrame, "SEND TO GLOBAL", function() end)
-btnSend.Position = UDim2.new(0, 0, 0, 45)
-btnSend.Size = UDim2.new(1, 0, 0, 40)
-btnSend.BackgroundColor3 = Color3.fromRGB(0, 102, 204)
+local btnSend = btn(inputArea, "SEND TO GLOBAL", function() end)
+btnSend.Position = UDim2.new(0, 0, 0, 42)
+btnSend.Size = UDim2.new(1, 0, 0, 38)
+btnSend.BackgroundColor3 = Color3.fromRGB(0, 110, 220)
 
--- [[ MESSAGE UI FUNCTION ]] --
-local function addMessageToUI(name, message)
+-- [[ LOGIC ]] --
+
+local function addMessage(name, message)
     local msgFrame = Instance.new("Frame", chatScroll)
     msgFrame.Size = UDim2.new(1, 0, 0, 0)
     msgFrame.AutomaticSize = Enum.AutomaticSize.Y
@@ -1864,7 +1860,7 @@ local function addMessageToUI(name, message)
 
     local textLabel = Instance.new("TextLabel", msgFrame)
     textLabel.Size = UDim2.new(1, -55, 0, 0)
-    textLabel.Position = UDim2.new(0, 8, 0, 8)
+    textLabel.Position = UDim2.new(0, 8, 0, 5)
     textLabel.AutomaticSize = Enum.AutomaticSize.Y
     textLabel.BackgroundTransparency = 1
     textLabel.TextWrapped = true
@@ -1875,10 +1871,10 @@ local function addMessageToUI(name, message)
     textLabel.Text = "[" .. name .. "]: " .. message
 
     local cp = Instance.new("TextButton", msgFrame)
-    cp.Size = UDim2.new(0, 45, 0, 22)
+    cp.Size = UDim2.new(0, 45, 0, 20)
     cp.Position = UDim2.new(1, -50, 0, 5)
     cp.Text = "Copy"
-    cp.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+    cp.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     cp.TextColor3 = Color3.new(1,1,1)
     Instance.new("UICorner", cp)
 
@@ -1888,12 +1884,10 @@ local function addMessageToUI(name, message)
         task.wait(1)
         cp.Text = "Copy"
     end)
-    
-    -- ลบ Auto-scroll ออกตามต้องการ (จะไม่เลื่อนลงล่างสุดเองแล้ว)
+    -- ลบ Auto-scroll ออกตามคำขอ (หน้าจอจะไม่เลื่อนเอง)
 end
 
--- [[ SEND LOGIC ]] --
-local function performSend()
+btnSend.MouseButton1Click:Connect(function()
     local msg = txtMsg.Text
     if msg == "" then return end
 
@@ -1906,7 +1900,7 @@ local function performSend()
                     Method = "POST",
                     Headers = { ["Content-Type"] = "application/json" },
                     Body = HttpService:JSONEncode({
-                        username = game.Players.LocalPlayer.Name .. " (Global)",
+                        username = game.Players.LocalPlayer.Name,
                         content = msg
                     })
                 })
@@ -1914,13 +1908,11 @@ local function performSend()
         end)
     end
 
-    addMessageToUI(game.Players.LocalPlayer.Name, msg)
+    addMessage(game.Players.LocalPlayer.Name, msg)
     txtMsg.Text = ""
-end
+end)
 
-btnSend.MouseButton1Click:Connect(performSend)
-
--- ปุ่มเปิดหน้า Chat จากหน้าหลัก
+-- ปุ่มเปิดจากหน้าหลัก
 label(pages.main, "--- COMMUNICATION ---")
 btn(pages.main, "OPEN GLOBAL CHAT", function()
     showPage("chat")
