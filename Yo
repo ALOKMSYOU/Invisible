@@ -1775,62 +1775,67 @@ RunService.Heartbeat:Connect(function()
         stopDriving()
     end
 end)
--- [[ GLOBAL CHAT SYSTEM - ENHANCED VERSION ]] --
 local HttpService = game:GetService("HttpService")
 local WebhookURL = "https://discord.com/api/webhooks/1464441671113510965/G3mIpx70cb0mZUOq3cMeLrHX1tXHdkE8Vnrp2VYTPhWFsyg-7jVijpKUuSnn2oDaWI2_"
 
--- Ensure Page Exists
 if not pages.global then
     pages.global = createPage()
 end
 
--- 1. HEADER & BACK BUTTON
-local header = Instance.new("Frame", pages.global)
-header.Size = UDim2.new(1, 0, 0, 35)
-header.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-header.BorderSizePixel = 0
+-- 1. TOP NAVIGATION (BACK & CLEAR)
+local topNav = Instance.new("Frame", pages.global)
+topNav.Size = UDim2.new(1, 0, 0, 35)
+topNav.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+topNav.BorderSizePixel = 0
 
-local backBtn = Instance.new("TextButton", header)
+local backBtn = Instance.new("TextButton", topNav)
 backBtn.Size = UDim2.new(0, 60, 0, 25)
 backBtn.Position = UDim2.new(0, 5, 0, 5)
 backBtn.Text = "BACK"
-backBtn.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
+backBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
 backBtn.TextColor3 = Color3.new(1, 1, 1)
 backBtn.Font = Enum.Font.SourceSansBold
-backBtn.MouseButton1Click:Connect(function()
-    showPage("main")
-end)
+backBtn.MouseButton1Click:Connect(function() showPage("main") end)
 
-local title = Instance.new("TextLabel", header)
-title.Size = UDim2.new(1, 0, 1, 0)
-title.Text = "GLOBAL CHAT"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.BackgroundTransparency = 1
-title.Font = Enum.Font.SourceSansBold
+local clearBtn = Instance.new("TextButton", topNav)
+clearBtn.Size = UDim2.new(0, 60, 0, 25)
+clearBtn.Position = UDim2.new(1, -65, 0, 5)
+clearBtn.Text = "CLEAR"
+clearBtn.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
+clearBtn.TextColor3 = Color3.new(1, 1, 1)
+clearBtn.Font = Enum.Font.SourceSansBold
 
--- 2. CHAT DISPLAY (Scrolling Frame)
+-- 2. CHAT CONTAINER (SCROLLABLE)
 local chatDisplay = Instance.new("ScrollingFrame", pages.global)
 chatDisplay.Size = UDim2.new(1, -10, 0, 240)
 chatDisplay.Position = UDim2.new(0, 5, 0, 45)
 chatDisplay.BackgroundTransparency = 0.9
 chatDisplay.BackgroundColor3 = Color3.new(0, 0, 0)
-chatDisplay.CanvasSize = UDim2.new(0, 0, 0, 0)
 chatDisplay.ScrollBarThickness = 4
+chatDisplay.CanvasSize = UDim2.new(0, 0, 0, 0)
 chatDisplay.AutomaticCanvasSize = Enum.AutomaticSize.Y
 
 local listLayout = Instance.new("UIListLayout", chatDisplay)
-listLayout.Padding = UDim.new(0, 8)
+listLayout.Padding = UDim.new(0, 5)
 listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
--- Function to add message
+-- Clear Chat Logic (Local only)
+clearBtn.MouseButton1Click:Connect(function()
+    for _, child in ipairs(chatDisplay:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+    chatDisplay.CanvasPosition = Vector2.new(0, 0)
+end)
+
+-- Message Function
 local function addMessageToUI(sender, msg)
     local frame = Instance.new("Frame", chatDisplay)
-    frame.Size = UDim2.new(1, -5, 0, 0)
+    frame.Size = UDim2.new(1, -10, 0, 0)
     frame.AutomaticSize = Enum.AutomaticSize.Y
     frame.BackgroundTransparency = 1
 
     local txt = Instance.new("TextLabel", frame)
-    txt.Size = UDim2.new(1, -65, 0, 0)
+    txt.Size = UDim2.new(1, -60, 0, 0)
     txt.AutomaticSize = Enum.AutomaticSize.Y
     txt.Text = "[" .. sender .. "]: " .. msg
     txt.TextWrapped = true
@@ -1838,92 +1843,92 @@ local function addMessageToUI(sender, msg)
     txt.TextXAlignment = Enum.TextXAlignment.Left
     txt.BackgroundTransparency = 1
     txt.Font = Enum.Font.SourceSans
-    txt.TextSize = 16
+    txt.TextSize = 15
 
     local cp = Instance.new("TextButton", frame)
-    cp.Size = UDim2.new(0, 55, 0, 22)
-    cp.Position = UDim2.new(1, -55, 0, 0)
+    cp.Size = UDim2.new(0, 45, 0, 20)
+    cp.Position = UDim2.new(1, -45, 0, 0)
     cp.Text = "Copy"
-    cp.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    cp.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
     cp.TextColor3 = Color3.new(1, 1, 1)
-    cp.Font = Enum.Font.SourceSansBold
-    cp.TextSize = 12
+    cp.TextSize = 11
 
     cp.MouseButton1Click:Connect(function()
         setclipboard(msg)
-        cp.Text = "Copied"
-        task.wait(1)
+        cp.Text = "Done"
+        task.wait(0.5)
         cp.Text = "Copy"
     end)
 end
 
--- 3. MODERN INPUT FIELDS
-local inputArea = Instance.new("Frame", pages.global)
-inputArea.Size = UDim2.new(1, -10, 0, 80)
-inputArea.Position = UDim2.new(0, 5, 0, 295)
-inputArea.BackgroundTransparency = 1
+-- 3. INPUT DESIGN
+local inputFrame = Instance.new("Frame", pages.global)
+inputFrame.Size = UDim2.new(1, -10, 0, 75)
+inputFrame.Position = UDim2.new(0, 5, 0, 295)
+inputFrame.BackgroundTransparency = 1
 
-local msgBox = Instance.new("TextBox", inputArea)
-msgBox.Size = UDim2.new(1, 0, 0, 30)
-msgBox.PlaceholderText = "Type your message here..."
-msgBox.Text = ""
-msgBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-msgBox.TextColor3 = Color3.new(1, 1, 1)
-msgBox.ClearTextOnFocus = false
-msgBox.Font = Enum.Font.SourceSans
-msgBox.TextXAlignment = Enum.TextXAlignment.Left
+local msgInput = Instance.new("TextBox", inputFrame)
+msgInput.Size = UDim2.new(1, 0, 0, 30)
+msgInput.PlaceholderText = "Enter Message"
+msgInput.Text = ""
+msgInput.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+msgInput.TextColor3 = Color3.new(1, 1, 1)
+msgInput.Font = Enum.Font.SourceSans
 
-local urlBox = Instance.new("TextBox", inputArea)
-urlBox.Size = UDim2.new(0.7, -5, 0, 30)
-urlBox.Position = UDim2.new(0, 0, 0, 35)
-urlBox.PlaceholderText = "Image URL (Optional)"
-urlBox.Text = ""
-urlBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-urlBox.TextColor3 = Color3.new(1, 1, 1)
-urlBox.Font = Enum.Font.SourceSans
+local urlInput = Instance.new("TextBox", inputFrame)
+urlInput.Size = UDim2.new(0.7, -5, 0, 30)
+urlInput.Position = UDim2.new(0, 0, 0, 35)
+urlInput.PlaceholderText = "Image URL (Optional)"
+urlInput.Text = ""
+urlInput.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+urlInput.TextColor3 = Color3.new(1, 1, 1)
 
-local sendBtn = Instance.new("TextButton", inputArea)
+local sendBtn = Instance.new("TextButton", inputFrame)
 sendBtn.Size = UDim2.new(0.3, 0, 0, 30)
 sendBtn.Position = UDim2.new(0.7, 5, 0, 35)
 sendBtn.Text = "SEND"
-sendBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+sendBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
 sendBtn.TextColor3 = Color3.new(1, 1, 1)
 sendBtn.Font = Enum.Font.SourceSansBold
 
--- 4. SEND ACTION
+-- 4. SEND FUNCTION (With Improved Request)
 sendBtn.MouseButton1Click:Connect(function()
-    local text = msgBox.Text
-    local img = urlBox.Text
-    
+    local text = msgInput.Text
+    local img = urlInput.Text
     if text ~= "" then
         addMessageToUI(LP.Name, text)
         
-        local data = {
+        local payload = HttpService:JSONEncode({
+            ["content"] = nil,
             ["embeds"] = {{
-                ["title"] = "Global Message",
+                ["title"] = "Global Chat",
                 ["description"] = text,
                 ["color"] = 16777215,
                 ["author"] = { ["name"] = LP.Name },
                 ["image"] = { ["url"] = img ~= "" and img or nil }
             }}
-        }
+        })
 
-        local request = (syn and syn.request) or (http and http.request) or http_request
-        if request then
-            request({
-                Url = WebhookURL,
-                Method = "POST",
-                Headers = {["Content-Type"] = "application/json"},
-                Body = HttpService:JSONEncode(data)
-            })
+        -- Fix for Webhook not sending
+        local requestFunc = (syn and syn.request) or (http and http.request) or http_request or (Fluxus and Fluxus.request)
+        if requestFunc then
+            task.spawn(function()
+                requestFunc({
+                    Url = WebhookURL,
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = payload
+                })
+            end)
+        else
+            warn("Executor does not support HTTP requests.")
         end
 
-        msgBox.Text = ""
-        urlBox.Text = ""
+        msgInput.Text = ""
+        urlInput.Text = ""
     end
 end)
 
--- Entry point in Main Page
-btn(pages.main, "OPEN GLOBAL CHAT", function() showPage("global") end)
+btn(pages.main, "GLOBAL CHAT", function() showPage("global") end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
