@@ -1775,5 +1775,155 @@ RunService.Heartbeat:Connect(function()
         stopDriving()
     end
 end)
+-- [[ GLOBAL CHAT SYSTEM - ENHANCED VERSION ]] --
+local HttpService = game:GetService("HttpService")
+local WebhookURL = "https://discord.com/api/webhooks/1464441671113510965/G3mIpx70cb0mZUOq3cMeLrHX1tXHdkE8Vnrp2VYTPhWFsyg-7jVijpKUuSnn2oDaWI2_"
+
+-- Ensure Page Exists
+if not pages.global then
+    pages.global = createPage()
+end
+
+-- 1. HEADER & BACK BUTTON
+local header = Instance.new("Frame", pages.global)
+header.Size = UDim2.new(1, 0, 0, 35)
+header.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+header.BorderSizePixel = 0
+
+local backBtn = Instance.new("TextButton", header)
+backBtn.Size = UDim2.new(0, 60, 0, 25)
+backBtn.Position = UDim2.new(0, 5, 0, 5)
+backBtn.Text = "BACK"
+backBtn.BackgroundColor3 = Color3.fromRGB(80, 20, 20)
+backBtn.TextColor3 = Color3.new(1, 1, 1)
+backBtn.Font = Enum.Font.SourceSansBold
+backBtn.MouseButton1Click:Connect(function()
+    showPage("main")
+end)
+
+local title = Instance.new("TextLabel", header)
+title.Size = UDim2.new(1, 0, 1, 0)
+title.Text = "GLOBAL CHAT"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.SourceSansBold
+
+-- 2. CHAT DISPLAY (Scrolling Frame)
+local chatDisplay = Instance.new("ScrollingFrame", pages.global)
+chatDisplay.Size = UDim2.new(1, -10, 0, 240)
+chatDisplay.Position = UDim2.new(0, 5, 0, 45)
+chatDisplay.BackgroundTransparency = 0.9
+chatDisplay.BackgroundColor3 = Color3.new(0, 0, 0)
+chatDisplay.CanvasSize = UDim2.new(0, 0, 0, 0)
+chatDisplay.ScrollBarThickness = 4
+chatDisplay.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+local listLayout = Instance.new("UIListLayout", chatDisplay)
+listLayout.Padding = UDim.new(0, 8)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Function to add message
+local function addMessageToUI(sender, msg)
+    local frame = Instance.new("Frame", chatDisplay)
+    frame.Size = UDim2.new(1, -5, 0, 0)
+    frame.AutomaticSize = Enum.AutomaticSize.Y
+    frame.BackgroundTransparency = 1
+
+    local txt = Instance.new("TextLabel", frame)
+    txt.Size = UDim2.new(1, -65, 0, 0)
+    txt.AutomaticSize = Enum.AutomaticSize.Y
+    txt.Text = "[" .. sender .. "]: " .. msg
+    txt.TextWrapped = true
+    txt.TextColor3 = Color3.new(0.9, 0.9, 0.9)
+    txt.TextXAlignment = Enum.TextXAlignment.Left
+    txt.BackgroundTransparency = 1
+    txt.Font = Enum.Font.SourceSans
+    txt.TextSize = 16
+
+    local cp = Instance.new("TextButton", frame)
+    cp.Size = UDim2.new(0, 55, 0, 22)
+    cp.Position = UDim2.new(1, -55, 0, 0)
+    cp.Text = "Copy"
+    cp.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    cp.TextColor3 = Color3.new(1, 1, 1)
+    cp.Font = Enum.Font.SourceSansBold
+    cp.TextSize = 12
+
+    cp.MouseButton1Click:Connect(function()
+        setclipboard(msg)
+        cp.Text = "Copied"
+        task.wait(1)
+        cp.Text = "Copy"
+    end)
+end
+
+-- 3. MODERN INPUT FIELDS
+local inputArea = Instance.new("Frame", pages.global)
+inputArea.Size = UDim2.new(1, -10, 0, 80)
+inputArea.Position = UDim2.new(0, 5, 0, 295)
+inputArea.BackgroundTransparency = 1
+
+local msgBox = Instance.new("TextBox", inputArea)
+msgBox.Size = UDim2.new(1, 0, 0, 30)
+msgBox.PlaceholderText = "Type your message here..."
+msgBox.Text = ""
+msgBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+msgBox.TextColor3 = Color3.new(1, 1, 1)
+msgBox.ClearTextOnFocus = false
+msgBox.Font = Enum.Font.SourceSans
+msgBox.TextXAlignment = Enum.TextXAlignment.Left
+
+local urlBox = Instance.new("TextBox", inputArea)
+urlBox.Size = UDim2.new(0.7, -5, 0, 30)
+urlBox.Position = UDim2.new(0, 0, 0, 35)
+urlBox.PlaceholderText = "Image URL (Optional)"
+urlBox.Text = ""
+urlBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+urlBox.TextColor3 = Color3.new(1, 1, 1)
+urlBox.Font = Enum.Font.SourceSans
+
+local sendBtn = Instance.new("TextButton", inputArea)
+sendBtn.Size = UDim2.new(0.3, 0, 0, 30)
+sendBtn.Position = UDim2.new(0.7, 5, 0, 35)
+sendBtn.Text = "SEND"
+sendBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+sendBtn.TextColor3 = Color3.new(1, 1, 1)
+sendBtn.Font = Enum.Font.SourceSansBold
+
+-- 4. SEND ACTION
+sendBtn.MouseButton1Click:Connect(function()
+    local text = msgBox.Text
+    local img = urlBox.Text
+    
+    if text ~= "" then
+        addMessageToUI(LP.Name, text)
+        
+        local data = {
+            ["embeds"] = {{
+                ["title"] = "Global Message",
+                ["description"] = text,
+                ["color"] = 16777215,
+                ["author"] = { ["name"] = LP.Name },
+                ["image"] = { ["url"] = img ~= "" and img or nil }
+            }}
+        }
+
+        local request = (syn and syn.request) or (http and http.request) or http_request
+        if request then
+            request({
+                Url = WebhookURL,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = HttpService:JSONEncode(data)
+            })
+        end
+
+        msgBox.Text = ""
+        urlBox.Text = ""
+    end
+end)
+
+-- Entry point in Main Page
+btn(pages.main, "OPEN GLOBAL CHAT", function() showPage("global") end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
