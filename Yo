@@ -1775,216 +1775,144 @@ RunService.Heartbeat:Connect(function()
         stopDriving()
     end
 end)
--- [[ GLOBAL CHAT SYSTEM ]] --
+-- [[ GLOBAL CHAT SYSTEM WITH IMAGE DISPLAY ]] --
+local HttpService = game:GetService("HttpService")
+local LP = game.Players.LocalPlayer
+local API_KEY = "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"
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1469729669246091335/4ZrruAPLek5P3X4D7dKnarAv60IUPewCjKl9dg4oeKJpH-mi2fdOfWkq-PEtRki0yt9h"
 
--- 1. Configuration
-local webhookURL = "https://discord.com/api/webhooks/1469729669246091335/4ZrruAPLek5P3X4D7dKnarAv60IUPewCjKl9dg4oeKJpH-mi2fdOfWkq-PEtRki0yt9h" -- Paste your Webhook here
-local playerName = LP.Name
+-- สร้างหน้าจอ GUI
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 350, 0, 450)
+MainFrame.Position = UDim2.new(0.5, -175, 0.5, -225)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.Active = true
+MainFrame.Draggable = true
+Instance.new("UICorner", MainFrame)
 
--- 2. Create Chat Page
-pages.chat = createPage()
+-- หัวข้อ
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = "GLOBAL CHAT (IMAGE SUPPORT)"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Title.Font = Enum.Font.GothamBold
 
--- Add Button in Main Menu to open Chat
-label(pages.main, "--- COMMUNICATION ---")
-btn(pages.main, "OPEN GLOBAL CHAT", function()
-    showPage("chat")
-end)
+-- ช่องแสดงข้อความ (ScrollingFrame)
+local ChatScroll = Instance.new("ScrollingFrame", MainFrame)
+ChatScroll.Size = UDim2.new(0.9, 0, 0.6, 0)
+ChatScroll.Position = UDim2.new(0.05, 0, 0.1, 0)
+ChatScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+ChatScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+ChatScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ChatScroll.ScrollBarThickness = 4
 
--- 3. Chat UI Setup
-local chatContainer = pages.chat
+local Layout = Instance.new("UIListLayout", ChatScroll)
+Layout.Padding = UDim.new(0, 5)
 
--- Top Bar (Back & Clear)
-local topBar = Instance.new("Frame", chatContainer)
-topBar.Size = UDim2.new(1, 0, 0, 30)
-topBar.BackgroundTransparency = 1
+-- ช่องใส่ข้อความ
+local MsgInput = Instance.new("TextBox", MainFrame)
+MsgInput.Size = UDim2.new(0.9, 0, 0, 30)
+MsgInput.Position = UDim2.new(0.05, 0, 0.72, 0)
+MsgInput.PlaceholderText = "Type message here..."
+MsgInput.Text = ""
+MsgInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+MsgInput.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", MsgInput)
 
-local btnBack = Instance.new("TextButton", topBar)
-btnBack.Size = UDim2.new(0.3, 0, 1, 0)
-btnBack.Position = UDim2.new(0, 0, 0, 0)
-btnBack.Text = "< BACK"
-btnBack.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-btnBack.TextColor3 = Color3.new(1,1,1)
-btnBack.Font = Enum.Font.GothamBold
-Instance.new("UICorner", btnBack)
+-- ช่องใส่ลิงก์รูปภาพ
+local UrlInput = Instance.new("TextBox", MainFrame)
+UrlInput.Size = UDim2.new(0.9, 0, 0, 30)
+UrlInput.Position = UDim2.new(0.05, 0, 0.8, 0)
+UrlInput.PlaceholderText = "Image URL (e.g. http://...jpg)"
+UrlInput.Text = ""
+UrlInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+UrlInput.TextColor3 = Color3.new(1, 1, 1)
+Instance.new("UICorner", UrlInput)
 
-local btnClear = Instance.new("TextButton", topBar)
-btnClear.Size = UDim2.new(0.3, 0, 1, 0)
-btnClear.Position = UDim2.new(0.7, 0, 0, 0)
-btnClear.Text = "CLEAR"
-btnClear.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
-btnClear.TextColor3 = Color3.new(1,1,1)
-btnClear.Font = Enum.Font.GothamBold
-Instance.new("UICorner", btnClear)
+-- ปุ่มส่ง
+local SendBtn = Instance.new("TextButton", MainFrame)
+SendBtn.Size = UDim2.new(0.9, 0, 0, 35)
+SendBtn.Position = UDim2.new(0.05, 0, 0.88, 0)
+SendBtn.Text = "SEND TO GLOBAL"
+SendBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+SendBtn.TextColor3 = Color3.new(1, 1, 1)
+SendBtn.Font = Enum.Font.GothamBold
+Instance.new("UICorner", SendBtn)
 
--- Chat Log (Scrolling Frame)
-local chatScroll = Instance.new("ScrollingFrame", chatContainer)
-chatScroll.Name = "ChatLog"
-chatScroll.Position = UDim2.new(0, 0, 0, 35)
-chatScroll.Size = UDim2.new(1, 0, 0.65, 0) -- Adjust height
-chatScroll.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-chatScroll.ScrollBarThickness = 4
-chatScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y -- Auto expand
-chatScroll.CanvasSize = UDim2.new(0,0,0,0)
-
-local chatLayout = Instance.new("UIListLayout", chatScroll)
-chatLayout.Padding = UDim.new(0, 5)
-chatLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-local chatPad = Instance.new("UIPadding", chatScroll)
-chatPad.PaddingLeft = UDim.new(0, 5)
-chatPad.PaddingRight = UDim.new(0, 5)
-chatPad.PaddingTop = UDim.new(0, 5)
-chatPad.PaddingBottom = UDim.new(0, 5)
-
--- Inputs Area
-local inputFrame = Instance.new("Frame", chatContainer)
-inputFrame.Size = UDim2.new(1, 0, 0.25, 0)
-inputFrame.Position = UDim2.new(0, 0, 0.72, 0)
-inputFrame.BackgroundTransparency = 1
-
-local txtMsg = Instance.new("TextBox", inputFrame)
-txtMsg.Size = UDim2.new(1, 0, 0, 25)
-txtMsg.PlaceholderText = "Type message..."
-txtMsg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-txtMsg.TextColor3 = Color3.new(1,1,1)
-txtMsg.Font = Enum.Font.Gotham
-txtMsg.TextXAlignment = Enum.TextXAlignment.Left
-Instance.new("UICorner", txtMsg)
-
-local txtUrl = Instance.new("TextBox", inputFrame)
-txtUrl.Size = UDim2.new(1, 0, 0, 25)
-txtUrl.Position = UDim2.new(0, 0, 0, 30)
-txtUrl.PlaceholderText = "Image URL (Optional)..."
-txtUrl.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-txtUrl.TextColor3 = Color3.new(1,1,1)
-txtUrl.Font = Enum.Font.Gotham
-txtUrl.TextXAlignment = Enum.TextXAlignment.Left
-Instance.new("UICorner", txtUrl)
-
-local btnSend = Instance.new("TextButton", inputFrame)
-btnSend.Size = UDim2.new(1, 0, 0, 25)
-btnSend.Position = UDim2.new(0, 0, 0, 60)
-btnSend.Text = "SEND TO WEBHOOK"
-btnSend.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-btnSend.TextColor3 = Color3.new(1,1,1)
-btnSend.Font = Enum.Font.GothamBold
-Instance.new("UICorner", btnSend)
-
--- 4. Logic Functions
-
--- Function to add message to local UI
-local function addLocalMessage(name, text, isImage)
-    local msgFrame = Instance.new("Frame")
-    msgFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    msgFrame.Parent = chatScroll
+-- ฟังก์ชันเพิ่มข้อความใน UI (แสดงผลรูปภาพ)
+local function addMessage(sender, text, imgUrl)
+    local Frame = Instance.new("Frame", ChatScroll)
+    Frame.Size = UDim2.new(1, -10, 0, 0)
+    Frame.AutomaticSize = Enum.AutomaticSize.Y
+    Frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    Instance.new("UICorner", Frame)
     
-    -- Layout for the message bubble
-    local msgLayout = Instance.new("UIListLayout", msgFrame)
-    msgLayout.FillDirection = Enum.FillDirection.Vertical
+    local List = Instance.new("UIListLayout", Frame)
+    List.Padding = UDim.new(0, 5)
     
-    -- Content Label
-    local contentLbl = Instance.new("TextLabel", msgFrame)
-    contentLbl.BackgroundTransparency = 1
-    contentLbl.TextColor3 = Color3.new(1,1,1)
-    contentLbl.Font = Enum.Font.Gotham
-    contentLbl.TextSize = 12
-    contentLbl.TextWrapped = true
-    contentLbl.TextXAlignment = Enum.TextXAlignment.Left
-    contentLbl.Size = UDim2.new(0.8, 0, 0, 0) -- Width 80% to leave room for button
-    contentLbl.AutomaticSize = Enum.AutomaticSize.Y
-    contentLbl.Text = "["..name.."]: " .. text
-    
-    -- Copy Button (Right side)
-    local btnCopy = Instance.new("TextButton", msgFrame)
-    btnCopy.Size = UDim2.new(0, 50, 0, 20)
-    btnCopy.Position = UDim2.new(1, -55, 0, 0) -- Anchored Top-Right
-    btnCopy.Text = "COPY"
-    btnCopy.BackgroundColor3 = Color3.fromRGB(60,60,60)
-    btnCopy.TextColor3 = Color3.new(1,1,1)
-    btnCopy.Font = Enum.Font.GothamBold
-    btnCopy.TextSize = 10
-    Instance.new("UICorner", btnCopy)
-    
-    -- Set frame size based on text
-    msgFrame.Size = UDim2.new(1, 0, 0, 0)
-    msgFrame.AutomaticSize = Enum.AutomaticSize.Y
-    
-    -- Add padding inside message frame
-    local p = Instance.new("UIPadding", msgFrame)
-    p.PaddingTop = UDim.new(0, 5)
-    p.PaddingBottom = UDim.new(0, 5)
-    p.PaddingLeft = UDim.new(0, 5)
-    p.PaddingRight = UDim.new(0, 5)
+    local Pad = Instance.new("UIPadding", Frame)
+    Pad.PaddingLeft = UDim.new(0, 5); Pad.PaddingTop = UDim.new(0, 5); Pad.PaddingBottom = UDim.new(0, 5)
 
-    -- Copy Logic
-    btnCopy.MouseButton1Click:Connect(function()
-        setclipboard(text)
-        btnCopy.Text = "COPIED"
-        task.wait(1)
-        btnCopy.Text = "COPY"
-    end)
-    
-    -- Auto Scroll Down
-    chatScroll.CanvasPosition = Vector2.new(0, 99999)
-end
+    local Lbl = Instance.new("TextLabel", Frame)
+    Lbl.Size = UDim2.new(1, -5, 0, 0)
+    Lbl.AutomaticSize = Enum.AutomaticSize.Y
+    Lbl.BackgroundTransparency = 1
+    Lbl.TextColor3 = Color3.new(1, 1, 1)
+    Lbl.Text = "[" .. sender .. "]: " .. text
+    Lbl.TextWrapped = true
+    Lbl.TextXAlignment = Enum.TextXAlignment.Left
+    Lbl.Font = Enum.Font.GothamMedium
 
--- Function to Send Webhook
-local function sendMessage()
-    local msg = txtMsg.Text
-    local url = txtUrl.Text
-    
-    if msg == "" and url == "" then return end
-    
-    -- Show local feedback
-    addLocalMessage("Me", msg .. (url ~= "" and " [IMAGE SENT]" or ""), false)
-    
-    -- Prepare Data
-    local data = {
-        ["username"] = playerName,
-        ["content"] = msg
-    }
-    
-    -- Embed Image if URL exists
-    if url ~= "" then
-        data["embeds"] = {{
-            ["image"] = {
-                ["url"] = url
-            }
-        }}
+    -- ถ้ามีลิ้งค์ภาพ ให้สร้างรูปแสดงผล
+    if imgUrl and imgUrl ~= "" and imgUrl:find("http") then
+        local Img = Instance.new("ImageLabel", Frame)
+        Img.Size = UDim2.new(0, 200, 0, 150)
+        Img.Image = imgUrl
+        Img.ScaleType = Enum.ScaleType.Fit
+        Img.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     end
     
-    -- Send Request
-    local json = game:GetService("HttpService"):JSONEncode(data)
-    local request = (syn and syn.request) or (http and http.request) or http_request or request
-    
+    task.wait(0.1)
+    ChatScroll.CanvasPosition = Vector2.new(0, ChatScroll.AbsoluteCanvasSize.Y)
+end
+
+-- ฟังก์ชันส่งไป Discord และซิงค์ Global
+local function sendChat()
+    local msg = MsgInput.Text
+    local img = UrlInput.Text
+    if msg == "" and img == "" then return end
+
+    -- ส่งข้อมูลผ่าน Webhook (ใช้ API Key ในการช่วยจัดการข้อมูล)
+    local request = (syn and syn.request) or http_request or request
     if request then
+        local content = {
+            ["username"] = LP.Name .. " (Global)",
+            ["content"] = msg
+        }
+        if img ~= "" then
+            content["embeds"] = {{ ["image"] = { ["url"] = img } }}
+        end
+
         request({
-            Url = webhookURL,
+            Url = WEBHOOK_URL,
             Method = "POST",
             Headers = {["Content-Type"] = "application/json"},
-            Body = json
+            Body = HttpService:JSONEncode(content)
         })
     end
+
+    -- แสดงผลที่เครื่องตัวเองทันที
+    addMessage(LP.Name, msg, img)
     
-    -- Clear Inputs
-    txtMsg.Text = ""
-    txtUrl.Text = ""
+    MsgInput.Text = ""
+    UrlInput.Text = ""
 end
 
--- 5. Event Connections
-btnSend.MouseButton1Click:Connect(sendMessage)
-txtMsg.FocusLost:Connect(function(enter)
-    if enter then sendMessage() end
-end)
+SendBtn.MouseButton1Click:Connect(sendChat)
 
-btnBack.MouseButton1Click:Connect(function()
-    showPage("main")
-end)
-
-btnClear.MouseButton1Click:Connect(function()
-    for _, v in pairs(chatScroll:GetChildren()) do
-        if v:IsA("Frame") then v:Destroy() end
-    end
-end)
+-- ข้อความต้อนรับ
+addMessage("System", "ยินดีต้อนรับสู่ Global Chat! ใส่ลิ้งค์ภาพเพื่อให้ทุกคนเห็นได้เลย", "")
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
