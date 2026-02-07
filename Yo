@@ -1775,7 +1775,7 @@ RunService.Heartbeat:Connect(function()
         stopDriving()
     end
 end)
--- [[ GLOBAL CHAT SYSTEM - REALTIME VIEW (TEXT ONLY) ]] --
+-- [[ GLOBAL CHAT SYSTEM - REFINED VERSION ]] --
 
 local HttpService = game:GetService("HttpService")
 local webhookURL = "https://discord.com/api/webhooks/1464441671113510965/G3mIpx70cb0mZUOq3cMeLrHX1tXHdkE8Vnrp2VYTPhWFsyg-7jVijpKUuSnn2oDaWI2_"
@@ -1792,89 +1792,89 @@ end)
 -- [[ UI SETUP ]] --
 local chatContainer = pages.chat
 
--- Top Bar
+-- Top Bar (บาร์ด้านบน)
 local topBar = Instance.new("Frame", chatContainer)
-topBar.Size = UDim2.new(1, 0, 0, 30)
+topBar.Size = UDim2.new(1, -10, 0, 35)
+topBar.Position = UDim2.new(0, 5, 0, 5)
 topBar.BackgroundTransparency = 1
 
 local btnBack = btn(topBar, "BACK", function()
     showPage("main")
 end)
-btnBack.Size = UDim2.new(0.3, 0, 1, 0)
-btnBack.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+btnBack.Size = UDim2.new(0.45, 0, 1, 0)
+btnBack.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
 
-local btnClear = btn(topBar, "CLEAR", function()
+local btnClear = btn(topBar, "CLEAR CHAT", function()
     for _, v in pairs(chatScroll:GetChildren()) do
-        if v:IsA("Frame") then
-            v:Destroy()
-        end
+        if v:IsA("Frame") then v:Destroy() end
     end
 end)
-btnClear.Size = UDim2.new(0.3, 0, 1, 0)
-btnClear.Position = UDim2.new(0.7, 0, 0, 0)
+btnClear.Size = UDim2.new(0.45, 0, 1, 0)
+btnClear.Position = UDim2.new(0.55, 0, 0, 0)
 
--- Chat Log
+-- Chat Log (ส่วนแสดงข้อความ)
 local chatScroll = Instance.new("ScrollingFrame", chatContainer)
-chatScroll.Position = UDim2.new(0, 0, 0, 35)
-chatScroll.Size = UDim2.new(1, 0, 0.6, 0)
-chatScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+chatScroll.Position = UDim2.new(0.05, 0, 0, 45)
+chatScroll.Size = UDim2.new(0.9, 0, 0.65, 0) -- ปรับให้สมส่วน
+chatScroll.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+chatScroll.BorderSizePixel = 0
 chatScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-chatScroll.ScrollBarThickness = 4
+chatScroll.ScrollBarThickness = 3
 
 local chatLayout = Instance.new("UIListLayout", chatScroll)
-chatLayout.Padding = UDim.new(0, 5)
+chatLayout.Padding = UDim.new(0, 6)
+chatLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
--- Input Area
+local chatPad = Instance.new("UIPadding", chatScroll)
+chatPad.PaddingLeft = UDim.new(0, 5)
+chatPad.PaddingRight = UDim.new(0, 5)
+chatPad.PaddingTop = UDim.new(0, 5)
+
+-- Input Area (ส่วนพิมพ์ข้อความ)
 local inputFrame = Instance.new("Frame", chatContainer)
-inputFrame.Size = UDim2.new(1, 0, 0.3, 0)
-inputFrame.Position = UDim2.new(0, 0, 0.68, 0)
+inputFrame.Size = UDim2.new(0.9, 0, 0.2, 0)
+inputFrame.Position = UDim2.new(0.05, 0, 0.75, 0) -- ขยับลงมาให้ดูดี
 inputFrame.BackgroundTransparency = 1
 
 local txtMsg = Instance.new("TextBox", inputFrame)
-txtMsg.Size = UDim2.new(1, 0, 0, 25)
-txtMsg.PlaceholderText = "Message..."
-txtMsg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+txtMsg.Size = UDim2.new(1, 0, 0, 30)
+txtMsg.PlaceholderText = "Type your message here..."
+txtMsg.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 txtMsg.TextColor3 = Color3.new(1,1,1)
+txtMsg.TextSize = 14
+txtMsg.Font = Enum.Font.Gotham
 txtMsg.ClearTextOnFocus = false
-Instance.new("UICorner", txtMsg)
+Instance.new("UICorner", txtMsg).CornerRadius = UDim.new(0, 6)
 
 local btnSend = btn(inputFrame, "SEND TO GLOBAL", function() end)
-btnSend.Position = UDim2.new(0, 0, 0, 35)
-btnSend.Size = UDim2.new(1, 0, 0, 30)
-btnSend.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+btnSend.Position = UDim2.new(0, 0, 0, 38)
+btnSend.Size = UDim2.new(1, 0, 0, 35)
+btnSend.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
 
 -- [[ MESSAGE UI ]] --
 local function addMessageToUI(name, message)
     local msgFrame = Instance.new("Frame", chatScroll)
-    msgFrame.Size = UDim2.new(1, -10, 0, 0)
+    msgFrame.Size = UDim2.new(1, 0, 0, 0)
     msgFrame.AutomaticSize = Enum.AutomaticSize.Y
     msgFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     Instance.new("UICorner", msgFrame)
 
-    local pad = Instance.new("UIPadding", msgFrame)
-    pad.PaddingLeft = UDim.new(0, 6)
-    pad.PaddingRight = UDim.new(0, 6)
-    pad.PaddingTop = UDim.new(0, 6)
-    pad.PaddingBottom = UDim.new(0, 6)
-
     local textLabel = Instance.new("TextLabel", msgFrame)
-    textLabel.Size = UDim2.new(1, -50, 0, 0)
+    textLabel.Size = UDim2.new(1, -55, 0, 0)
+    textLabel.Position = UDim2.new(0, 5, 0, 5)
     textLabel.AutomaticSize = Enum.AutomaticSize.Y
     textLabel.BackgroundTransparency = 1
     textLabel.TextWrapped = true
     textLabel.TextXAlignment = Enum.TextXAlignment.Left
-    textLabel.TextYAlignment = Enum.TextYAlignment.Top
     textLabel.Font = Enum.Font.GothamMedium
     textLabel.TextSize = 13
     textLabel.TextColor3 = Color3.new(1,1,1)
     textLabel.Text = "[" .. name .. "]: " .. message
 
-    -- Copy Button
     local cp = Instance.new("TextButton", msgFrame)
-    cp.Size = UDim2.new(0, 40, 0, 18)
-    cp.Position = UDim2.new(1, -45, 0, 0)
+    cp.Size = UDim2.new(0, 45, 0, 20)
+    cp.Position = UDim2.new(1, -50, 0, 5)
     cp.Text = "Copy"
-    cp.TextSize = 10
     cp.BackgroundColor3 = Color3.fromRGB(60,60,60)
     cp.TextColor3 = Color3.new(1,1,1)
     Instance.new("UICorner", cp)
@@ -1885,9 +1885,8 @@ local function addMessageToUI(name, message)
         task.wait(1)
         cp.Text = "Copy"
     end)
-
-    task.wait()
-    chatScroll.CanvasPosition = Vector2.new(0, chatScroll.AbsoluteCanvasSize.Y)
+    
+    -- แก้ไข: ลบบรรทัด CanvasPosition ออก เพื่อไม่ให้มันดีดลงไปล่างสุดเอง
 end
 
 -- [[ SEND LOGIC ]] --
@@ -1897,15 +1896,19 @@ local function performSend()
 
     local request = (syn and syn.request) or (http and http.request) or http_request or request
     if request then
-        request({
-            Url = webhookURL,
-            Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body = HttpService:JSONEncode({
-                username = game.Players.LocalPlayer.Name .. " (Global)",
-                content = msg
-            })
-        })
+        task.spawn(function()
+            pcall(function()
+                request({
+                    Url = webhookURL,
+                    Method = "POST",
+                    Headers = { ["Content-Type"] = "application/json" },
+                    Body = HttpService:JSONEncode({
+                        username = game.Players.LocalPlayer.Name .. " (Global)",
+                        content = msg
+                    })
+                })
+            end)
+        end)
     end
 
     addMessageToUI(game.Players.LocalPlayer.Name, msg)
