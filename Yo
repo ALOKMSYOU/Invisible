@@ -1780,135 +1780,129 @@ local API_KEY = "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"
 local WEBHOOK_URL = "https://discord.com/api/webhooks/1469729669246091335/4ZrruAPLek5P3X4D7dKnarAv60IUPewCjKl9dg4oeKJpH-mi2fdOfWkq-PEtRki0yt9h"
 local LP = game.Players.LocalPlayer
 
--- [[ 1. สร้างหน้า Page และปุ่มเปิด ]] --
-local chatPage = createPage() -- สร้างหน้าใหม่ใน Telekinesis UI
-
--- เพิ่มปุ่มในหน้า Main ของคุณ
-btn(pages.main, "OPEN GLOBAL CHAT", function()
-    showPage(chatPage)
+-- [[ 1. เพิ่มปุ่มลงในหน้าหลักของ Telekinesis UI ]] --
+-- ค้นหาตำแหน่งที่คุณสร้างปุ่มอื่นๆ แล้ววางโค้ดนี้ลงไป
+local globalChatBtn = btn(pages.main, "OPEN GLOBAL CHAT", function()
+    showPage(chatPage) -- สลับไปหน้าแชท
 end)
 
--- [[ 2. สร้างโครงสร้างหน้าแชท ]] --
-local chatTitle = label(chatPage, "--- GLOBAL COMMUNICATION ---")
-chatTitle.TextColor3 = Color3.fromRGB(0, 255, 255)
+-- [[ 2. สร้างหน้า Page สำหรับ Global Chat ]] --
+local chatPage = createPage() 
 
--- ช่องแสดงข้อความ (Scrolling)
-local chatScroll = Instance.new("ScrollingFrame", chatPage)
-chatScroll.Size = UDim2.new(1, -10, 0, 180)
-chatScroll.Position = UDim2.new(0, 5, 0, 45)
-chatScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-chatScroll.BorderSizePixel = 0
-chatScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-chatScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-chatScroll.ScrollBarThickness = 3
+-- หัวข้อหน้าแชท
+label(chatPage, "--- GLOBAL CHAT SYSTEM ---")
 
-local layout = Instance.new("UIListLayout", chatScroll)
-layout.Padding = UDim.new(0, 8)
+-- ช่องสำหรับแสดงแชท (ScrollingFrame) ปรับให้เข้ากับธีมในวิดีโอ
+local chatContainer = Instance.new("ScrollingFrame", chatPage)
+chatContainer.Size = UDim2.new(1, -10, 0, 150)
+chatContainer.Position = UDim2.new(0, 5, 0, 40)
+chatContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 15) -- สีดำเข้มตามวิดีโอ
+chatContainer.BorderSizePixel = 0
+chatContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+chatContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
+chatContainer.ScrollBarThickness = 2
+
+local layout = Instance.new("UIListLayout", chatContainer)
+layout.Padding = UDim.new(0, 5)
 layout.SortOrder = Enum.SortOrder.LayoutOrder
 
--- ช่อง Input ข้อความ
-local msgInput = Instance.new("TextBox", chatPage)
-msgInput.Size = UDim2.new(1, -10, 0, 25)
-msgInput.Position = UDim2.new(0, 5, 0, 235)
-msgInput.PlaceholderText = "Type message here..."
-msgInput.Text = ""
-msgInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-msgInput.TextColor3 = Color3.new(1, 1, 1)
-msgInput.Font = Enum.Font.Gotham
-msgInput.TextSize = 12
-Instance.new("UICorner", msgInput).CornerRadius = UDim.new(0, 4)
+-- [[ 3. ส่วนรับข้อมูล (Input) ]] --
 
--- ช่อง Input ลิงก์ภาพ (ใส่ลิงก์ GIF ที่คุณให้มาได้ที่นี่)
-local imgInput = Instance.new("TextBox", chatPage)
-imgInput.Size = UDim2.new(1, -10, 0, 25)
-imgInput.Position = UDim2.new(0, 5, 0, 265)
-imgInput.PlaceholderText = "Paste Image URL (.png, .jpg, .gif)"
-imgInput.Text = ""
-imgInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-imgInput.TextColor3 = Color3.new(1, 1, 1)
-imgInput.Font = Enum.Font.Gotham
-imgInput.TextSize = 12
-Instance.new("UICorner", imgInput).CornerRadius = UDim.new(0, 4)
+-- ช่องพิมพ์ข้อความ
+local msgBox = Instance.new("TextBox", chatPage)
+msgBox.Size = UDim2.new(1, -10, 0, 25)
+msgBox.Position = UDim2.new(0, 5, 0, 200)
+msgBox.PlaceholderText = "Type your message..."
+msgBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+msgBox.TextColor3 = Color3.new(1, 1, 1)
+msgBox.Text = ""
+Instance.new("UICorner", msgBox).CornerRadius = UDim.new(0, 4)
 
--- [[ 3. ฟังก์ชันหลัก ]] --
+-- ช่องใส่ลิงก์รูปภาพ (รองรับ GIF ที่คุณส่งมา)
+local imgBox = Instance.new("TextBox", chatPage)
+imgBox.Size = UDim2.new(1, -10, 0, 25)
+imgBox.Position = UDim2.new(0, 5, 0, 230)
+imgBox.PlaceholderText = "Paste Image/GIF Link..."
+imgBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+imgBox.TextColor3 = Color3.new(1, 1, 1)
+imgBox.Text = ""
+Instance.new("UICorner", imgBox).CornerRadius = UDim.new(0, 4)
 
--- ฟังก์ชันแสดงผลในแชท
-local function addLocalMessage(name, text, url)
-    local frame = Instance.new("Frame", chatScroll)
+-- [[ 4. ระบบแสดงผลและส่งข้อมูล ]] --
+
+local function displayMessage(user, text, url)
+    local frame = Instance.new("Frame", chatContainer)
     frame.Size = UDim2.new(1, -10, 0, 0)
     frame.AutomaticSize = Enum.AutomaticSize.Y
     frame.BackgroundTransparency = 1
     
-    local list = Instance.new("UIListLayout", frame)
-    list.Padding = UDim.new(0, 4)
+    local vList = Instance.new("UIListLayout", frame)
+    vList.Padding = UDim.new(0, 2)
 
-    -- ชื่อผู้ส่งและข้อความ
-    local content = Instance.new("TextLabel", frame)
-    content.Size = UDim2.new(1, 0, 0, 0)
-    content.AutomaticSize = Enum.AutomaticSize.Y
-    content.BackgroundTransparency = 1
-    content.Font = Enum.Font.GothamMedium
-    content.TextSize = 13
-    content.TextColor3 = (name == LP.Name) and Color3.fromRGB(255, 255, 0) or Color3.new(1, 1, 1)
-    content.Text = "[" .. name .. "]: " .. (text ~= "" and text or "(Sent an image)")
-    content.TextWrapped = true
-    content.TextXAlignment = Enum.TextXAlignment.Left
+    local txtLabel = Instance.new("TextLabel", frame)
+    txtLabel.Size = UDim2.new(1, 0, 0, 0)
+    txtLabel.AutomaticSize = Enum.AutomaticSize.Y
+    txtLabel.BackgroundTransparency = 1
+    txtLabel.TextColor3 = (user == LP.Name) and Color3.fromRGB(0, 255, 255) or Color3.new(1, 1, 1)
+    txtLabel.Text = "[" .. user .. "]: " .. text
+    txtLabel.TextWrapped = true
+    txtLabel.TextXAlignment = Enum.TextXAlignment.Left
+    txtLabel.Font = Enum.Font.SourceSansBold
+    txtLabel.TextSize = 14
 
-    -- แสดงรูปภาพ
+    -- แสดงผลรูปภาพ/GIF
     if url and url:find("http") then
-        local img = Instance.new("ImageLabel", frame)
-        img.Size = UDim2.new(0, 180, 0, 120) -- ปรับขนาดภาพตามความสวยงาม
-        img.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-        img.Image = url
-        img.ScaleType = Enum.ScaleType.Fit
-        Instance.new("UICorner", img)
+        local imgDisplay = Instance.new("ImageLabel", frame)
+        imgDisplay.Size = UDim2.new(0, 150, 0, 100)
+        imgDisplay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        imgDisplay.Image = url -- ใส่ลิงก์ GIF ตรงๆ ได้เลย
+        imgDisplay.ScaleType = Enum.ScaleType.Fit
+        Instance.new("UICorner", imgDisplay)
         
-        -- ถ้าลิ้งค์เสียให้ลบทิ้ง
-        img.ImageFailed:Connect(function()
-            img:Destroy()
-            content.Text = content.Text .. " [Image Load Failed]"
+        -- ตรวจสอบว่าภาพโหลดได้ไหม
+        imgDisplay.ImageFailed:Connect(function()
+            imgDisplay:Destroy()
+            txtLabel.Text = txtLabel.Text .. " (Image Error)"
         end)
     end
 
-    -- เลื่อนแชทลงล่างสุด
+    -- เลื่อนแชทลงล่าง
     task.wait(0.1)
-    chatScroll.CanvasPosition = Vector2.new(0, chatScroll.AbsoluteCanvasSize.Y)
+    chatContainer.CanvasPosition = Vector2.new(0, chatContainer.AbsoluteCanvasSize.Y)
 end
 
--- ปุ่มกดส่ง
+-- ปุ่ม SEND
 btn(chatPage, "SEND TO GLOBAL", function()
-    local msg = msgInput.Text
-    local img = imgInput.Text
+    local message = msgBox.Text
+    local imageLink = imgBox.Text
     
-    if msg == "" and img == "" then return end
+    if message == "" and imageLink == "" then return end
 
-    -- 1. แสดงผลในหน้าจอตัวเองทันที
-    addLocalMessage(LP.Name, msg, img)
+    -- 1. โชว์ในเครื่องเราเอง
+    displayMessage(LP.Name, message, imageLink)
 
-    -- 2. ส่งไปยัง Discord Webhook
+    -- 2. ส่งไป Discord Webhook
     local request = (syn and syn.request) or http_request or request
     if request then
-        local body = {
-            ["username"] = LP.Name .. " (Global Chat)",
-            ["content"] = msg ~= "" and msg or nil
-        }
-        if img ~= "" then
-            body["embeds"] = {{
-                ["image"] = { ["url"] = img }
-            }}
-        end
-
-        request({
-            Url = WEBHOOK_URL,
-            Method = "POST",
-            Headers = {["Content-Type"] = "application/json"},
-            Body = game:GetService("HttpService"):JSONEncode(body)
-        })
+        pcall(function()
+            request({
+                Url = WEBHOOK_URL,
+                Method = "POST",
+                Headers = {["Content-Type"] = "application/json"},
+                Body = game:GetService("HttpService"):JSONEncode({
+                    ["username"] = LP.Name,
+                    ["content"] = message ~= "" and message or nil,
+                    ["embeds"] = imageLink ~= "" and {{
+                        ["image"] = {["url"] = imageLink}
+                    }} or nil
+                })
+            })
+        end)
     end
 
-    -- เคลียร์ช่องพิมพ์
-    msgInput.Text = ""
-    imgInput.Text = ""
+    -- ล้างช่องพิมพ์
+    msgBox.Text = ""
+    imgBox.Text = ""
 end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
