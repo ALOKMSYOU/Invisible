@@ -1776,7 +1776,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 local HttpService = game:GetService("HttpService")
-local WebhookURL = "https://discord.com/api/webhooks/1464441671113510965/G3mIpx70cb0mZUOq3cMeLrHX1tXHdkE8Vnrp2VYTPhWFsyg-7jVijpKUuSnn2oDaWI2_"
+local WebhookURL = "https://discord.com/api/webhooks/1469729669246091335/4ZrruAPLek5P3X4D7dKnarAv60IUPewCjKl9dg4oeKJpH-mi2fdOfWkq-PEtRki0yt9h"
 
 if not pages.global then
     pages.global = createPage()
