@@ -1775,88 +1775,86 @@ RunService.Heartbeat:Connect(function()
         stopDriving()
     end
 end)
--- [[ GLOBAL CHAT SYSTEM - REFINED VERSION ]] --
-
+-- [[ GLOBAL CHAT SYSTEM - FIXED & REFINED ]] --
 local HttpService = game:GetService("HttpService")
 local webhookURL = "https://discord.com/api/webhooks/1469729669246091335/4ZrruAPLek5P3X4D7dKnarAv60IUPewCjKl9dg4oeKJpH-mi2fdOfWkq-PEtRki0yt9h"
 
 -- สร้างหน้า Chat
 pages.chat = createPage()
-
--- ปุ่มเปิดหน้า Chat จากหน้าหลัก
-label(pages.main, "--- COMMUNICATION ---")
-btn(pages.main, "OPEN GLOBAL CHAT", function()
-    showPage("chat")
-end)
-
--- [[ UI SETUP ]] --
 local chatContainer = pages.chat
 
--- Top Bar (บาร์ด้านบน)
+-- [[ UI SETUP ]] --
+
+-- Top Bar
 local topBar = Instance.new("Frame", chatContainer)
-topBar.Size = UDim2.new(1, -10, 0, 35)
-topBar.Position = UDim2.new(0, 5, 0, 5)
+topBar.Size = UDim2.new(1, -20, 0, 35)
+topBar.Position = UDim2.new(0, 10, 0, 10)
 topBar.BackgroundTransparency = 1
 
+-- แก้ไขปุ่ม BACK: กลับหน้า Main
 local btnBack = btn(topBar, "BACK", function()
     showPage("main")
 end)
-btnBack.Size = UDim2.new(0.45, 0, 1, 0)
-btnBack.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+btnBack.Size = UDim2.new(0.3, 0, 1, 0)
+btnBack.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 
+-- แก้ไขปุ่ม CLEAR: ลบข้อความ (Fix ให้ทำงานแน่นอน)
 local btnClear = btn(topBar, "CLEAR CHAT", function()
-    -- วนลูปเช็ค Object ทั้งหมดใน chatScroll
-    for _, v in pairs(chatScroll:GetChildren()) do
-        -- ลบเฉพาะ Frame ที่เป็นข้อความ (ไม่ลบ UIListLayout หรือ UIPadding)
-        if v:IsA("Frame") then
-            v:Destroy()
+    -- หา ScrollingFrame ที่อยู่ใน chatContainer
+    local scroll = chatContainer:FindFirstChild("ChatScroll")
+    if scroll then
+        for _, v in pairs(scroll:GetChildren()) do
+            if v:IsA("Frame") then
+                v:Destroy()
+            end
         end
     end
-    -- รีเซ็ตขนาดพื้นที่เลื่อนให้กลับไปด้านบนสุด (Optional)
-    chatScroll.CanvasPosition = Vector2.new(0, 0)
 end)
+btnClear.Size = UDim2.new(0.65, 0, 1, 0)
+btnClear.Position = UDim2.new(0.35, 0, 0, 0)
+btnClear.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
 
-
--- Chat Log (ส่วนแสดงข้อความ)
+-- Chat Log (ScrollingFrame)
 local chatScroll = Instance.new("ScrollingFrame", chatContainer)
-chatScroll.Position = UDim2.new(0.05, 0, 0, 45)
-chatScroll.Size = UDim2.new(0.9, 0, 0.65, 0) -- ปรับให้สมส่วน
-chatScroll.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+chatScroll.Name = "ChatScroll" -- ตั้งชื่อเพื่อให้ปุ่ม Clear หาเจอ
+chatScroll.Position = UDim2.new(0.05, 0, 0, 55)
+chatScroll.Size = UDim2.new(0.9, 0, 0.55, 0)
+chatScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 chatScroll.BorderSizePixel = 0
 chatScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 chatScroll.ScrollBarThickness = 3
 
 local chatLayout = Instance.new("UIListLayout", chatScroll)
-chatLayout.Padding = UDim.new(0, 6)
+chatLayout.Padding = UDim.new(0, 5)
 chatLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 local chatPad = Instance.new("UIPadding", chatScroll)
-chatPad.PaddingLeft = UDim.new(0, 5)
-chatPad.PaddingRight = UDim.new(0, 5)
-chatPad.PaddingTop = UDim.new(0, 5)
+chatPad.PaddingLeft = UDim.new(0, 8)
+chatPad.PaddingRight = UDim.new(0, 8)
+chatPad.PaddingTop = UDim.new(0, 8)
 
--- Input Area (ส่วนพิมพ์ข้อความ)
+-- Input Area
 local inputFrame = Instance.new("Frame", chatContainer)
-inputFrame.Size = UDim2.new(0.9, 0, 0.2, 0)
-inputFrame.Position = UDim2.new(0.05, 0, 0.75, 0) -- ขยับลงมาให้ดูดี
+inputFrame.Size = UDim2.new(0.9, 0, 0.25, 0)
+inputFrame.Position = UDim2.new(0.05, 0, 0.7, 0)
 inputFrame.BackgroundTransparency = 1
 
 local txtMsg = Instance.new("TextBox", inputFrame)
-txtMsg.Size = UDim2.new(1, 0, 0, 30)
+txtMsg.Size = UDim2.new(1, 0, 0, 35)
 txtMsg.PlaceholderText = "Type your message here..."
-txtMsg.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+txtMsg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 txtMsg.TextColor3 = Color3.new(1,1,1)
-txtMsg.TextSize = 14
 txtMsg.Font = Enum.Font.Gotham
+txtMsg.TextSize = 14
 txtMsg.ClearTextOnFocus = false
-Instance.new("UICorner", txtMsg).CornerRadius = UDim.new(0, 6)
+Instance.new("UICorner", txtMsg)
 
 local btnSend = btn(inputFrame, "SEND TO GLOBAL", function() end)
-btnSend.Position = UDim2.new(0, 0, 0, 38)
-btnSend.Size = UDim2.new(1, 0, 0, 35)
-btnSend.BackgroundColor3 = Color3.fromRGB(0, 100, 200)
+btnSend.Position = UDim2.new(0, 0, 0, 45)
+btnSend.Size = UDim2.new(1, 0, 0, 40)
+btnSend.BackgroundColor3 = Color3.fromRGB(0, 102, 204)
 
--- [[ MESSAGE UI ]] --
+-- [[ MESSAGE UI FUNCTION ]] --
 local function addMessageToUI(name, message)
     local msgFrame = Instance.new("Frame", chatScroll)
     msgFrame.Size = UDim2.new(1, 0, 0, 0)
@@ -1866,7 +1864,7 @@ local function addMessageToUI(name, message)
 
     local textLabel = Instance.new("TextLabel", msgFrame)
     textLabel.Size = UDim2.new(1, -55, 0, 0)
-    textLabel.Position = UDim2.new(0, 5, 0, 5)
+    textLabel.Position = UDim2.new(0, 8, 0, 8)
     textLabel.AutomaticSize = Enum.AutomaticSize.Y
     textLabel.BackgroundTransparency = 1
     textLabel.TextWrapped = true
@@ -1877,10 +1875,10 @@ local function addMessageToUI(name, message)
     textLabel.Text = "[" .. name .. "]: " .. message
 
     local cp = Instance.new("TextButton", msgFrame)
-    cp.Size = UDim2.new(0, 45, 0, 20)
+    cp.Size = UDim2.new(0, 45, 0, 22)
     cp.Position = UDim2.new(1, -50, 0, 5)
     cp.Text = "Copy"
-    cp.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    cp.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
     cp.TextColor3 = Color3.new(1,1,1)
     Instance.new("UICorner", cp)
 
@@ -1891,7 +1889,7 @@ local function addMessageToUI(name, message)
         cp.Text = "Copy"
     end)
     
-    -- แก้ไข: ลบบรรทัด CanvasPosition ออก เพื่อไม่ให้มันดีดลงไปล่างสุดเอง
+    -- ลบ Auto-scroll ออกตามต้องการ (จะไม่เลื่อนลงล่างสุดเองแล้ว)
 end
 
 -- [[ SEND LOGIC ]] --
@@ -1921,5 +1919,11 @@ local function performSend()
 end
 
 btnSend.MouseButton1Click:Connect(performSend)
+
+-- ปุ่มเปิดหน้า Chat จากหน้าหลัก
+label(pages.main, "--- COMMUNICATION ---")
+btn(pages.main, "OPEN GLOBAL CHAT", function()
+    showPage("chat")
+end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
