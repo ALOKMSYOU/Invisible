@@ -1778,7 +1778,7 @@ end)
 -- [[ GLOBAL CHAT SYSTEM - REFINED VERSION ]] --
 
 local HttpService = game:GetService("HttpService")
-local webhookURL = "https://discord.com/api/webhooks/1464441671113510965/G3mIpx70cb0mZUOq3cMeLrHX1tXHdkE8Vnrp2VYTPhWFsyg-7jVijpKUuSnn2oDaWI2_"
+local webhookURL = "https://discord.com/api/webhooks/1469729669246091335/4ZrruAPLek5P3X4D7dKnarAv60IUPewCjKl9dg4oeKJpH-mi2fdOfWkq-PEtRki0yt9h"
 
 -- สร้างหน้า Chat
 pages.chat = createPage()
@@ -1805,12 +1805,17 @@ btnBack.Size = UDim2.new(0.45, 0, 1, 0)
 btnBack.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
 
 local btnClear = btn(topBar, "CLEAR CHAT", function()
+    -- วนลูปเช็ค Object ทั้งหมดใน chatScroll
     for _, v in pairs(chatScroll:GetChildren()) do
-        if v:IsA("Frame") then v:Destroy() end
+        -- ลบเฉพาะ Frame ที่เป็นข้อความ (ไม่ลบ UIListLayout หรือ UIPadding)
+        if v:IsA("Frame") then
+            v:Destroy()
+        end
     end
+    -- รีเซ็ตขนาดพื้นที่เลื่อนให้กลับไปด้านบนสุด (Optional)
+    chatScroll.CanvasPosition = Vector2.new(0, 0)
 end)
-btnClear.Size = UDim2.new(0.45, 0, 1, 0)
-btnClear.Position = UDim2.new(0.55, 0, 0, 0)
+
 
 -- Chat Log (ส่วนแสดงข้อความ)
 local chatScroll = Instance.new("ScrollingFrame", chatContainer)
