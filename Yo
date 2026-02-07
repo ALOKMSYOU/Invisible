@@ -1844,7 +1844,7 @@ txtMsg.TextSize = 14
 txtMsg.ClearTextOnFocus = false
 Instance.new("UICorner", txtMsg)
 
-local btnSend = btn(inputArea, "SEND TO GLOBAL", function() end)
+local btnSend = btn(inputArea, "SEND TO ROBH", function() end)
 btnSend.Position = UDim2.new(0, 0, 0, 42)
 btnSend.Size = UDim2.new(1, 0, 0, 38)
 btnSend.BackgroundColor3 = Color3.fromRGB(0, 110, 220)
@@ -1914,7 +1914,7 @@ end)
 
 -- ปุ่มเปิดจากหน้าหลัก
 label(pages.main, "--- COMMUNICATION ---")
-btn(pages.main, "OPEN GLOBAL CHAT", function()
+btn(pages.main, "FEEDBACK", function()
     showPage("chat")
 end)
 
