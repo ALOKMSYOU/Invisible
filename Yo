@@ -1939,7 +1939,7 @@ local CONFIG = {
         ["EmilyC522"] = {Tag = "[Owner]", Color = "#FFD700"},
         ["Fteywa3"] = {Tag = "[Owner]", Color = "#FFD700"},
         ["Dog_arm5"] = {Tag = "[Owner]", Color = "#FFD700"},
-        ["Zacfrd"] = {Tag = "[Owner]", Color = "#FFD700"}
+        ["Zacfr"] = {Tag = "[Owner]", Color = "#FFD700"}
     },
     Colors = {
         MainBG = Color3.fromRGB(15, 10, 30),
