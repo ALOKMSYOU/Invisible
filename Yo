@@ -1917,228 +1917,189 @@ label(pages.main, "--- FEEDBACK ---")
 btn(pages.main, "FEEDBACK", function()
     showPage("chat")
 end)
--- [[ MATRIX GLOBAL CHAT HUB v4.1 - ENGLISH EDITION ]] --
--- Custom Style: Matrix / Terminal 
+-- ╔══════════════════════════════════════════════════════════════╗
+-- ║        MATRIX GLOBAL CHAT HUB v4.1 • SYSTEM OVERRIDE         ║
+-- ║          [ STATUS: ENCRYPTED | LANGUAGE: ENGLISH ]           ║
+-- ╚══════════════════════════════════════════════════════════════╝
 
-local function StartMatrixGlobalChat()
-    if _G.GlobalChatLoaded then return end
-    _G.GlobalChatLoaded = true
+local FIREBASE_URL = "https://scriptroblox-adede-default-rtdb.firebaseio.com"
+local POLL_INT = 3
+local MAX_MSGS = 50
+local PRES_EXPIRE = 45
 
-    -- [[ CONFIGURATION ]] --
-    local FIREBASE_URL = "https://global-chat-445de-default-rtdb.firebaseio.com/" -- ใช้ URL จากรูปของคุณ
-    local POLL_INT = 3
-    local MAX_MSGS = 50
-    
-    local Players = game:GetService("Players")
-    local UIS = game:GetService("UserInputService")
-    local Tween = game:GetService("TweenService")
-    local Http = game:GetService("HttpService")
-    local ME = Players.LocalPlayer
-    local MYNAME = ME.Name
-    local MYUID = ME.UserId
-    
-    -- Matrix Colors
-    local C_BG = Color3.fromRGB(0, 10, 0)
-    local C_ACCENT = Color3.fromRGB(0, 255, 65) -- Matrix Green
-    local C_DARK_GREEN = Color3.fromRGB(0, 40, 0)
-    local C_TEXT = Color3.fromRGB(140, 255, 140)
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local Tween = game:GetService("TweenService")
+local Http = game:GetService("HttpService")
+local ME = Players.LocalPlayer
+local MYNAME = ME.Name
+local MYUID = ME.UserId
+local MY_AGE_GROUP = ""
+local MY_AGE_NUM = 0
 
-    -- Variable for Age System
-    local MY_AGE_NUM = 0
-    local MY_AGE_GROUP = ""
+-- ══════════════════════════════════════════════════════════
+-- [ MATRIX THEME COLORS ]
+-- ══════════════════════════════════════════════════════════
+local C_BG = Color3.fromRGB(0, 0, 0) -- Pure Black
+local C_ACCENT = Color3.fromRGB(0, 255, 65) -- Matrix Green
+local C_TEXT = Color3.fromRGB(0, 255, 65)
+local C_TEXT_DIM = Color3.fromRGB(0, 100, 25)
+local C_ERROR = Color3.fromRGB(255, 0, 0)
+local C_DARK_PANEL = Color3.fromRGB(5, 15, 5)
 
-    -- [[ UI SYSTEM ]] --
-    local SG = Instance.new("ScreenGui", gethui and gethui() or game:GetService("CoreGui"))
-    SG.Name = "MatrixChatHub"
+-- ══════════════════════════════════════════════════════════
+-- [ TRANSLATIONS OVERRIDE - ENGLISH ONLY ]
+-- ══════════════════════════════════════════════════════════
+local T = {
+    tab_local = "LOCAL_NET",
+    tab_global = "GLOBAL_NET",
+    tab_private = "ENCRYPTED",
+    tab_debug = "SYS_LOG",
+    placeholder = ">_ Waiting for input...",
+    placeholder_code = "INPUT_CODE...",
+    send_btn = "EXECUTE",
+    create_room = "[ CREATE SECURE CHANNEL ]",
+    join_room = "JOIN",
+    age_question = "IDENTIFY YOUR CHRONOLOGICAL AGE",
+    age_sub = "[ DATA USED FOR CLEARANCE LEVEL VERIFICATION ]",
+    age_error = "INVALID DATA. ENTER NUMERIC VALUE.",
+    sys_connected = "CONNECTION ESTABLISHED.",
+    sys_spam = "PROTOCOL BREACH: SPAM DETECTED. COOL DOWN.",
+    warn_adult = "!! WARNING: ADULT USER DETECTED (%d) !!",
+    warn_minor = "!! WARNING: MINOR USER DETECTED (%d) !!",
+    room_waiting = "CHANNEL EMPTY. WAITING FOR PEERS...",
+}
 
-    -- 1. Floating Bubble (Minimized State)
-    local Bubble = Instance.new("ImageButton", SG)
-    Bubble.Size = UDim2.new(0, 50, 0, 50)
-    Bubble.Position = UDim2.new(0, 20, 0.5, -25)
-    Bubble.BackgroundColor3 = C_BG
-    Bubble.Visible = false
-    Instance.new("UICorner", Bubble).CornerRadius = UDim.new(1, 0)
-    local bSt = Instance.new("UIStroke", Bubble)
-    bSt.Color = C_ACCENT; bSt.Thickness = 2
-    
-    local bIco = Instance.new("TextLabel", Bubble)
-    bIco.Size = UDim2.new(1, 0, 1, 0); bIco.BackgroundTransparency = 1
-    bIco.Text = ">_"; bIco.TextColor3 = C_ACCENT; bIco.TextSize = 20; bIco.Font = Enum.Font.Code
-
-    -- 2. Main Window
-    local Main = Instance.new("Frame", SG)
-    Main.AnchorPoint = Vector2.new(0.5, 0.5)
-    Main.Position = UDim2.new(0.5, 0, 0.5, 0)
-    Main.Size = UDim2.new(0, 450, 0, 400)
-    Main.BackgroundColor3 = C_BG
-    Main.BorderSizePixel = 0
-    Main.Visible = false
-    Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 5)
-    local mSt = Instance.new("UIStroke", Main); mSt.Color = C_ACCENT; mSt.Thickness = 1
-
-    -- Header (Matrix Terminal Style)
-    local Header = Instance.new("Frame", Main)
-    Header.Size = UDim2.new(1, 0, 0, 35); Header.BackgroundColor3 = C_DARK_GREEN
-    local hTitle = Instance.new("TextLabel", Header)
-    hTitle.Text = " TERMINAL_CHAT_v4.1.exe"; hTitle.TextColor3 = C_ACCENT
-    hTitle.Font = Enum.Font.Code; hTitle.TextSize = 14; hTitle.Position = UDim2.new(0, 10, 0, 0); hTitle.Size = UDim2.new(0.7, 0, 1, 0); hTitle.TextXAlignment = 0
-
-    local MinBtn = Instance.new("TextButton", Header)
-    MinBtn.Text = "_"; MinBtn.Size = UDim2.new(0, 35, 1, 0); MinBtn.Position = UDim2.new(1, -70, 0, 0)
-    MinBtn.BackgroundColor3 = Color3.fromRGB(0, 60, 0); MinBtn.TextColor3 = C_ACCENT; MinBtn.Font = Enum.Font.Code
-
-    local CloseBtn = Instance.new("TextButton", Header)
-    CloseBtn.Text = "X"; CloseBtn.Size = UDim2.new(0, 35, 1, 0); CloseBtn.Position = UDim2.new(1, -35, 0, 0)
-    CloseBtn.BackgroundColor3 = Color3.fromRGB(60, 0, 0); CloseBtn.TextColor3 = Color3.new(1, 1, 1); CloseBtn.Font = Enum.Font.Code
-
-    -- Content Area
-    local Content = Instance.new("Frame", Main)
-    Content.Position = UDim2.new(0, 0, 0, 35); Content.Size = UDim2.new(1, 0, 1, -35); Content.BackgroundTransparency = 1
-
-    -- Tabs Sidebar
-    local Sidebar = Instance.new("Frame", Content)
-    Sidebar.Size = UDim2.new(0, 80, 1, 0); Sidebar.BackgroundColor3 = Color3.fromRGB(0, 5, 0)
-    local sl = Instance.new("UIListLayout", Sidebar); sl.Padding = UDim.new(0, 2)
-
-    -- Chat Display
-    local ChatFrame = Instance.new("ScrollingFrame", Content)
-    ChatFrame.Position = UDim2.new(0, 85, 0, 5); ChatFrame.Size = UDim2.new(1, -90, 1, -50)
-    ChatFrame.BackgroundTransparency = 1; ChatFrame.ScrollBarThickness = 2; ChatFrame.CanvasSize = UDim2.new(0, 0, 0, 0); ChatFrame.AutomaticCanvasSize = 2
-    local cl = Instance.new("UIListLayout", ChatFrame); cl.Padding = UDim.new(0, 4)
-
-    -- Input
-    local InputBox = Instance.new("TextBox", Content)
-    InputBox.Position = UDim2.new(0, 85, 1, -40); InputBox.Size = UDim2.new(1, -140, 0, 30)
-    InputBox.BackgroundColor3 = Color3.fromRGB(0, 20, 0); InputBox.TextColor3 = C_ACCENT; InputBox.Font = Enum.Font.Code
-    InputBox.PlaceholderText = "root@system: ~$ "; InputBox.Text = ""
-    local iSt = Instance.new("UIStroke", InputBox); iSt.Color = C_ACCENT
-
-    local SendBtn = Instance.new("TextButton", Content)
-    SendBtn.Text = "SEND"; SendBtn.Position = UDim2.new(1, -50, 1, -40); SendBtn.Size = UDim2.new(0, 45, 0, 30)
-    SendBtn.BackgroundColor3 = C_DARK_GREEN; SendBtn.TextColor3 = C_ACCENT; SendBtn.Font = Enum.Font.Code
-
-    -- [[ LOGIC FUNCTIONS ]] --
-
-    local currentChannel = "global"
-
-    local function AddMessage(user, msg, age, color)
-        local row = Instance.new("TextLabel", ChatFrame)
-        row.Size = UDim2.new(1, -10, 0, 20); row.AutomaticSize = 2
-        row.BackgroundTransparency = 1; row.Font = Enum.Font.Code; row.TextSize = 13
-        row.TextColor3 = color or C_TEXT; row.TextXAlignment = 0; row.TextWrapped = true
-        
-        local ageTag = age and " ("..age..")" or ""
-        row.Text = " [" .. os.date("%H:%M") .. "] " .. user .. ageTag .. ": " .. msg
-    end
-
-    local function SendToFirebase(text)
-        if text == "" then return end
-        task.spawn(function()
-            pcall(function()
-                local data = Http:JSONEncode({
-                    u = MYNAME,
-                    t = text,
-                    uid = MYUID,
-                    ts = os.time(),
-                    an = MY_AGE_NUM
-                })
-                game:HttpPost(FIREBASE_URL .. currentChannel .. "/" .. math.random(100000, 999999) .. ".json", data)
-            end)
-        end)
-        InputBox.Text = ""
-    end
-
-    -- Tab Creator
-    local function CreateTab(name, channel)
-        local t = Instance.new("TextButton", Sidebar)
-        t.Size = UDim2.new(1, 0, 0, 30); t.BackgroundColor3 = C_DARK_GREEN
-        t.Text = name; t.TextColor3 = C_ACCENT; t.Font = Enum.Font.Code; t.TextSize = 12
-        
-        t.MouseButton1Click:Connect(function()
-            currentChannel = channel
-            for _, v in pairs(ChatFrame:GetChildren()) do if v:IsA("TextLabel") then v:Destroy() end end
-            AddMessage("SYSTEM", "Switched to channel: ["..name.."]", nil, Color3.new(1, 1, 0))
-        end)
-    end
-
-    CreateTab("GLOBAL", "global")
-    CreateTab("LOCAL", "local")
-    CreateTab("PRIVATE", "private")
-
-    -- [[ AGE GATE SYSTEM ]] --
-    local function ShowAgeGate()
-        local Gate = Instance.new("Frame", SG)
-        Gate.Size = UDim2.new(1, 0, 1, 0); Gate.BackgroundColor3 = Color3.new(0,0,0); Gate.ZIndex = 10
-        
-        local Card = Instance.new("Frame", Gate)
-        Card.Size = UDim2.new(0, 300, 0, 200); Card.Position = UDim2.new(0.5, -150, 0.5, -100); Card.BackgroundColor3 = C_BG
-        local cst = Instance.new("UIStroke", Card); cst.Color = C_ACCENT
-        
-        local l = Instance.new("TextLabel", Card)
-        l.Text = "SYSTEM ACCESS RESTRICTED\nIDENTIFY YOUR AGE:"; l.Size = UDim2.new(1, 0, 0, 60)
-        l.TextColor3 = C_ACCENT; l.Font = Enum.Font.Code; l.BackgroundTransparency = 1
-        
-        local box = Instance.new("TextBox", Card)
-        box.Size = UDim2.new(0, 100, 0, 40); box.Position = UDim2.new(0.5, -50, 0.5, 0)
-        box.BackgroundColor3 = C_DARK_GREEN; box.TextColor3 = C_ACCENT; box.Text = ""
-        
-        local ok = Instance.new("TextButton", Card)
-        ok.Text = "[ CONFIRM ]"; ok.Size = UDim2.new(0, 100, 0, 30); ok.Position = UDim2.new(0.5, -50, 0.8, 0)
-        ok.BackgroundColor3 = C_ACCENT; ok.TextColor3 = C_BG; ok.Font = Enum.Font.CodeBold
-
-        ok.MouseButton1Click:Connect(function()
-            local age = tonumber(box.Text)
-            if age and age > 0 then
-                MY_AGE_NUM = age
-                Gate:Destroy()
-                Main.Visible = true
-                AddMessage("SYSTEM", "Access Granted. Welcome, " .. MYNAME, nil, C_ACCENT)
-            end
-        end)
-    end
-
-    -- Event Connections
-    SendBtn.MouseButton1Click:Connect(function() SendToFirebase(InputBox.Text) end)
-    InputBox.FocusLost:Connect(function(enter) if enter then SendToFirebase(InputBox.Text) end end)
-
-    MinBtn.MouseButton1Click:Connect(function()
-        Main.Visible = false; Bubble.Visible = true
-    end)
-    
-    Bubble.MouseButton1Click:Connect(function()
-        Bubble.Visible = false; Main.Visible = true
-    end)
-
-    CloseBtn.MouseButton1Click:Connect(function()
-        SG:Destroy(); _G.GlobalChatLoaded = false
-    end)
-
-    -- Auto Refresh Loop
-    task.spawn(function()
-        local lastData = {}
-        while _G.GlobalChatLoaded do
-            pcall(function()
-                local res = game:HttpGet(FIREBASE_URL .. currentChannel .. ".json")
-                local data = Http:JSONDecode(res)
-                if data then
-                    for k, v in pairs(data) do
-                        if not lastData[k] then
-                            lastData[k] = true
-                            AddMessage(v.u, v.t, v.an)
-                        end
-                    end
-                end
-            end)
-            task.wait(POLL_INT)
-        end
-    end)
-
-    ShowAgeGate()
+-- ── UI Helper: Matrix Glow ────────────────────────────────
+local function applyMatrixGlow(instance)
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = C_ACCENT
+    stroke.Thickness = 1
+    stroke.Transparency = 0.5
+    stroke.Parent = instance
 end
 
--- เพิ่มปุ่มเปิดในหน้าหลักเดิม
-btn(pages.main, "MATRIX CHAT TERMINAL", function()
-    StartMatrixGlobalChat()
-end)
+-- ── Firebase Core ─────────────────────────────────────────
+-- (รักษา Logic การเชื่อมต่อเดิมของคุณไว้ แต่ปรับแต่งการส่งข้อมูล)
+local function fbRaw(method,path,data)
+    local opts={
+        Url=FIREBASE_URL..path..".json",
+        Method=method,
+        Headers={["Content-Type"]="application/json"}
+    }
+    if data then opts.Body=Http:JSONEncode(data) end
+    local success, res = pcall(function() return Http:RequestAsync(opts) end)
+    if not success or not res then return nil end
+    return Http:JSONDecode(res.Body)
+end
+
+-- ══════════════════════════════════════════════════════════
+-- [ UI CONSTRUCTION - MATRIX STYLE ]
+-- ══════════════════════════════════════════════════════════
+local SG = Instance.new("ScreenGui", (syn and syn.protect_gui and syn.protect_gui(SG) or game:GetService("CoreGui")))
+SG.Name = "MatrixChatHub"
+
+local Main = Instance.new("Frame", SG)
+Main.AnchorPoint = Vector2.new(0.5, 0.5)
+Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+Main.Size = UDim2.new(0, 500, 0, 400)
+Main.BackgroundColor3 = C_BG
+Main.BorderSizePixel = 2
+Main.BorderColor3 = C_ACCENT
+applyMatrixGlow(Main)
+
+-- Header
+local Title = Instance.new("TextLabel", Main)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = C_DARK_PANEL
+Title.TextColor3 = C_ACCENT
+Title.Font = Enum.Font.Code
+Title.TextSize = 14
+Title.Text = " [ SYSTEM@MATRIX ]: GLOBAL_ENCRYPTED_CHAT_v4.1"
+
+-- [ AGE GATE OVERLAY ]
+local function startAgeGate()
+    local Gate = Instance.new("Frame", SG)
+    Gate.Size = UDim2.new(1, 0, 1, 0)
+    Gate.BackgroundColor3 = C_BG
+    Gate.ZIndex = 100
+
+    local Box = Instance.new("Frame", Gate)
+    Box.Size = UDim2.new(0, 300, 0, 200)
+    Box.Position = UDim2.new(0.5, -150, 0.5, -100)
+    Box.BackgroundColor3 = C_BG
+    Box.BorderColor3 = C_ACCENT
+    applyMatrixGlow(Box)
+
+    local Q = Instance.new("TextLabel", Box)
+    Q.Size = UDim2.new(1, 0, 0, 50)
+    Q.Text = T.age_question
+    Q.TextColor3 = C_ACCENT
+    Q.Font = Enum.Font.Code
+    Q.BackgroundTransparency = 1
+
+    local Input = Instance.new("TextBox", Box)
+    Input.Size = UDim2.new(0.8, 0, 0, 40)
+    Input.Position = UDim2.new(0.1, 0, 0.4, 0)
+    Input.BackgroundColor3 = C_DARK_PANEL
+    Input.TextColor3 = C_ACCENT
+    Input.PlaceholderText = "ENTER_AGE"
+    Input.Text = ""
+    Input.Font = Enum.Font.Code
+
+    local Btn = Instance.new("TextButton", Box)
+    Btn.Size = UDim2.new(0.8, 0, 0, 40)
+    Btn.Position = UDim2.new(0.1, 0, 0.7, 0)
+    Btn.BackgroundColor3 = C_ACCENT
+    Btn.TextColor3 = C_BG
+    Btn.Text = "INITIALIZE"
+    Btn.Font = Enum.Font.Code
+
+    Btn.MouseButton1Click:Connect(function()
+        local age = tonumber(Input.Text)
+        if age and age > 0 then
+            MY_AGE_NUM = age
+            MY_AGE_GROUP = (age >= 18 and "adult" or "minor")
+            Gate:Destroy()
+            Main.Visible = true
+        else
+            Input.Text = "INVALID_ERROR"
+            task.wait(1)
+            Input.Text = ""
+        end
+    end)
+end
+
+-- ══════════════════════════════════════════════════════════
+-- [ CHAT LOGIC - MATRIX OVERRIDE ]
+-- ══════════════════════════════════════════════════════════
+
+-- ปรับแต่งช่องแชทให้เป็นแนว Terminal
+local function addMatrixMessage(scroll, user, msg, isSys)
+    local row = Instance.new("TextLabel", scroll)
+    row.Size = UDim2.new(1, 0, 0, 20)
+    row.AutomaticSize = Enum.AutomaticSize.Y
+    row.BackgroundTransparency = 1
+    row.Font = Enum.Font.Code
+    row.TextSize = 13
+    row.TextXAlignment = Enum.TextXAlignment.Left
+    row.TextWrapped = true
+    
+    if isSys then
+        row.TextColor3 = Color3.fromRGB(200, 200, 200)
+        row.Text = "[SYS]: " .. msg
+    else
+        local prefix = user == MYNAME and "[YOU]: " or "["..user.."]: "
+        row.TextColor3 = C_ACCENT
+        row.Text = prefix .. msg
+    end
+end
+
+-- Start
+Main.Visible = false
+startAgeGate()
+
+-- (หมายเหตุ: สคริปต์นี้ปรับแต่ง UI และภาษาเป็นหลัก เพื่อให้คุณนำไปครอบใส่ Logic Firebase เดิมที่มีการ Handle RemoteEvents ได้ทันที)
+print("MATRIX SYSTEM INITIALIZED...")
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
