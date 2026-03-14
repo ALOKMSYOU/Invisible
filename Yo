@@ -2039,5 +2039,60 @@ task.spawn(function()
         task.wait(3)
     end
 end)
+-- ==========================================
+-- ระบบรวม: Global Chat Tag [Owner] & Join Button
+-- ==========================================
+
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+
+-- รายชื่อผู้ได้รับฉายา (แก้ไขชื่อได้ที่นี่)
+local specialUsers = {
+    ["EmilyC522"] = {tag = "[Owner]", color = "rgb(255, 215, 0)"},
+    ["Fteywa3"] = {tag = "[Owner]", color = "rgb(255, 215, 0)"},
+    ["Dog_arm5"] = {tag = "[Owner]", color = "rgb(255, 215, 0)"},
+    ["Zacfr"] = {tag = "[Owner]", color = "rgb(255, 215, 0)"}
+}
+
+-- 1. ฟังก์ชันจัดการชื่อและปุ่ม (เอาไปใช้ในฟังก์ชัน Update Global Chat ของคุณ)
+local function ProcessGlobalEntry(nameTextObject, parentFrame, targetJobId)
+    local playerName = nameTextObject.Text -- ดึงชื่อจาก Text Label ของแชท
+    
+    -- เช็คว่าเป็น Owner หรือไม่
+    if specialUsers[playerName] then
+        local data = specialUsers[playerName]
+        -- เปลี่ยน Text ให้มีฉายา (รองรับ RichText)
+        nameTextObject.RichText = true
+        nameTextObject.Text = string.format("<font color='%s'>%s</font> %s", data.color, data.tag, playerName)
+    end
+
+    -- 2. สร้างปุ่ม Join ไว้ข้างชื่อในช่องแชท/ลิสต์
+    local JoinBtn = Instance.new("TextButton")
+    JoinBtn.Name = "GlobalJoinBtn"
+    JoinBtn.Size = UDim2.new(0, 45, 0, 18)
+    JoinBtn.Position = UDim2.new(1, -50, 0, 2) -- ปรับตำแหน่งตาม Layout ของคุณ
+    JoinBtn.Text = "JOIN"
+    JoinBtn.Font = Enum.Font.SourceSansBold
+    JoinBtn.TextSize = 12
+    JoinBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+    JoinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 4)
+    Corner.Parent = JoinBtn
+    
+    JoinBtn.Parent = parentFrame
+
+    JoinBtn.MouseButton1Click:Connect(function()
+        if targetJobId and targetJobId ~= "" then
+            setclipboard(targetJobId)
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, targetJobId, Players.LocalPlayer)
+        end
+    end)
+end
+
+-- [วิธีใช้งาน] 
+-- ใน Script แชทของคุณ ตรงจังหวะที่สร้าง Label ใหม่ ให้เรียกใช้แบบนี้:
+-- ProcessGlobalEntry(ข้อความชื่อ, เฟรมแชทนั้นๆ, JobIdของคนส่ง)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
