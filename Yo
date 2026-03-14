@@ -1917,233 +1917,343 @@ label(pages.main, "--- FEEDBACK ---")
 btn(pages.main, "FEEDBACK", function()
     showPage("chat")
 end)
--- [[ GLOBAL CHAT HUB v5.0 - FIREBASE EDITION ]] --
-local HttpService = game:GetService("HttpService")
+-- ══════════════════════════════════════════════════════════════
+--  GLOBAL CHAT v6.0 — TELEKINESIS UI EDITION
+--  วิธีใช้: นำโค้ดนี้ไปวางต่อท้ายสคริปต์ Telekinesis หลักได้เลย
+-- ══════════════════════════════════════════════════════════════
+
+local HttpService2    = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
-local FIREBASE_URL = "https://global-chat-445de-default-rtdb.firebaseio.com"
-local POLL_INT = 2 -- ดึงข้อมูลทุกๆ 3 วินาที
 
--- [[ 5 NEW IDEAS FUNCTIONS ]] --
--- 1. [Server Hop] : กด Join ตามไปเซิร์ฟเวอร์ที่คนนั้นอยู่ได้ทันที
--- 2. [System Broadcast] : แสดงประกาศสำคัญจากเจ้าของสคริปต์ (Owner)
--- 3. [Quick Phrases] : ปุ่มส่งข้อความด่วนสำหรับมือถือ (เช่น "Hello!", "Nice UI!")
--- 4. [Translator Hint] : ใส่ RichText รองรับสีและฟอนต์พิเศษ
--- 5. [Anti-Spam Filter] : ระบบป้องกันการส่งข้อความซ้ำซ้อน
+local FIREBASE   = "https://global-chat-445de-default-rtdb.firebaseio.com"
+local POLL_INT   = 2
+local SPAM_COOL  = 2
 
--- สร้างหน้า Chat ใหม่
+-- ── Owner List ──────────────────────────────────────────────
+local GlobalOwners = {
+    ["Fteywa3"]   = true,
+    ["EmilyC522"] = true,
+    ["Dog_arm5"]  = true,
+    ["Zacfr"]     = true,
+}
+local GOLD     = "#FFD700"
+local OWNER_BG = Color3.fromRGB(50, 44, 18)
+
+-- ── สร้างหน้า Chat ใน pages เดิม ──────────────────────────
 pages.chat = createPage()
 local chatPage = pages.chat
 
--- UI Elements Setup
-label(chatPage, "--- GLOBAL HUB v5.0 ---")
+-- ── ปุ่มเปิด Chat จากหน้าหลัก ─────────────────────────────
+label(pages.main, "--- GLOBAL CHAT ---")
+local chatOpenBtn = btn(pages.main, "🌐 GLOBAL CHAT v6.0", function()
+    showPage("chat")
+end)
+chatOpenBtn.BackgroundColor3 = Color3.fromRGB(30, 60, 130)
+chatOpenBtn.Font = Enum.Font.GothamBold
 
-local scroll = Instance.new("ScrollingFrame", chatPage)
-scroll.Size = UDim2.new(1, 0, 0, 180)
-scroll.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-scroll.BorderSizePixel = 0
-scroll.ScrollBarThickness = 2
-scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+-- ══════════════════════════════════════════════════════════════
+--  CHAT PAGE UI
+-- ══════════════════════════════════════════════════════════════
 
-local layout = Instance.new("UIListLayout", scroll)
-layout.Padding = UDim.new(0, 4)
-layout.SortOrder = Enum.SortOrder.LayoutOrder
+-- หัวข้อ
+local chatTitle = Instance.new("TextLabel", chatPage)
+chatTitle.Size               = UDim2.new(1, 0, 0, 22)
+chatTitle.BackgroundColor3   = Color3.fromRGB(20, 30, 60)
+chatTitle.Text               = "🌐  GLOBAL CHAT  v6.0"
+chatTitle.Font               = Enum.Font.GothamBold
+chatTitle.TextSize           = 13
+chatTitle.TextColor3         = Color3.fromRGB(160, 180, 255)
+chatTitle.BorderSizePixel    = 0
+Instance.new("UICorner", chatTitle).CornerRadius = UDim.new(0, 6)
 
--- ช่องพิมพ์ข้อความ
-local input = Instance.new("TextBox", chatPage)
-input.Size = UDim2.new(1, 0, 0, 30)
-input.PlaceholderText = "Type message Scroll up"
-input.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-input.TextColor3 = Color3.new(1,1,1)
-input.Font = Enum.Font.Gotham
-input.Text = ""
+-- กรอบแสดงข้อความ
+local scrollBg = Instance.new("Frame", chatPage)
+scrollBg.Size             = UDim2.new(1, 0, 0, 180)
+scrollBg.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
+scrollBg.BorderSizePixel  = 0
+Instance.new("UICorner", scrollBg).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", scrollBg).Color = Color3.fromRGB(50, 50, 90)
 
--- [[ 3. QUICK PHRASES (Idea #3) ]] --
-local quickFrame = Instance.new("Frame", chatPage)
-quickFrame.Size = UDim2.new(1, 0, 0, 25)
-quickFrame.BackgroundTransparency = 1
-local qLayout = Instance.new("UIListLayout", quickFrame)
+local scroll = Instance.new("ScrollingFrame", scrollBg)
+scroll.Size                  = UDim2.new(1, -4, 1, -4)
+scroll.Position              = UDim2.new(0, 2, 0, 2)
+scroll.BackgroundTransparency= 1
+scroll.BorderSizePixel       = 0
+scroll.ScrollBarThickness    = 3
+scroll.ScrollBarImageColor3  = Color3.fromRGB(80, 80, 180)
+scroll.AutomaticCanvasSize   = Enum.AutomaticSize.Y
+scroll.CanvasSize            = UDim2.new(0,0,0,0)
+
+local msgLayout = Instance.new("UIListLayout", scroll)
+msgLayout.Padding   = UDim.new(0, 3)
+msgLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local msgPad = Instance.new("UIPadding", scroll)
+msgPad.PaddingLeft   = UDim.new(0, 3)
+msgPad.PaddingRight  = UDim.new(0, 3)
+msgPad.PaddingTop    = UDim.new(0, 3)
+msgPad.PaddingBottom = UDim.new(0, 3)
+
+-- กรอบพิมพ์ข้อความ
+local inputBg = Instance.new("Frame", chatPage)
+inputBg.Size             = UDim2.new(1, 0, 0, 30)
+inputBg.BackgroundColor3 = Color3.fromRGB(28, 28, 44)
+inputBg.BorderSizePixel  = 0
+Instance.new("UICorner", inputBg).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", inputBg).Color = Color3.fromRGB(60, 60, 110)
+
+local input = Instance.new("TextBox", inputBg)
+input.Size               = UDim2.new(1, -70, 1, -6)
+input.Position           = UDim2.new(0, 8, 0, 3)
+input.BackgroundTransparency = 1
+input.PlaceholderText    = "พิมพ์ข้อความ..."
+input.PlaceholderColor3  = Color3.fromRGB(100, 100, 130)
+input.Text               = ""
+input.Font               = Enum.Font.Gotham
+input.TextSize           = 12
+input.TextColor3         = Color3.new(1,1,1)
+input.ClearTextOnFocus   = false
+
+local sendBtn2 = Instance.new("TextButton", inputBg)
+sendBtn2.Size             = UDim2.fromOffset(56, 22)
+sendBtn2.Position         = UDim2.new(1, -60, 0.5, -11)
+sendBtn2.BackgroundColor3 = Color3.fromRGB(50, 80, 200)
+sendBtn2.Text             = "SEND"
+sendBtn2.Font             = Enum.Font.GothamBold
+sendBtn2.TextSize         = 11
+sendBtn2.TextColor3       = Color3.new(1,1,1)
+sendBtn2.BorderSizePixel  = 0
+Instance.new("UICorner", sendBtn2).CornerRadius = UDim.new(0, 6)
+
+-- Quick Phrases
+local qFrame = Instance.new("Frame", chatPage)
+qFrame.Size             = UDim2.new(1, 0, 0, 24)
+qFrame.BackgroundTransparency = 1
+
+local qLayout = Instance.new("UIListLayout", qFrame)
 qLayout.FillDirection = Enum.FillDirection.Horizontal
-qLayout.Padding = UDim.new(0, 5)
+qLayout.Padding       = UDim.new(0, 4)
 
-local function createQuickBtn(txt)
-    local b = btn(quickFrame, txt, function() input.Text = txt end)
-    b.Size = UDim2.new(0.23, 0, 1, 0)
-    b.TextSize = 10
-end
-createQuickBtn("Hello!")
-createQuickBtn("Nice UI!")
-createQuickBtn("Ez")
-createQuickBtn("GG")
-
--- ปุ่มส่ง
-local sendBtn = btn(chatPage, "SEND TO GLOBAL", function() end)
-sendBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
-
--- [[ FIREBASE LOGIC ]] --
-local function fbReq(method, path, data)
-    local req = (syn and syn.request) or (http and http.request) or request or http_request
-    if not req then return nil end
-    local success, res = pcall(function()
-        return req({
-            Url = FIREBASE_URL .. path .. ".json",
-            Method = method,
-            Headers = {["Content-Type"] = "application/json"},
-            Body = data and HttpService:JSONEncode(data) or nil
-        })
-    end)
-    return success and res and HttpService:JSONDecode(res.Body) or nil
+local PHRASES = {"Hello! 👋", "Nice!", "Ez 😎", "GG!", "Bruh 💀"}
+for _, phrase in ipairs(PHRASES) do
+    local b = Instance.new("TextButton", qFrame)
+    b.Size             = UDim2.new(0, 56, 1, 0)
+    b.BackgroundColor3 = Color3.fromRGB(30, 30, 52)
+    b.Text             = phrase
+    b.Font             = Enum.Font.Gotham
+    b.TextSize         = 9
+    b.TextColor3       = Color3.fromRGB(160, 160, 255)
+    b.BorderSizePixel  = 0
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    b.MouseButton1Click:Connect(function() input.Text = phrase end)
 end
 
--- [[ ADD MESSAGE UI (Idea #1 & #4) ]] --
-local function addMsg(user, text, jobId)
-    local f = Instance.new("Frame", scroll)
-    f.Size = UDim2.new(1, -5, 0, 35)
-    f.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
-    
-    local t = Instance.new("TextLabel", f)
-    t.Size = UDim2.new(1, -65, 1, 0)
-    t.Position = UDim2.new(0, 10, 0, 0)
-    t.BackgroundTransparency = 1
-    t.RichText = true
-    t.TextColor3 = Color3.new(1, 1, 1)
-    t.TextXAlignment = Enum.TextXAlignment.Left
-    t.Font = Enum.Font.GothamMedium
-    t.TextSize = 13
+-- Status label
+local statusLbl = Instance.new("TextLabel", chatPage)
+statusLbl.Size               = UDim2.new(1, 0, 0, 14)
+statusLbl.BackgroundTransparency = 1
+statusLbl.Text               = "● Firebase connected"
+statusLbl.Font               = Enum.Font.Gotham
+statusLbl.TextSize           = 9
+statusLbl.TextColor3         = Color3.fromRGB(70, 200, 90)
+statusLbl.TextXAlignment     = Enum.TextXAlignment.Left
 
-    local displayName = ""
-    if GlobalOwners[user] then
-        displayName = string.format("<b><font color='%s'>[OWNER] %s</font></b>", GOLD_COLOR, user)
-        f.BackgroundColor3 = Color3.fromRGB(45, 42, 25)
-        f.LayoutOrder = -1
-    else
-        displayName = "<b>" .. user .. "</b>"
+-- Clear + Back buttons
+local bottomRow = Instance.new("Frame", chatPage)
+bottomRow.Size             = UDim2.new(1, 0, 0, 26)
+bottomRow.BackgroundTransparency = 1
+local botLayout = Instance.new("UIListLayout", bottomRow)
+botLayout.FillDirection = Enum.FillDirection.Horizontal
+botLayout.Padding       = UDim.new(0, 5)
+
+local function botBtn(txt, col)
+    local b = btn(bottomRow, txt, function() end)
+    b.Size             = UDim2.new(0.5, -2, 1, 0)
+    b.BackgroundColor3 = col
+    return b
+end
+
+local clearBtn2 = botBtn("🗑 CLEAR", Color3.fromRGB(130, 35, 35))
+clearBtn2.MouseButton1Click:Connect(function()
+    for _, v in ipairs(scroll:GetChildren()) do
+        if v:IsA("Frame") then v:Destroy() end
     end
-
-    t.Text = displayName .. ": " .. text
-
-    if jobId and jobId ~= "" and jobId ~= game.JobId then
-        local j = btn(f, "JOIN", function()
-            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, jobId, LP)
-        end)
-        j.Size = UDim2.new(0, 50, 0, 24)
-        j.Position = UDim2.new(1, -55, 0.5, -12)
-        j.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
-    end
-    
-    scroll.CanvasPosition = Vector2.new(0, scroll.AbsoluteCanvasSize.Y + 40)
-end
--- ส่งข้อความ (Idea #5 Anti-Spam)
-local lastSent = ""
-sendBtn.MouseButton1Click:Connect(function()
-    local msg = input.Text
-    if msg == "" or msg == lastSent then return end
-    lastSent = msg
-    
-    task.spawn(function()
-        fbReq("POST", "/global", {
-            u = LP.Name,
-            t = msg,
-            job = game.JobId,
-            ts = os.time()
-        })
-    end)
-    input.Text = ""
 end)
 
--- ระบบ Real-time ดึงข้อมูล
-local cache = {}
+local backBtn = botBtn("◀ BACK", Color3.fromRGB(50, 50, 50))
+backBtn.MouseButton1Click:Connect(function() showPage("main") end)
+
+-- ══════════════════════════════════════════════════════════════
+--  LOGIC: addMsg (Owner Tag + Server Hop)
+-- ══════════════════════════════════════════════════════════════
+local msgCount = 0
+local cache    = {}
+
+local function addChatMsg(user, text, jobId)
+    msgCount += 1
+    local isOwner = GlobalOwners[user] == true
+
+    local f = Instance.new("Frame", scroll)
+    f.Size             = UDim2.new(1, 0, 0, 36)
+    f.BackgroundColor3 = isOwner and OWNER_BG or Color3.fromRGB(22, 22, 34)
+    f.BorderSizePixel  = 0
+    f.LayoutOrder      = isOwner and -msgCount or msgCount
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
+
+    -- แถบทองด้านซ้ายสำหรับ Owner
+    if isOwner then
+        local accent = Instance.new("Frame", f)
+        accent.Size             = UDim2.new(0, 3, 1, -6)
+        accent.Position         = UDim2.new(0, 0, 0, 3)
+        accent.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+        accent.BorderSizePixel  = 0
+        Instance.new("UICorner", accent).CornerRadius = UDim.new(0, 3)
+    end
+
+    local t = Instance.new("TextLabel", f)
+    t.Size               = UDim2.new(1, jobId and -54 or -10, 1, 0)
+    t.Position           = UDim2.new(0, isOwner and 8 or 6, 0, 0)
+    t.BackgroundTransparency = 1
+    t.RichText           = true
+    t.TextWrapped        = true
+    t.TextColor3         = Color3.new(1,1,1)
+    t.TextXAlignment     = Enum.TextXAlignment.Left
+    t.TextYAlignment     = Enum.TextYAlignment.Center
+    t.Font               = Enum.Font.GothamMedium
+    t.TextSize           = 11
+
+    local displayName
+    if isOwner then
+        displayName = string.format(
+            "<b><font color='%s'>👑[OWNER] %s</font></b>",
+            GOLD, user
+        )
+    else
+        displayName = string.format(
+            "<b><font color='#9999FF'>%s</font></b>", user
+        )
+    end
+    t.Text = displayName .. "<font color='#CCCCCC'>: " .. text .. "</font>"
+
+    -- ปุ่ม JOIN ถ้าคนละเซิร์ฟ
+    if jobId and jobId ~= "" and jobId ~= game.JobId then
+        local j = Instance.new("TextButton", f)
+        j.Size             = UDim2.fromOffset(42, 20)
+        j.Position         = UDim2.new(1, -46, 0.5, -10)
+        j.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+        j.Text             = "JOIN"
+        j.Font             = Enum.Font.GothamBold
+        j.TextSize         = 10
+        j.TextColor3       = Color3.new(1,1,1)
+        j.BorderSizePixel  = 0
+        Instance.new("UICorner", j).CornerRadius = UDim.new(0, 5)
+        j.MouseButton1Click:Connect(function()
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, LP)
+        end)
+    end
+
+    task.defer(function()
+        scroll.CanvasPosition = Vector2.new(0, scroll.AbsoluteCanvasSize.Y + 9999)
+    end)
+end
+
+-- ══════════════════════════════════════════════════════════════
+--  FIREBASE HELPERS
+-- ══════════════════════════════════════════════════════════════
+local function fbReq(method, path, data)
+    local req = (syn and syn.request)
+             or (http and http.request)
+             or request
+             or http_request
+    if not req then
+        statusLbl.Text      = "✕ HTTP not supported"
+        statusLbl.TextColor3= Color3.fromRGB(220, 60, 60)
+        return nil
+    end
+    local ok, res = pcall(function()
+        return req({
+            Url     = FIREBASE .. path .. ".json",
+            Method  = method,
+            Headers = {["Content-Type"] = "application/json"},
+            Body    = data and HttpService2:JSONEncode(data) or nil
+        })
+    end)
+    if not ok or not res then return nil end
+    local dok, decoded = pcall(HttpService2.JSONDecode, HttpService2, res.Body)
+    return dok and decoded or nil
+end
+
+-- ══════════════════════════════════════════════════════════════
+--  ANTI-SPAM + SEND
+-- ══════════════════════════════════════════════════════════════
+local lastSentMsg = ""
+local lastSentAt  = 0
+
+local function setStatus(msg, col, resetSec)
+    statusLbl.Text      = msg
+    statusLbl.TextColor3= col
+    if resetSec then
+        task.delay(resetSec, function()
+            statusLbl.Text      = "● Firebase connected"
+            statusLbl.TextColor3= Color3.fromRGB(70, 200, 90)
+        end)
+    end
+end
+
+local function trySend()
+    local msg = input.Text:match("^%s*(.-)%s*$")
+    if msg == "" then return end
+    if msg == lastSentMsg then
+        setStatus("⚠ ข้อความซ้ำ!", Color3.fromRGB(255, 180, 0), 2)
+        return
+    end
+    if (os.clock() - lastSentAt) < SPAM_COOL then
+        setStatus("⚠ รอ " .. SPAM_COOL .. "s ก่อนส่งใหม่", Color3.fromRGB(255, 180, 0), 2)
+        return
+    end
+    lastSentMsg = msg
+    lastSentAt  = os.clock()
+    input.Text  = ""
+
+    task.spawn(function()
+        fbReq("POST", "/global", {
+            u   = LP.Name,
+            t   = msg,
+            job = game.JobId,
+            ts  = os.time()
+        })
+    end)
+end
+
+sendBtn2.MouseButton1Click:Connect(trySend)
+input.FocusLost:Connect(function(enter) if enter then trySend() end end)
+
+-- ══════════════════════════════════════════════════════════════
+--  REAL-TIME POLLING
+-- ══════════════════════════════════════════════════════════════
 task.spawn(function()
     while task.wait(POLL_INT) do
-        if pages.chat.Visible then
+        if pages.chat and pages.chat.Visible then
             local data = fbReq("GET", "/global")
             if data then
+                local sorted = {}
                 for id, msg in pairs(data) do
                     if not cache[id] then
-                        cache[id] = true
-                        addMsg(msg.u, msg.t, msg.job)
-                        scroll.CanvasPosition = Vector2.new(0, scroll.AbsoluteCanvasSize.Y)
+                        table.insert(sorted, {id = id, msg = msg})
                     end
+                end
+                table.sort(sorted, function(a, b)
+                    return (a.msg.ts or 0) < (b.msg.ts or 0)
+                end)
+                for _, entry in ipairs(sorted) do
+                    cache[entry.id] = true
+                    addChatMsg(entry.msg.u or "?", entry.msg.t or "", entry.msg.job)
                 end
             end
         end
     end
 end)
 
--- ปุ่มเข้าหน้า Chat จากหน้าหลัก
-btn(pages.main, "🌐 GLOBAL CHAT V5.0", function() showPage("chat") end)
-btn(chatPage, "◀ BACK TO MAIN", function() showPage("main") end)
-
-print("Global Chat v5.0 (5-Ideas Edition) Loaded!")
--- [[ GLOBAL CHAT: GOLDEN OWNER TAG SYSTEM ]] --
-
--- รายชื่อ Owner ที่จะได้รับ Tag และชื่อสีทอง
-local GlobalOwners = {
-    ["Fteywa3"] = true,
-    ["Zacfr"] = true,
-    ["EmilyC522"] = true,
-    ["Dog_arm5"] = true
-}
-
--- สีทองสำหรับ Owner (Gold Hex)
-local GOLD_COLOR = "#FFD700"
-
--- อัปเดตฟังก์ชันแสดงผลข้อความ
-local function addMsg(user, text, jobId)
-    local f = Instance.new("Frame", scroll)
-    f.Size = UDim2.new(1, -5, 0, 35)
-    f.BackgroundColor3 = Color3.fromRGB(30, 30, 30) -- สีพื้นหลังแชทปกติ
-    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
-    
-    local t = Instance.new("TextLabel", f)
-    t.Size = UDim2.new(1, -65, 1, 0)
-    t.Position = UDim2.new(0, 10, 0, 0)
-    t.BackgroundTransparency = 1
-    t.RichText = true -- เปิดใช้ RichText เพื่อแสดงสี
-    t.TextColor3 = Color3.new(1, 1, 1)
-    t.TextXAlignment = Enum.TextXAlignment.Left
-    t.Font = Enum.Font.GothamMedium
-    t.TextSize = 13
-
-    -- เช็คว่าเป็น Owner หรือไม่
-    local displayName = ""
-    if GlobalOwners[user] then
-        -- ถ้าเป็น Owner: [OWNER] ชื่อ (ทั้งแถบเป็นสีทอง)
-        displayName = string.format("<b><font color='%s'>[OWNER] %s</font></b>", GOLD_COLOR, user)
-        f.BackgroundColor3 = Color3.fromRGB(45, 42, 25) -- ปรับพื้นหลังให้อมทองจางๆ
-        f.LayoutOrder = -1 -- ให้แชท Owner อยู่บนๆ เสมอ (ถ้าต้องการ)
-    else
-        -- ถ้าคนปกติ: ชื่อสีขาวปกติ
-        displayName = "<b>" .. user .. "</b>"
-    end
-
-    t.Text = displayName .. ": " .. text
-
-    -- ปุ่ม Join (ระบบย้ายเซิร์ฟ)
-    if jobId and jobId ~= "" and jobId ~= game.JobId then
-        local j = btn(f, "JOIN", function()
-            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, jobId, LP)
-        end)
-        j.Size = UDim2.new(0, 50, 0, 24)
-        j.Position = UDim2.new(1, -55, 0.5, -12)
-        j.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
-    end
-    
-    -- เลื่อนหน้าจอลงล่างสุดอัตโนมัติ
-    scroll.CanvasPosition = Vector2.new(0, scroll.AbsoluteCanvasSize.Y + 40)
-end
-
--- เพิ่มปุ่ม Clear Chat (Client) ไว้ท้ายหน้า Chat
-if pages.chat then
-    local clearBtn = btn(pages.chat, "🗑️ CLEAR CLIENT CHAT", function()
-        for _, v in pairs(scroll:GetChildren()) do
-            if v:IsA("Frame") then v:Destroy() end
-        end
-    end)
-    clearBtn.BackgroundColor3 = Color3.fromRGB(130, 40, 40)
-    clearBtn.Size = UDim2.new(1, 0, 0, 25)
-end
-
-print("Golden Owner Tags System Loaded!")
+print("✅ Global Chat v6.0 (Telekinesis Edition) Loaded!")
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))()
