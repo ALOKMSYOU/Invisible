@@ -1998,31 +1998,41 @@ end
 local function addMsg(user, text, jobId)
     local f = Instance.new("Frame", scroll)
     f.Size = UDim2.new(1, -5, 0, 35)
-    f.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    Instance.new("UICorner", f)
+    f.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
     
     local t = Instance.new("TextLabel", f)
-    t.Size = UDim2.new(1, -60, 1, 0)
-    t.Position = UDim2.new(0, 8, 0, 0)
+    t.Size = UDim2.new(1, -65, 1, 0)
+    t.Position = UDim2.new(0, 10, 0, 0)
     t.BackgroundTransparency = 1
     t.RichText = true
-    t.Text = "<b>" .. user .. "</b>: " .. text
-    t.TextColor3 = Color3.new(1,1,1)
-    t.TextXAlignment = "Left"
-    t.Font = "Gotham"
-    t.TextSize = 12
+    t.TextColor3 = Color3.new(1, 1, 1)
+    t.TextXAlignment = Enum.TextXAlignment.Left
+    t.Font = Enum.Font.GothamMedium
+    t.TextSize = 13
 
-    -- ปุ่ม JOIN เซิร์ฟเวอร์ (Idea #1)
+    local displayName = ""
+    if GlobalOwners[user] then
+        displayName = string.format("<b><font color='%s'>[OWNER] %s</font></b>", GOLD_COLOR, user)
+        f.BackgroundColor3 = Color3.fromRGB(45, 42, 25)
+        f.LayoutOrder = -1
+    else
+        displayName = "<b>" .. user .. "</b>"
+    end
+
+    t.Text = displayName .. ": " .. text
+
     if jobId and jobId ~= "" and jobId ~= game.JobId then
         local j = btn(f, "JOIN", function()
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, LP)
+            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, jobId, LP)
         end)
-        j.Size = UDim2.new(0, 45, 0, 22)
-        j.Position = UDim2.new(1, -50, 0.5, -11)
-        j.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
+        j.Size = UDim2.new(0, 50, 0, 24)
+        j.Position = UDim2.new(1, -55, 0.5, -12)
+        j.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
     end
+    
+    scroll.CanvasPosition = Vector2.new(0, scroll.AbsoluteCanvasSize.Y + 40)
 end
-
 -- ส่งข้อความ (Idea #5 Anti-Spam)
 local lastSent = ""
 sendBtn.MouseButton1Click:Connect(function()
