@@ -1917,5 +1917,104 @@ label(pages.main, "--- COMMUNICATION ---")
 btn(pages.main, "FEEDBACK", function()
     showPage("chat")
 end)
+-- ==========================================
+-- [ ส่วนต่อท้าย: ระบบล่องหน FE + กันของหลุดมือ ]
+-- ==========================================
+
+local runService = game:GetService("RunService")
+local ghost_active = false
+local appearance_data = {}
+local ghost_loop
+local guardian_loop
+
+-- ระยะปลอดภัย (ปรับแต่งได้)
+local NET_LIMIT = 75 -- ระยะสูงสุดที่จะไม่หลุดมือ
+local HIDE_OFFSET = 55 -- ความสูงที่ส่งร่างไปซ่อน
+
+-- สร้างปุ่มใหม่ใน main frame เดิมของคุณ (ถ้ามี main อยู่แล้วจะใช้ main นั้น)
+local invisBtnFE = Instance.new("TextButton", main)
+invisBtnFE.Size = UDim2.new(1, -10, 0, 30)
+invisBtnFE.Position = UDim2.new(0, 5, 0, 115) -- ขยับลงมาไม่ให้ทับปุ่มเก่า
+invisBtnFE.Text = "Turn on Invis"
+invisBtnFE.BackgroundColor3 = Color3.fromRGB(100, 0, 255)
+invisBtnFE.TextColor3 = Color3.new(1, 1, 1)
+invisBtnFE.Font = Enum.Font.FredokaOne
+invisBtnFE.TextSize = 12
+
+-- ระบบตรวจจับและดึงของกลับอัตโนมัติ
+local function startGuardianSystem(root)
+    guardian_loop = runService.Heartbeat:Connect(function()
+        if not ghost_active then return end
+        
+        -- ค้นหาวัตถุที่เรากำลังคุมอยู่ (เช็คจาก Network Ownership)
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and obj.ReceiveAge == 0 and not obj:IsAncestorOf(character) then
+                local dist = (obj.Position - root.Position).Magnitude
+                if dist > NET_LIMIT then
+                    -- ดึงกลับเข้าหารัศมีควบคุม
+                    local pullDir = (root.Position - obj.Position).Unit
+                    obj.Velocity = pullDir * 120 -- แรงดึงกลับ
+                end
+            end
+        end
+    end)
+end
+
+invisBtnFE.MouseButton1Click:Connect(function()
+    if sound then sound:Play() end
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local root = char.HumanoidRootPart
+
+    ghost_active = not ghost_active
+
+    if ghost_active then
+        -- 1. บันทึกและปรับโปร่งใส 0.5
+        for _, v in pairs(char:GetDescendants()) do
+            if (v:IsA("BasePart") or v:IsA("Decal")) and v.Name ~= "HumanoidRootPart" then
+                appearance_data[v] = v.Transparency
+                v.Transparency = 0.5
+            end
+        end
+
+        -- 2. Loop ย้ายร่างไปซ่อน (FE)
+        ghost_loop = runService.RenderStepped:Connect(function()
+            if ghost_active and char:FindFirstChild("HumanoidRootPart") then
+                for _, part in pairs(char:GetChildren()) do
+                    if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                        part.CFrame = root.CFrame * CFrame.new(0, HIDE_OFFSET, 0)
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+
+        startGuardianSystem(root)
+        
+        invisBtnFE.Text = "Turn off (reset)"
+        invisBtnFE.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    else
+        -- ปิดระบบ
+        if ghost_loop then ghost_loop:Disconnect() end
+        if guardian_loop then guardian_loop:Disconnect() end
+        
+        -- คืนค่าเดิมเท่าที่ทำได้ (แนะนำให้ Reset ตัวละครจะดีที่สุด)
+        for part, trans in pairs(appearance_data) do
+            if part and part.Parent then part.Transparency = trans end
+        end
+        
+        char.Humanoid.Health = 0 -- ต้อง Reset เพราะตัดข้อต่อ Joint ไปแล้วในสายตา Server
+        ghost_active = false
+        invisBtnFE.Text = "Turn on Invis"
+        invisBtnFE.BackgroundColor3 = Color3.fromRGB(100, 0, 255)
+    end
+end)
+
+-- รีเซ็ตค่าเมื่อตัวละครตาย
+player.CharacterAdded:Connect(function()
+    ghost_active = false
+    if ghost_loop then ghost_loop:Disconnect() end
+    if guardian_loop then guardian_loop:Disconnect() end
+end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
