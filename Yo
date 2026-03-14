@@ -1917,231 +1917,193 @@ label(pages.main, "--- FEEDBACK ---")
 btn(pages.main, "FEEDBACK", function()
     showPage("chat")
 end)
--- [[ CONFIGURATION & DATABASE ]] --
-local FIREBASE_URL = "https://global-chat-445de-default-rtdb.firebaseio.com/"
-local HttpService = game:GetService("HttpService")
-local chatCache = {}
+-- [[ GLOBAL CHAT HUB v4.1 • ENGLISH EDITION ]] --
+-- Features: Real-time Firebase, Owner Tags, Join JobID, Mobile Optimization
 
--- [[ 1. สร้างหน้า Global Chat UI ]] --
-pages.globalChat = createPage()
+local FIREBASE_URL = "https://global-chat-445de-default-rtdb.firebaseio.com"
+local POLL_INT = 3
+local MAX_MSGS = 50
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local Tween = game:GetService("TweenService")
+local Http = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
 
--- [[ 2. เพิ่มปุ่มในหน้า Main เพื่อเปิด Chat ]] --
-if pages.main then
-    label(pages.main, "--- NETWORK ---")
-    btn(pages.main, "🌐 OPEN GLOBAL CHAT", function()
-        showPage("globalChat")
-    end).BackgroundColor3 = Color3.fromRGB(0, 150, 100)
-end
+local ME = Players.LocalPlayer
+local MYNAME = ME.Name
+local MYUID = ME.UserId
 
--- [[ 3. ออกแบบหน้า Global Chat ]] --
-label(pages.globalChat, "🌐 GLOBAL SERVER MESSAGES")
+-- 1. Configuration & Owner List
+local CONFIG = {
+    Owners = {
+        ["EmilyC522"] = {Tag = "[Owner]", Color = "#FFD700"},
+        ["Fteywa3"] = {Tag = "[Owner]", Color = "#FFD700"},
+        ["Dog_arm5"] = {Tag = "[Owner]", Color = "#FFD700"},
+        ["Zacfrd"] = {Tag = "[Owner]", Color = "#FFD700"}
+    },
+    Colors = {
+        MainBG = Color3.fromRGB(15, 10, 30),
+        Accent = Color3.fromRGB(100, 60, 255),
+        Text = Color3.fromRGB(255, 255, 255),
+        OwnerGold = Color3.fromRGB(255, 215, 0)
+    }
+}
 
--- ส่วนแสดงผลข้อความ
-local chatScroll = Instance.new("ScrollingFrame", pages.globalChat)
-chatScroll.Size = UDim2.new(1, 0, 0, 180)
-chatScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-chatScroll.BorderSizePixel = 0
-chatScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-chatScroll.ScrollBarThickness = 2
-
-local chatLayout = Instance.new("UIListLayout", chatScroll)
-chatLayout.Padding = UDim.new(0, 4)
-chatLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    chatScroll.CanvasSize = UDim2.new(0, 0, 0, chatLayout.AbsoluteContentSize.Y)
-end)
-
--- ฟังก์ชันเพิ่มข้อความลงบนจอ
-local function addLocalMsg(user, text)
-    local msgBtn = btn(chatScroll, "[" .. user .. "]: " .. text, function()
-        setclipboard(text) -- คลิกที่ข้อความเพื่อ Copy
+-- 2. HTTP Helper (For Firebase)
+local function fbRequest(method, path, data)
+    local url = FIREBASE_URL .. path .. ".json"
+    local options = {
+        Url = url,
+        Method = method,
+        Headers = {["Content-Type"] = "application/json"}
+    }
+    if data then options.Body = Http:JSONEncode(data) end
+    
+    local success, result = pcall(function()
+        -- Support for most executors
+        local req = (syn and syn.request) or (http and http.request) or request or http_request
+        if req then
+            return req(options)
+        end
     end)
-    msgBtn.Size = UDim2.new(1, -5, 0, 24)
-    msgBtn.TextXAlignment = Enum.TextXAlignment.Left
-    msgBtn.BackgroundColor3 = (user == LP.Name) and Color3.fromRGB(40, 60, 40) or Color3.fromRGB(35, 35, 35)
-    msgBtn.TextColor3 = (user == LP.Name) and Color3.fromRGB(255, 255, 100) or Color3.fromRGB(0, 255, 150)
-    msgBtn.TextSize = 11
-    -- Auto Scroll ไปล่างสุด
-    chatScroll.CanvasPosition = Vector2.new(0, 99999)
+    
+    if success and result then
+        return Http:JSONDecode(result.Body)
+    end
+    return nil
 end
 
--- ช่องพิมพ์ข้อความ
-local chatInput = Instance.new("TextBox", pages.globalChat)
-chatInput.Size = UDim2.new(1, 0, 0, 30)
-chatInput.PlaceholderText = "Type message here..."
-chatInput.Text = ""
-chatInput.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-chatInput.TextColor3 = Color3.new(1, 1, 1)
-Instance.new("UICorner", chatInput)
+-- 3. Core UI Setup
+local SG = Instance.new("ScreenGui", game:GetService("CoreGui"))
+SG.Name = "GlobalChat_v4_1"
 
--- [[ 4. ระบบรับ-ส่งข้อมูล (Firebase Logic) ]] --
+local MainFrame = Instance.new("Frame", SG)
+MainFrame.Size = UDim2.new(0, 400, 0, 300)
+MainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+MainFrame.BackgroundColor3 = CONFIG.Colors.MainBG
+MainFrame.BorderSizePixel = 0
+Instance.new("UICorner", MainFrame)
 
-local function fetchGlobalMessages()
-    pcall(function()
-        local raw = game:HttpGet(FIREBASE_URL .. "Chat.json")
-        local data = HttpService:JSONDecode(raw)
+-- Scrolling Container for Messages
+local Scroll = Instance.new("ScrollingFrame", MainFrame)
+Scroll.Size = UDim2.new(1, -20, 1, -80)
+Scroll.Position = UDim2.new(0, 10, 0, 40)
+Scroll.BackgroundTransparency = 1
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+Scroll.ScrollBarThickness = 2
+
+local UIList = Instance.new("UIListLayout", Scroll)
+UIList.SortOrder = Enum.SortOrder.LayoutOrder
+UIList.Padding = UDim.new(0, 5)
+
+-- 4. Function: Create Chat Message Row
+local function AddChatMessage(sender, text, jobId, isRealtime)
+    local row = Instance.new("Frame", Scroll)
+    row.Size = UDim2.new(1, 0, 0, 30)
+    row.BackgroundTransparency = 0.9
+    row.BackgroundColor3 = Color3.new(1,1,1)
+    Instance.new("UICorner", row)
+
+    local txtLabel = Instance.new("TextLabel", row)
+    txtLabel.Size = UDim2.new(1, -60, 1, 0)
+    txtLabel.Position = UDim2.new(0, 5, 0, 0)
+    txtLabel.BackgroundTransparency = 1
+    txtLabel.TextColor3 = CONFIG.Colors.Text
+    txtLabel.TextXAlignment = Enum.TextXAlignment.Left
+    txtLabel.RichText = true
+    txtLabel.Font = Enum.Font.Gotham
+    txtLabel.TextSize = 14
+
+    -- Apply Owner Tags
+    local prefix = ""
+    if CONFIG.Owners[sender] then
+        prefix = string.format("<font color='%s'>%s</font> ", CONFIG.Owners[sender].Color, CONFIG.Owners[sender].Tag)
+    end
+    txtLabel.Text = prefix .. "<b>" .. sender .. "</b>: " .. text
+
+    -- Join Button (If JobID exists)
+    if jobId and jobId ~= "" then
+        local jBtn = Instance.new("TextButton", row)
+        jBtn.Size = UDim2.new(0, 45, 0, 20)
+        jBtn.Position = UDim2.new(1, -50, 0.5, -10)
+        jBtn.Text = "JOIN"
+        jBtn.BackgroundColor3 = CONFIG.Colors.Accent
+        jBtn.TextColor3 = Color3.new(1,1,1)
+        jBtn.Font = Enum.Font.GothamBold
+        jBtn.TextSize = 10
+        Instance.new("UICorner", jBtn)
+
+        jBtn.MouseButton1Click:Connect(function()
+            setclipboard(jobId)
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, ME)
+        end)
+    end
+
+    -- Auto Scroll
+    Scroll.CanvasPosition = Vector2.new(0, Scroll.AbsoluteCanvasSize.Y)
+end
+
+-- 5. Sending Logic
+local Input = Instance.new("TextBox", MainFrame)
+Input.Size = UDim2.new(1, -70, 0, 30)
+Input.Position = UDim2.new(0, 10, 1, -40)
+Input.PlaceholderText = "Type your message..."
+Input.Text = ""
+
+local SendBtn = Instance.new("TextButton", MainFrame)
+SendBtn.Size = UDim2.new(0, 50, 0, 30)
+SendBtn.Position = UDim2.new(1, -60, 1, -40)
+SendBtn.Text = "SEND"
+SendBtn.BackgroundColor3 = CONFIG.Colors.Accent
+SendBtn.TextColor3 = Color3.new(1,1,1)
+
+local function SendMessage()
+    local text = Input.Text
+    if text ~= "" then
+        fbRequest("POST", "/global", {
+            u = MYNAME,
+            t = text,
+            job = game.JobId,
+            ts = os.time()
+        })
+        Input.Text = ""
+    end
+end
+
+SendBtn.MouseButton1Click:Connect(SendMessage)
+
+-- 6. Polling & Refresh (Real-time Simulation)
+local knownMessages = {}
+task.spawn(function()
+    while true do
+        local data = fbRequest("GET", "/global")
         if data then
-            for id, val in pairs(data) do
-                if not chatCache[id] then
-                    chatCache[id] = true
-                    addLocalMsg(val.u or "Player", val.t or "")
+            for id, msg in pairs(data) do
+                if not knownMessages[id] then
+                    knownMessages[id] = true
+                    AddChatMessage(msg.u, msg.t, msg.job)
                 end
             end
         end
-    end)
-end
-
-local function sendGlobalMessage()
-    local msg = chatInput.Text
-    if msg == "" then return end
-    chatInput.Text = ""
-    
-    -- แสดงผลบนจอตัวเองทันที (Instant Feedback)
-    addLocalMsg(LP.Name, msg)
-    
-    task.spawn(function()
-        pcall(function()
-            local data = {u = LP.Name, t = msg, ts = os.time()}
-            -- ใช้ HttpPost สำหรับ Firebase
-            game:HttpPost(FIREBASE_URL .. "Chat.json", HttpService:JSONEncode(data))
-        end)
-    end)
-end
-
-chatInput.FocusLost:Connect(function(enter) if enter then sendGlobalMessage() end end)
-
--- [[ 5. ปุ่มควบคุมเพิ่มเติม ]] --
-local controlFrame = Instance.new("Frame", pages.globalChat)
-controlFrame.Size = UDim2.new(1, 0, 0, 30)
-controlFrame.BackgroundTransparency = 1
-Instance.new("UIListLayout", controlFrame).FillDirection = Enum.FillDirection.Horizontal
-
--- ปุ่ม Refresh
-btn(controlFrame, "🔄 REFRESH", function()
-    fetchGlobalMessages()
-end).Size = UDim2.new(0.5, -2, 1, 0)
-
--- ปุ่ม Clear (เฉพาะหน้าจอผู้รัน)
-btn(controlFrame, "🧹 CLEAR LOCAL", function()
-    for _, child in pairs(chatScroll:GetChildren()) do
-        if child:IsA("TextButton") then child:Destroy() end
-    end
-    chatCache = {} -- ล้าง Cache เพื่อให้โหลดใหม่ได้
-end).Size = UDim2.new(0.5, -2, 1, 0)
-
-btn(pages.globalChat, "◀ BACK TO MAIN", function() showPage("main") end)
-
--- [[ 6. Background Loop (Sync ทุก 3 วินาที) ]] --
-task.spawn(function()
-    while true do
-        if pages.globalChat.Visible then
-            fetchGlobalMessages()
-        end
-        task.wait(3)
+        task.wait(POLL_INT)
     end
 end)
--- =======================================================
--- GLOBAL CHAT SYSTEM (REAL-TIME + OWNER TAG + JOIN JOBID)
--- =======================================================
 
-local Players = game:GetService("Players")
-local TeleportService = game:GetService("TeleportService")
+-- Refresh Button Function (Clear view)
+local Refresh = Instance.new("TextButton", MainFrame)
+Refresh.Size = UDim2.new(0, 60, 0, 20)
+Refresh.Position = UDim2.new(1, -70, 0, 10)
+Refresh.Text = "Refresh"
+Refresh.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Refresh.TextColor3 = Color3.new(1,1,1)
 
--- 1. Configuration (รายชื่อเจ้าของ)
-local ownerConfig = {
-    ["EmilyC522"] = {tag = "[Owner]", color = "#FFD700"},
-    ["Fteywa3"] = {tag = "[Owner]", color = "#FFD700"},
-    ["Dog_arm5"] = {tag = "[Owner]", color = "#FFD700"},
-    ["Zacfr"] = {tag = "[Owner]", color = "#FFD700"}
-}
-
--- 2. อ้างอิง UI (ปรับชื่อให้ตรงกับ UI ของคุณ)
-local GlobalScrollingFrame = script.Parent:WaitForChild("ScrollingFrame") -- ช่องที่ข้อความแชทเด้งขึ้นมา
-local RefreshButton = script.Parent:WaitForChild("RefreshButton") -- ปุ่ม Refresh
-local ClearButton = script.Parent:WaitForChild("ClearButton") -- ปุ่ม Clear Chat
-
--- 3. ฟังก์ชันปรับแต่งข้อความ (เพิ่ม Tag และปุ่ม Join)
-local function StyleChatRow(frame)
-    if not frame:IsA("Frame") then return end
-    
-    -- รอให้ระบบหลักใส่ข้อมูลสักครู่
-    task.wait(0.05)
-    
-    local nameLabel = frame:FindFirstChild("NameLabel") or frame:FindFirstChildOfClass("TextLabel")
-    local jobId = frame:GetAttribute("JobID") or "" 
-    
-    if nameLabel then
-        local rawName = nameLabel.Text:gsub("%s+", "") -- ลบช่องว่างเพื่อเช็คชื่อ
-        
-        -- ถ้าเป็น Owner ให้ใส่ฉายา
-        if ownerConfig[rawName] then
-            local data = ownerConfig[rawName]
-            nameLabel.RichText = true
-            nameLabel.Text = string.format("<font color='%s'>%s</font> %s", data.color, data.tag, rawName)
-        end
-        
-        -- สร้างปุ่ม JoinJobID (เพิ่มไว้ท้ายแถว)
-        if not frame:FindFirstChild("JoinBtn") then
-            local JoinBtn = Instance.new("TextButton")
-            JoinBtn.Name = "JoinBtn"
-            JoinBtn.Size = UDim2.new(0, 40, 0, 18)
-            JoinBtn.Position = UDim2.new(1, -45, 0.5, -9)
-            JoinBtn.Text = "JOIN"
-            JoinBtn.Font = Enum.Font.SourceSansBold
-            JoinBtn.TextSize = 10
-            JoinBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
-            JoinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            JoinBtn.ZIndex = 10
-            
-            local Corner = Instance.new("UICorner")
-            Corner.CornerRadius = UDim.new(0, 4)
-            Corner.Parent = JoinBtn
-            
-            JoinBtn.Parent = frame
-            
-            JoinBtn.MouseButton1Click:Connect(function()
-                if jobId ~= "" then
-                    setclipboard(jobId)
-                    TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, Players.LocalPlayer)
-                end
-            end)
-        end
+Refresh.MouseButton1Click:Connect(function()
+    for _, child in pairs(Scroll:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
     end
-end
-
--- 4. ระบบ Real-time (เด้งทันทีที่มีคนแชท)
-GlobalScrollingFrame.ChildAdded:Connect(function(child)
-    StyleChatRow(child)
+    knownMessages = {} -- Reset to fetch fresh
 end)
 
--- 5. ระบบ Clear & Refresh แบบไม่โหลดของเก่า
-local function ClearCurrentChat()
-    for _, child in pairs(GlobalScrollingFrame:GetChildren()) do
-        if child:IsA("Frame") or child:IsA("TextLabel") then
-            child:Destroy()
-        end
-    end
-end
-
--- เมื่อกด Clear Chat
-if ClearButton then
-    ClearButton.MouseButton1Click:Connect(function()
-        ClearCurrentChat()
-        -- ส่งสัญญาณไปบอก Script หลักของคุณว่าไม่ต้องโหลดแชทชุดเก่า (ถ้ามีระบบเก็บ Cache)
-    end)
-end
-
--- เมื่อกด Refresh (ล้างของเก่าและรอรับเฉพาะของใหม่)
-if RefreshButton then
-    RefreshButton.MouseButton1Click:Connect(function()
-        ClearCurrentChat()
-        -- ตรงนี้มักจะไปสั่งยิง RemoteEvent เพื่อดึงข้อมูลล่าสุด (ถ้าคุณมีระบบ Backend)
-        -- แต่ตามเงื่อนไขของคุณคือ Refresh แล้วจะไม่โชว์อันที่เพิ่งลบไป
-    end)
-end
-
--- รันครั้งแรกเผื่อมีค้างอยู่
-for _, child in pairs(GlobalScrollingFrame:GetChildren()) do
-    StyleChatRow(child)
-end
+print("[Global Chat] Loaded with Firebase!")
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
