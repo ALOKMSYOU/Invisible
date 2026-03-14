@@ -1951,7 +1951,7 @@ layout.SortOrder = Enum.SortOrder.LayoutOrder
 -- ช่องพิมพ์ข้อความ
 local input = Instance.new("TextBox", chatPage)
 input.Size = UDim2.new(1, 0, 0, 30)
-input.PlaceholderText = "Type message..."
+input.PlaceholderText = "Type message Scroll up"
 input.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 input.TextColor3 = Color3.new(1,1,1)
 input.Font = Enum.Font.Gotham
