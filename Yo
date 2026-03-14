@@ -1917,5 +1917,106 @@ label(pages.main, "--- COMMUNICATION ---")
 btn(pages.main, "FEEDBACK", function()
     showPage("chat")
 end)
+-- 📥 ส่วนที่นำไปต่อท้ายสคริปต์ Telekinesis UI ของคุณ 📥
+
+-- 1. ตัวอย่างการสร้างปุ่ม (แก้ชื่อ 'MainTab' ให้ตรงกับเมนูของคุณ)
+TelekinesisUI_F3X_Pro:AddButton({
+	Name = "Global Chat Hub",
+	Callback = function()
+		if _G.GlobalChatLoaded then
+            warn("Global Chat already running!")
+            return 
+        end
+        _G.LaunchGlobalChat()
+	end    
+})
+
+-- 2. ตัวโค้ดหลัก (English & Adjusted)
+_G.LaunchGlobalChat = function()
+    _G.GlobalChatLoaded = true
+    
+    local FIREBASE_URL = "https://global-chat-445de-default-rtdb.firebaseio.com"
+    local FIREBASE_SECRET = "CcyYBOhfyKfqeTW6tUOOLv8JHRUtxkhPA7yLE1cZ"
+    local POLL_INT = 3
+    local MAX_MSGS = 50
+    local PRES_EXPIRE = 45
+
+    local Players = game:GetService("Players")
+    local UIS = game:GetService("UserInputService")
+    local Tween = game:GetService("TweenService")
+    local Http = game:GetService("HttpService")
+    local ME = Players.LocalPlayer
+    local MYNAME = ME.Name
+    local MYUID = ME.UserId
+    local MY_AGE_GROUP = ""
+    local MY_AGE_NUM = 0
+
+    -- ══════════════════════════════════════════════════════════
+    -- TRANSLATIONS (English Default)
+    -- ══════════════════════════════════════════════════════════
+    local CURRENT_LANG = "en"
+    local TRANSLATIONS = {
+        en = {
+            tab_local = "Local", tab_global = "Global", tab_brasil = "Brazil", tab_usa = "USA", tab_private = "Private", tab_debug = "Debug",
+            placeholder = "Type here...", placeholder_prv = "Private message...", placeholder_code= "Room code...", send_btn = ">>>",
+            create_room = "✨ Create Private Room", creating_room = "⏳ Creating...", join_room = "Join",
+            room_created = "· you created", room_joined = "· you joined", room_waiting = "📭 Empty room. Share the code!",
+            room_active = "✅ Room active!", room_empty = "📭 Empty. Be the first!", room_connected= "✅ Connected!",
+            room_not_found= "❌ Room not found!", room_expired = "❌ Room not found or expired.",
+            invalid_code = "⚠️ Invalid code!", room_private_title = "🔒 Global Private Room",
+            room_private_sub = "Create or join with a code", invite_title = " invited you!",
+            invite_room = "Private room: ", invite_accept = "✔ Join", invite_decline= "✕ Decline",
+            report_btn = "🚨 Report", reported_btn = "✔ Reported", invite_prv_btn= "+ Priv Room",
+            invite_sent = "✔ Invited!", invite_sending= "Sending...", create_first = "Create room first!",
+            warn_adult = "⚠️ This user is an adult (%d yrs).", warn_minor = "⚠️ This user is a minor (%d yrs).",
+            age_question = "How old are you?", age_sub = "ℹ️ Enter your age to continue.",
+            age_placeholder= "e.g. 18", age_ok = "OK", age_error = "Invalid age!",
+            sys_local = "✅ Local chat connected!", sys_connecting= "🔗 Connecting [%s]...",
+            sys_executor = "Executor: ", sys_debug_sub = "Diagnostics Ready.",
+            sys_diag_start= "🔍 Starting...", sys_diag_ok = "✅ Firebase OK!",
+            sys_diag_nohttp="❌ No HTTP!", sys_diag_test = "📡 Testing...",
+            sys_diag_nofire="❌ No Response!", sys_diag_block= "❌ Firebase Blocked!",
+            btn_test_conn = "🔍 Test Connection", btn_testing = "Testing...",
+            sys_spam = "⛔ Spam! Wait 8s.", sys_wait = "⏳ Wait %ds", left_msg = "👋 %s left",
+        }
+    }
+
+    local function T(key, ...)
+        local tbl = TRANSLATIONS[CURRENT_LANG] or TRANSLATIONS["en"]
+        local str = tbl[key] or key
+        if select("#",...) > 0 then return string.format(str, ...) end
+        return str
+    end
+
+    -- ── HTTP Helper (Firebase URL with Auth) ────────────────
+    local function doRequest(opts)
+        local success, req = pcall(function() return request or syn.request or http_request end)
+        if success and req then
+            local r = req(opts)
+            return {Success = (r.StatusCode >= 200 and r.StatusCode < 300), Body = r.Body, StatusCode = r.StatusCode}
+        else
+            -- Fallback to HttpService (Only works in Studio or specific environments)
+            local ok, body = pcall(function() return Http:GetAsync(opts.Url) end)
+            return {Success = ok, Body = body, StatusCode = ok and 200 or 400}
+        end
+    end
+
+    local function fbRaw(method, path, data)
+        local url = FIREBASE_URL..path..".json?auth="..FIREBASE_SECRET
+        local opts = {Url = url, Method = method, Headers = {["Content-Type"] = "application/json"}}
+        if data then opts.Body = Http:JSONEncode(data) end
+        local res = doRequest(opts)
+        if not res or not res.Body then return nil, "no_response" end
+        if res.Body == "null" then return {}, nil end
+        local ok, d = pcall(Http.JSONDecode, Http, res.Body)
+        return ok and d or {}, nil
+    end
+
+    -- [แทรกโค้ดสร้าง GUI ของคุณทั้งหมดที่นี่ โดยเปลี่ยนข้อความเป็น T("key")]
+    -- หมายเหตุ: เนื่องจากสคริปต์ GUI ยาวมาก ให้คุณนำโค้ด GUI เดิมของคุณมาวางต่อจากส่วนนี้ 
+    -- และตรวจสอบให้แน่ใจว่าได้เปลี่ยนข้อความ (Text) เป็นการเรียกใช้ฟังก์ชัน T(...) แล้ว
+    
+    print("[Global Chat Hub] Global Chat Launched Successfully (English)")
+end
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
