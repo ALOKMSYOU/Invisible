@@ -1924,135 +1924,184 @@ local HttpService = game:GetService("HttpService")
 local ME = Players.LocalPlayer
 
 -- [[ THEME ]]
-local C_BG = Color3.fromRGB(0, 5, 0)
+local C_BG = Color3.fromRGB(0, 0, 0)
 local C_ACCENT = Color3.fromRGB(0, 255, 65)
+local C_RED = Color3.fromRGB(200, 0, 0)
 
 -- [[ UI ROOT ]]
 local SG = Instance.new("ScreenGui", ME.PlayerGui)
-SG.Name = "TelekinesisSystem"
+SG.Name = "Telekinesis_GlobalSystem"
 SG.ResetOnSpawn = false
 
--- [[ MAIN MENU FRAME (Telekinesis) ]]
+-- [[ MAIN MENU (TELEKINESIS) ]]
 local MainMenu = Instance.new("Frame", SG)
-MainMenu.Name = "MainMenu"
-MainMenu.Size = UDim2.new(0, 300, 0, 350)
-MainMenu.Position = UDim2.new(0.5, -150, 0.5, -175)
-MainMenu.BackgroundColor3 = C_BG
-MainMenu.BorderSizePixel = 2
-MainMenu.BorderColor3 = C_ACCENT
+MainMenu.Size = UDim2.new(0, 250, 0, 380)
+MainMenu.Position = UDim2.new(0, 50, 0.5, -190)
+MainMenu.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainMenu.BorderSizePixel = 0
+MainMenu.Visible = true
 
-local Title = Instance.new("TextLabel", MainMenu)
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundColor3 = C_ACCENT
-Title.TextColor3 = Color3.new(0,0,0)
-Title.Font = Enum.Font.Code
-Title.Text = "TELEKINESIS CONTROL"
-Title.TextSize = 16
+local MainCorner = Instance.new("UICorner", MainMenu)
+MainCorner.CornerRadius = UDim.new(0, 8)
 
--- [[ BUTTON TO OPEN CHAT ]]
-local OpenChatBtn = Instance.new("TextButton", MainMenu)
-OpenChatBtn.Size = UDim2.new(0.8, 0, 0, 40)
-OpenChatBtn.Position = UDim2.new(0.1, 0, 0.8, 0)
-OpenChatBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-OpenChatBtn.TextColor3 = C_ACCENT
-OpenChatBtn.Text = "> OPEN_GLOBAL_CHAT"
-OpenChatBtn.Font = Enum.Font.Code
-OpenChatBtn.BorderSizePixel = 1
-OpenChatBtn.BorderColor3 = C_ACCENT
+local MainTitle = Instance.new("TextLabel", MainMenu)
+MainTitle.Size = UDim2.new(1, 0, 0, 40)
+MainTitle.BackgroundTransparency = 1
+MainTitle.Text = "TELEKINESIS UI 1.6"
+MainTitle.TextColor3 = Color3.new(1,1,1)
+MainTitle.Font = Enum.Font.GothamBold
+MainTitle.TextSize = 14
 
--- [[ GLOBAL CHAT FRAME ]]
-local ChatMenu = Instance.new("Frame", SG)
-ChatMenu.Name = "ChatMenu"
-ChatMenu.Size = UDim2.new(0, 350, 0, 300)
-ChatMenu.Position = UDim2.new(0.5, -175, 0.5, -150)
-ChatMenu.BackgroundColor3 = C_BG
-ChatMenu.BorderSizePixel = 2
-ChatMenu.BorderColor3 = C_ACCENT
-ChatMenu.Visible = false -- เริ่มต้นให้ปิดไว้
+-- ปุ่มเข้าหน้า Global Chat
+local GlobalChatBtn = Instance.new("TextButton", MainMenu)
+GlobalChatBtn.Size = UDim2.new(0.9, 0, 0, 35)
+GlobalChatBtn.Position = UDim2.new(0.05, 0, 0.85, 0)
+GlobalChatBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+GlobalChatBtn.Text = "GLOBAL CHAT"
+GlobalChatBtn.TextColor3 = C_ACCENT
+GlobalChatBtn.Font = Enum.Font.GothamSemibold
+GlobalChatBtn.TextSize = 12
 
--- Back to Main Button
-local BackBtn = Instance.new("TextButton", ChatMenu)
-BackBtn.Size = UDim2.new(0, 100, 0, 25)
-BackBtn.Position = UDim2.new(0, 0, 0, -30) -- อยู่ด้านบนของกรอบแชท
-BackBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-BackBtn.TextColor3 = Color3.new(1,1,1)
+-- [[ GLOBAL CHAT INTERFACE ]]
+local ChatFrame = Instance.new("Frame", SG)
+ChatFrame.Size = UDim2.new(0, 320, 0, 380)
+ChatFrame.Position = UDim2.new(0.5, -160, 0.5, -190)
+ChatFrame.BackgroundColor3 = C_BG
+ChatFrame.BorderColor3 = C_ACCENT
+ChatFrame.BorderSizePixel = 2
+ChatFrame.Visible = false
+
+local ChatTitle = Instance.new("TextLabel", ChatFrame)
+ChatTitle.Size = UDim2.new(1, 0, 0, 35)
+ChatTitle.BackgroundColor3 = C_ACCENT
+ChatTitle.Text = "TELEKINESIS GLOBAL CHAT"
+ChatTitle.TextColor3 = Color3.new(0,0,0)
+ChatTitle.Font = Enum.Font.Code
+ChatTitle.TextSize = 14
+
+-- ปุ่ม Back to Main
+local BackBtn = Instance.new("TextButton", ChatFrame)
+BackBtn.Size = UDim2.new(0.45, 0, 0, 25)
+BackBtn.Position = UDim2.new(0.05, 0, 1, 5)
+BackBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 BackBtn.Text = "< BACK TO MAIN"
+BackBtn.TextColor3 = Color3.new(1,1,1)
 BackBtn.Font = Enum.Font.Code
-BackBtn.TextSize = 12
+BackBtn.TextSize = 10
 
-local ChatScroll = Instance.new("ScrollingFrame", ChatMenu)
-ChatScroll.Size = UDim2.new(1, -20, 1, -80)
-ChatScroll.Position = UDim2.new(0, 10, 0, 40)
-ChatScroll.BackgroundTransparency = 1
-ChatScroll.CanvasSize = UDim2.new(0,0,0,0)
-ChatScroll.ScrollBarThickness = 3
-ChatScroll.ScrollBarImageColor3 = C_ACCENT
+-- ปุ่ม Clear Chat (เฉพาะผู้รัน)
+local ClearBtn = Instance.new("TextButton", ChatFrame)
+ClearBtn.Size = UDim2.new(0.45, 0, 0, 25)
+ClearBtn.Position = UDim2.new(0.5, 5, 1, 5)
+ClearBtn.BackgroundColor3 = C_RED
+ClearBtn.Text = "CLEAR LOCAL"
+ClearBtn.TextColor3 = Color3.new(1,1,1)
+ClearBtn.Font = Enum.Font.Code
+ClearBtn.TextSize = 10
 
-local UIList = Instance.new("UIListLayout", ChatScroll)
-UIList.Padding = UDim.new(0, 5)
+local Scroll = Instance.new("ScrollingFrame", ChatFrame)
+Scroll.Size = UDim2.new(1, -20, 1, -110)
+Scroll.Position = UDim2.new(0, 10, 0, 45)
+Scroll.BackgroundTransparency = 1
+Scroll.CanvasSize = UDim2.new(0,0,0,0)
+Scroll.ScrollBarThickness = 2
+Scroll.ScrollBarImageColor3 = C_ACCENT
 
-local Input = Instance.new("TextBox", ChatMenu)
-Input.Size = UDim2.new(1, -20, 0, 30)
-Input.Position = UDim2.new(0, 10, 1, -40)
-Input.BackgroundColor3 = Color3.fromRGB(0, 20, 0)
-Input.TextColor3 = C_ACCENT
-Input.PlaceholderText = "> Type message..."
-Input.Font = Enum.Font.Code
+local List = Instance.new("UIListLayout", Scroll)
+List.Padding = UDim.new(0, 5)
+
+local Input = Instance.new("TextBox", ChatFrame)
+Input.Size = UDim2.new(0.9, 0, 0, 35)
+Input.Position = UDim2.new(0.05, 0, 1, -45)
+Input.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 Input.Text = ""
+Input.PlaceholderText = "Type global message..."
+Input.TextColor3 = C_ACCENT
+Input.Font = Enum.Font.Code
+Input.TextSize = 12
 
--- [[ LOGIC: SWITCHING ]]
-OpenChatBtn.MouseButton1Click:Connect(function()
-    MainMenu.Visible = false
-    ChatMenu.Visible = true
-end)
+-- [[ FUNCTIONS ]]
 
-BackBtn.MouseButton1Click:Connect(function()
-    ChatMenu.Visible = false
-    MainMenu.Visible = true
-end)
-
--- [[ CHAT FUNCTIONALITY ]]
 local function AddMsg(user, text)
-    local msg = Instance.new("TextLabel", ChatScroll)
-    msg.Size = UDim2.new(1, 0, 0, 20)
+    local msg = Instance.new("TextLabel", Scroll)
+    msg.Size = UDim2.new(1, 0, 0, 18)
     msg.AutomaticSize = Enum.AutomaticSize.Y
     msg.BackgroundTransparency = 1
-    msg.TextColor3 = C_ACCENT
+    msg.TextColor3 = (user == ME.Name) and Color3.new(1, 1, 0) or C_ACCENT
     msg.Font = Enum.Font.Code
+    msg.TextSize = 12
     msg.Text = "[" .. user .. "]: " .. text
     msg.TextXAlignment = Enum.TextXAlignment.Left
     msg.TextWrapped = true
-    ChatScroll.CanvasPosition = Vector2.new(0, 99999)
+    Scroll.CanvasPosition = Vector2.new(0, 99999)
 end
 
-Input.FocusLost:Connect(function(enter)
-    if enter and Input.Text ~= "" then
-        local content = Input.Text
-        Input.Text = ""
-        pcall(function()
-            local data = {u = ME.Name, t = content, ts = os.time()}
-            game:HttpPost(FIREBASE_URL .. "Chat.json", HttpService:JSONEncode(data))
-        end)
+-- ระบบสลับหน้า
+GlobalChatBtn.MouseButton1Click:Connect(function()
+    MainMenu.Visible = false
+    ChatFrame.Visible = true
+end)
+
+BackBtn.MouseButton1Click:Connect(function()
+    ChatFrame.Visible = false
+    MainMenu.Visible = true
+end)
+
+-- ปุ่ม Clear (ลบเฉพาะหน้าจอตัวเอง)
+ClearBtn.MouseButton1Click:Connect(function()
+    for _, child in pairs(Scroll:GetChildren()) do
+        if child:IsA("TextLabel") then child:Destroy() end
     end
 end)
 
+-- ระบบส่งข้อความ
+local function SendMessage()
+    if Input.Text ~= "" then
+        local msg = Input.Text
+        Input.Text = ""
+        pcall(function()
+            local data = {u = ME.Name, t = msg, ts = os.time()}
+            game:HttpPost(FIREBASE_URL .. "Chat.json", HttpService:JSONEncode(data))
+        end)
+    end
+end
+
+Input.FocusLost:Connect(function(enter) if enter then SendMessage() end end)
+
+-- ระบบ Auto-Refresh (Real-time Sync)
 task.spawn(function()
-    local lastSeen = {}
+    local cache = {}
     while true do
         pcall(function()
-            local res = game:HttpGet(FIREBASE_URL .. "Chat.json")
-            local data = HttpService:JSONDecode(res)
+            local raw = game:HttpGet(FIREBASE_URL .. "Chat.json")
+            local data = HttpService:JSONDecode(raw)
             if data then
                 for id, val in pairs(data) do
-                    if not lastSeen[id] then
-                        lastSeen[id] = true
+                    if not cache[id] then
+                        cache[id] = true
                         AddMsg(val.u or "Player", val.t or "")
                     end
                 end
             end
         end)
-        task.wait(3)
+        task.wait(2) -- รีเฟรชทุก 2 วินาทีเพื่อให้ดู Real-time
     end
 end)
+
+-- ลาก UI ได้
+local function MakeDraggable(frame)
+    local dragStart, startPos
+    frame.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragStart = i.Position; startPos = frame.Position end end)
+    game:GetService("UserInputService").InputChanged:Connect(function(i)
+        if dragStart and i.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = i.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    game:GetService("UserInputService").InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragStart = nil end end)
+end
+
+MakeDraggable(MainMenu)
+MakeDraggable(ChatFrame)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
