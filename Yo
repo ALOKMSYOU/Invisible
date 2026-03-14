@@ -1917,106 +1917,228 @@ label(pages.main, "--- FEEDBACK ---")
 btn(pages.main, "FEEDBACK", function()
     showPage("chat")
 end)
--- [[ GLOBAL CHAT HUB INTEGRATION - FIXED VERSION ]] --
+-- [[ MATRIX GLOBAL CHAT HUB v4.1 - ENGLISH EDITION ]] --
+-- Custom Style: Matrix / Terminal 
 
-local function StartGlobalChatHub()
-    if _G.GlobalChatLoaded then 
-        showPage("globalChat") 
-        return 
-    end
+local function StartMatrixGlobalChat()
+    if _G.GlobalChatLoaded then return end
     _G.GlobalChatLoaded = true
 
-    -- ใช้ URL จากรูปภาพของคุณ
-    local FIREBASE_URL = "https://global-chat-445de-default-rtdb.firebaseio.com/"
-    local MYNAME = game:GetService("Players").LocalPlayer.Name
-    local Http = game:GetService("HttpService")
-
-    pages.globalChat = createPage()
-    label(pages.globalChat, "--- GLOBAL CHAT HUB ---")
-
-    local display = Instance.new("ScrollingFrame", pages.globalChat)
-    display.Size = UDim2.new(1, 0, 0, 200)
-    display.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    display.CanvasSize = UDim2.new(0, 0, 0, 0)
-    display.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    -- [[ CONFIGURATION ]] --
+    local FIREBASE_URL = "https://global-chat-445de-default-rtdb.firebaseio.com/" -- ใช้ URL จากรูปของคุณ
+    local POLL_INT = 3
+    local MAX_MSGS = 50
     
-    local layout = Instance.new("UIListLayout", display)
-    layout.Padding = UDim.new(0, 5)
+    local Players = game:GetService("Players")
+    local UIS = game:GetService("UserInputService")
+    local Tween = game:GetService("TweenService")
+    local Http = game:GetService("HttpService")
+    local ME = Players.LocalPlayer
+    local MYNAME = ME.Name
+    local MYUID = ME.UserId
+    
+    -- Matrix Colors
+    local C_BG = Color3.fromRGB(0, 10, 0)
+    local C_ACCENT = Color3.fromRGB(0, 255, 65) -- Matrix Green
+    local C_DARK_GREEN = Color3.fromRGB(0, 40, 0)
+    local C_TEXT = Color3.fromRGB(140, 255, 140)
 
-    local function addMsg(user, text)
-        local l = Instance.new("TextLabel", display)
-        l.Size = UDim2.new(1, -10, 0, 20)
-        l.BackgroundTransparency = 1
-        l.Text = "[" .. user .. "]: " .. text
-        l.TextColor3 = Color3.new(1, 1, 1)
-        l.TextXAlignment = Enum.TextXAlignment.Left
-        l.Font = Enum.Font.GothamSemibold
-        l.TextSize = 14
+    -- Variable for Age System
+    local MY_AGE_NUM = 0
+    local MY_AGE_GROUP = ""
+
+    -- [[ UI SYSTEM ]] --
+    local SG = Instance.new("ScreenGui", gethui and gethui() or game:GetService("CoreGui"))
+    SG.Name = "MatrixChatHub"
+
+    -- 1. Floating Bubble (Minimized State)
+    local Bubble = Instance.new("ImageButton", SG)
+    Bubble.Size = UDim2.new(0, 50, 0, 50)
+    Bubble.Position = UDim2.new(0, 20, 0.5, -25)
+    Bubble.BackgroundColor3 = C_BG
+    Bubble.Visible = false
+    Instance.new("UICorner", Bubble).CornerRadius = UDim.new(1, 0)
+    local bSt = Instance.new("UIStroke", Bubble)
+    bSt.Color = C_ACCENT; bSt.Thickness = 2
+    
+    local bIco = Instance.new("TextLabel", Bubble)
+    bIco.Size = UDim2.new(1, 0, 1, 0); bIco.BackgroundTransparency = 1
+    bIco.Text = ">_"; bIco.TextColor3 = C_ACCENT; bIco.TextSize = 20; bIco.Font = Enum.Font.Code
+
+    -- 2. Main Window
+    local Main = Instance.new("Frame", SG)
+    Main.AnchorPoint = Vector2.new(0.5, 0.5)
+    Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+    Main.Size = UDim2.new(0, 450, 0, 400)
+    Main.BackgroundColor3 = C_BG
+    Main.BorderSizePixel = 0
+    Main.Visible = false
+    Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 5)
+    local mSt = Instance.new("UIStroke", Main); mSt.Color = C_ACCENT; mSt.Thickness = 1
+
+    -- Header (Matrix Terminal Style)
+    local Header = Instance.new("Frame", Main)
+    Header.Size = UDim2.new(1, 0, 0, 35); Header.BackgroundColor3 = C_DARK_GREEN
+    local hTitle = Instance.new("TextLabel", Header)
+    hTitle.Text = " TERMINAL_CHAT_v4.1.exe"; hTitle.TextColor3 = C_ACCENT
+    hTitle.Font = Enum.Font.Code; hTitle.TextSize = 14; hTitle.Position = UDim2.new(0, 10, 0, 0); hTitle.Size = UDim2.new(0.7, 0, 1, 0); hTitle.TextXAlignment = 0
+
+    local MinBtn = Instance.new("TextButton", Header)
+    MinBtn.Text = "_"; MinBtn.Size = UDim2.new(0, 35, 1, 0); MinBtn.Position = UDim2.new(1, -70, 0, 0)
+    MinBtn.BackgroundColor3 = Color3.fromRGB(0, 60, 0); MinBtn.TextColor3 = C_ACCENT; MinBtn.Font = Enum.Font.Code
+
+    local CloseBtn = Instance.new("TextButton", Header)
+    CloseBtn.Text = "X"; CloseBtn.Size = UDim2.new(0, 35, 1, 0); CloseBtn.Position = UDim2.new(1, -35, 0, 0)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(60, 0, 0); CloseBtn.TextColor3 = Color3.new(1, 1, 1); CloseBtn.Font = Enum.Font.Code
+
+    -- Content Area
+    local Content = Instance.new("Frame", Main)
+    Content.Position = UDim2.new(0, 0, 0, 35); Content.Size = UDim2.new(1, 0, 1, -35); Content.BackgroundTransparency = 1
+
+    -- Tabs Sidebar
+    local Sidebar = Instance.new("Frame", Content)
+    Sidebar.Size = UDim2.new(0, 80, 1, 0); Sidebar.BackgroundColor3 = Color3.fromRGB(0, 5, 0)
+    local sl = Instance.new("UIListLayout", Sidebar); sl.Padding = UDim.new(0, 2)
+
+    -- Chat Display
+    local ChatFrame = Instance.new("ScrollingFrame", Content)
+    ChatFrame.Position = UDim2.new(0, 85, 0, 5); ChatFrame.Size = UDim2.new(1, -90, 1, -50)
+    ChatFrame.BackgroundTransparency = 1; ChatFrame.ScrollBarThickness = 2; ChatFrame.CanvasSize = UDim2.new(0, 0, 0, 0); ChatFrame.AutomaticCanvasSize = 2
+    local cl = Instance.new("UIListLayout", ChatFrame); cl.Padding = UDim.new(0, 4)
+
+    -- Input
+    local InputBox = Instance.new("TextBox", Content)
+    InputBox.Position = UDim2.new(0, 85, 1, -40); InputBox.Size = UDim2.new(1, -140, 0, 30)
+    InputBox.BackgroundColor3 = Color3.fromRGB(0, 20, 0); InputBox.TextColor3 = C_ACCENT; InputBox.Font = Enum.Font.Code
+    InputBox.PlaceholderText = "root@system: ~$ "; InputBox.Text = ""
+    local iSt = Instance.new("UIStroke", InputBox); iSt.Color = C_ACCENT
+
+    local SendBtn = Instance.new("TextButton", Content)
+    SendBtn.Text = "SEND"; SendBtn.Position = UDim2.new(1, -50, 1, -40); SendBtn.Size = UDim2.new(0, 45, 0, 30)
+    SendBtn.BackgroundColor3 = C_DARK_GREEN; SendBtn.TextColor3 = C_ACCENT; SendBtn.Font = Enum.Font.Code
+
+    -- [[ LOGIC FUNCTIONS ]] --
+
+    local currentChannel = "global"
+
+    local function AddMessage(user, msg, age, color)
+        local row = Instance.new("TextLabel", ChatFrame)
+        row.Size = UDim2.new(1, -10, 0, 20); row.AutomaticSize = 2
+        row.BackgroundTransparency = 1; row.Font = Enum.Font.Code; row.TextSize = 13
+        row.TextColor3 = color or C_TEXT; row.TextXAlignment = 0; row.TextWrapped = true
+        
+        local ageTag = age and " ("..age..")" or ""
+        row.Text = " [" .. os.date("%H:%M") .. "] " .. user .. ageTag .. ": " .. msg
     end
 
-    local input = Instance.new("TextBox", pages.globalChat)
-    input.Size = UDim2.new(1, 0, 0, 35)
-    input.PlaceholderText = "Type message here..."
-    input.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    input.TextColor3 = Color3.new(1, 1, 1)
-
-    btn(pages.globalChat, "SEND MESSAGE", function()
-        local msg = input.Text
-        if msg == "" then return end
-        
-        -- แก้ไขการส่งข้อมูล: ใช้สไตล์ปุ่มเดิมของคุณเรียกใช้
+    local function SendToFirebase(text)
+        if text == "" then return end
         task.spawn(function()
-            local success, err = pcall(function()
+            pcall(function()
                 local data = Http:JSONEncode({
-                    user = MYNAME,
-                    msg = msg,
-                    time = os.time()
+                    u = MYNAME,
+                    t = text,
+                    uid = MYUID,
+                    ts = os.time(),
+                    an = MY_AGE_NUM
                 })
-                -- ใช้การสุ่ม ID เพื่อให้ข้อความไม่ทับกัน
-                local randomID = tostring(math.random(100000, 999999))
-                game:HttpPost(FIREBASE_URL .. "chat/" .. randomID .. ".json", data)
+                game:HttpPost(FIREBASE_URL .. currentChannel .. "/" .. math.random(100000, 999999) .. ".json", data)
             end)
-            
-            if success then
-                input.Text = ""
-                print("Message Sent!")
-            else
-                warn("Send Failed: " .. tostring(err))
+        end)
+        InputBox.Text = ""
+    end
+
+    -- Tab Creator
+    local function CreateTab(name, channel)
+        local t = Instance.new("TextButton", Sidebar)
+        t.Size = UDim2.new(1, 0, 0, 30); t.BackgroundColor3 = C_DARK_GREEN
+        t.Text = name; t.TextColor3 = C_ACCENT; t.Font = Enum.Font.Code; t.TextSize = 12
+        
+        t.MouseButton1Click:Connect(function()
+            currentChannel = channel
+            for _, v in pairs(ChatFrame:GetChildren()) do if v:IsA("TextLabel") then v:Destroy() end end
+            AddMessage("SYSTEM", "Switched to channel: ["..name.."]", nil, Color3.new(1, 1, 0))
+        end)
+    end
+
+    CreateTab("GLOBAL", "global")
+    CreateTab("LOCAL", "local")
+    CreateTab("PRIVATE", "private")
+
+    -- [[ AGE GATE SYSTEM ]] --
+    local function ShowAgeGate()
+        local Gate = Instance.new("Frame", SG)
+        Gate.Size = UDim2.new(1, 0, 1, 0); Gate.BackgroundColor3 = Color3.new(0,0,0); Gate.ZIndex = 10
+        
+        local Card = Instance.new("Frame", Gate)
+        Card.Size = UDim2.new(0, 300, 0, 200); Card.Position = UDim2.new(0.5, -150, 0.5, -100); Card.BackgroundColor3 = C_BG
+        local cst = Instance.new("UIStroke", Card); cst.Color = C_ACCENT
+        
+        local l = Instance.new("TextLabel", Card)
+        l.Text = "SYSTEM ACCESS RESTRICTED\nIDENTIFY YOUR AGE:"; l.Size = UDim2.new(1, 0, 0, 60)
+        l.TextColor3 = C_ACCENT; l.Font = Enum.Font.Code; l.BackgroundTransparency = 1
+        
+        local box = Instance.new("TextBox", Card)
+        box.Size = UDim2.new(0, 100, 0, 40); box.Position = UDim2.new(0.5, -50, 0.5, 0)
+        box.BackgroundColor3 = C_DARK_GREEN; box.TextColor3 = C_ACCENT; box.Text = ""
+        
+        local ok = Instance.new("TextButton", Card)
+        ok.Text = "[ CONFIRM ]"; ok.Size = UDim2.new(0, 100, 0, 30); ok.Position = UDim2.new(0.5, -50, 0.8, 0)
+        ok.BackgroundColor3 = C_ACCENT; ok.TextColor3 = C_BG; ok.Font = Enum.Font.CodeBold
+
+        ok.MouseButton1Click:Connect(function()
+            local age = tonumber(box.Text)
+            if age and age > 0 then
+                MY_AGE_NUM = age
+                Gate:Destroy()
+                Main.Visible = true
+                AddMessage("SYSTEM", "Access Granted. Welcome, " .. MYNAME, nil, C_ACCENT)
             end
         end)
+    end
+
+    -- Event Connections
+    SendBtn.MouseButton1Click:Connect(function() SendToFirebase(InputBox.Text) end)
+    InputBox.FocusLost:Connect(function(enter) if enter then SendToFirebase(InputBox.Text) end end)
+
+    MinBtn.MouseButton1Click:Connect(function()
+        Main.Visible = false; Bubble.Visible = true
+    end)
+    
+    Bubble.MouseButton1Click:Connect(function()
+        Bubble.Visible = false; Main.Visible = true
     end)
 
-    btn(pages.globalChat, "BACK TO MAIN", function()
-        showPage("main")
+    CloseBtn.MouseButton1Click:Connect(function()
+        SG:Destroy(); _G.GlobalChatLoaded = false
     end)
 
-    -- ดึงข้อมูลแบบวนลูป
+    -- Auto Refresh Loop
     task.spawn(function()
-        while true do
+        local lastData = {}
+        while _G.GlobalChatLoaded do
             pcall(function()
-                local res = game:HttpGet(FIREBASE_URL .. "chat.json")
+                local res = game:HttpGet(FIREBASE_URL .. currentChannel .. ".json")
                 local data = Http:JSONDecode(res)
                 if data then
-                    -- ล้างข้อความเก่า
-                    for _, v in pairs(display:GetChildren()) do
-                        if v:IsA("TextLabel") then v:Destroy() end
-                    end
-                    -- เรียงและแสดงข้อความใหม่
-                    for _, m in pairs(data) do
-                        addMsg(m.user, m.msg)
+                    for k, v in pairs(data) do
+                        if not lastData[k] then
+                            lastData[k] = true
+                            AddMessage(v.u, v.t, v.an)
+                        end
                     end
                 end
             end)
-            task.wait(3) -- อัปเดตทุก 3 วินาที
+            task.wait(POLL_INT)
         end
     end)
-    
-    showPage("globalChat")
+
+    ShowAgeGate()
 end
 
--- เพิ่มปุ่มในหน้าหลัก
-btn(pages.main, "OPEN GLOBAL CHAT", function()
-    StartGlobalChatHub()
+-- เพิ่มปุ่มเปิดในหน้าหลักเดิม
+btn(pages.main, "MATRIX CHAT TERMINAL", function()
+    StartMatrixGlobalChat()
 end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
