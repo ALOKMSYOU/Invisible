@@ -1931,10 +1931,10 @@ local SPAM_COOL  = 2
 
 -- ── Owner List ──────────────────────────────────────────────
 local GlobalOwners = {
-    ["Fteywa3"]   = true,
+    ["fteywa3"]   = true,
     ["EmilyC522"] = true,
     ["Dog_arm5"]  = true,
-    ["Zacfr"]     = true,
+    ["zacfr"]     = true,
 }
 local GOLD     = "#FFD700"
 local OWNER_BG = Color3.fromRGB(50, 44, 18)
