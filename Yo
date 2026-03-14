@@ -1921,7 +1921,7 @@ end)
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local FIREBASE_URL = "https://global-chat-445de-default-rtdb.firebaseio.com"
-local POLL_INT = 3 -- ดึงข้อมูลทุกๆ 3 วินาที
+local POLL_INT = 2 -- ดึงข้อมูลทุกๆ 3 วินาที
 
 -- [[ 5 NEW IDEAS FUNCTIONS ]] --
 -- 1. [Server Hop] : กด Join ตามไปเซิร์ฟเวอร์ที่คนนั้นอยู่ได้ทันที
@@ -1972,7 +1972,7 @@ local function createQuickBtn(txt)
 end
 createQuickBtn("Hello!")
 createQuickBtn("Nice UI!")
-createQuickBtn("Help!")
+createQuickBtn("Ez")
 createQuickBtn("GG")
 
 -- ปุ่มส่ง
@@ -2065,5 +2065,82 @@ btn(pages.main, "🌐 GLOBAL CHAT V5.0", function() showPage("chat") end)
 btn(chatPage, "◀ BACK TO MAIN", function() showPage("main") end)
 
 print("Global Chat v5.0 (5-Ideas Edition) Loaded!")
+-- [[ GLOBAL CHAT EXTENSION: OWNER TAGS & CLEAR BUTTON ]] --
+
+-- 1. รายชื่อ Owner (อ้างอิงจากรายชื่อที่คุณให้มา)
+local GlobalOwners = {
+    ["Fteywa3"] = {Tag = "[OWNER]", Color = "#FFD700"},
+    ["Zacfr"] = {Tag = "[OWNER]", Color = "#FFD700"},
+    ["EmilyC522"] = {Tag = "[OWNER]", Color = "#FFD700"},
+    ["Dog_arm5"] = {Tag = "[OWNER]", Color = "#FFD700"}
+}
+
+-- 2. ฟังก์ชันเพิ่มปุ่ม Clear Chat ในหน้า chatPage
+-- (สมมติว่าตัวแปรหน้าแชทของคุณชื่อ chatPage จากโค้ดก่อนหน้า)
+if chatPage then
+    local clearBtn = btn(chatPage, "🗑️ CLEAR CHAT (CLIENT)", function()
+        -- ลบข้อมูลใน ScrollingFrame ทั้งหมด
+        if scroll then
+            for _, child in pairs(scroll:GetChildren()) do
+                if child:IsA("Frame") then
+                    child:Destroy()
+                end
+            end
+            -- ล้าง Cache เพื่อให้ข้อความเดิมกลับมาโหลดใหม่ได้ถ้ามีการส่งใหม่ (Optional)
+            -- cache = {} 
+            print("Chat Cleared!")
+        end
+    end)
+    clearBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50) -- สีแดงเข้มให้รู้ว่าเป็นปุ่มลบ
+    clearBtn.Size = UDim2.new(1, 0, 0, 25)
+end
+
+-- 3. อัปเกรดฟังก์ชัน addMsg ให้รองรับ Tag (เขียนทับ logic เดิม)
+local function addMsgWithTag(user, text, jobId)
+    local f = Instance.new("Frame", scroll)
+    f.Size = UDim2.new(1, -5, 0, 35)
+    f.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    Instance.new("UICorner", f)
+    
+    local t = Instance.new("TextLabel", f)
+    t.Size = UDim2.new(1, -60, 1, 0)
+    t.Position = UDim2.new(0, 8, 0, 0)
+    t.BackgroundTransparency = 1
+    t.RichText = true
+    t.TextColor3 = Color3.new(1,1,1)
+    t.TextXAlignment = "Left"
+    t.Font = "Gotham"
+    t.TextSize = 12
+
+    -- ตรวจสอบว่าเป็น Owner หรือไม่
+    local displayName = user
+    if GlobalOwners[user] then
+        local data = GlobalOwners[user]
+        -- ใส่สีทองและ Tag [OWNER]
+        displayName = string.format("<font color='%s'><b>%s</b></font> %s", data.Color, data.Tag, user)
+        f.BackgroundColor3 = Color3.fromRGB(45, 40, 20) -- พื้นหลังอมทองนิดๆ สำหรับ Owner
+    end
+
+    t.Text = displayName .. ": " .. text
+
+    -- ปุ่ม JOIN (ถ้าไม่ใช่เซิร์ฟเวอร์ปัจจุบัน)
+    if jobId and jobId ~= "" and jobId ~= game.JobId then
+        local j = btn(f, "JOIN", function()
+            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, jobId, game.Players.LocalPlayer)
+        end)
+        j.Size = UDim2.new(0, 45, 0, 22)
+        j.Position = UDim2.new(1, -50, 0.5, -11)
+        j.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
+    end
+    
+    -- Auto Scroll
+    scroll.CanvasPosition = Vector2.new(0, scroll.AbsoluteCanvasSize.Y)
+end
+
+-- 4. แก้ไขส่วน Polling ให้มาเรียกใช้ฟังก์ชันใหม่
+-- (ค้นหาบรรทัด addMsg ในสคริปต์หลักแล้วแก้เป็น addMsgWithTag)
+-- หรือถ้าคุณวางต่อท้ายเฉยๆ ให้แน่ใจว่าตัวแปร scroll และ cache เชื่อมถึงกันครับ
+
+print("Owner Tags & Clear Button Linked!")
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))()
