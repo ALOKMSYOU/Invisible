@@ -1913,119 +1913,109 @@ btnSend.MouseButton1Click:Connect(function()
 end)
 
 -- ปุ่มเปิดจากหน้าหลัก
-label(pages.main, "--- COMMUNICATION ---")
+label(pages.main, "--- FEEDBACK ---")
 btn(pages.main, "FEEDBACK", function()
     showPage("chat")
 end)
--- [[ GLOBAL CHAT HUB INTEGRATION ]] --
--- วางต่อท้ายสคริปต์ TelekinesisUI_F3X_Pro ของคุณได้เลย
+-- [[ GLOBAL CHAT HUB INTEGRATION - FIXED VERSION ]] --
 
 local function StartGlobalChatHub()
-    if _G.GlobalChatLoaded then return end
+    if _G.GlobalChatLoaded then 
+        showPage("globalChat") 
+        return 
+    end
     _G.GlobalChatLoaded = true
 
-    -- Configuration
-    local FIREBASE_URL = "https://global-chat-445de-default-rtdb.firebaseio.com"
-    local FIREBASE_SECRET = "CcyYBOhfyKfqeTW6tUOOLv8JHRUtxkhPA7yLE1cZ"
+    -- ใช้ URL จากรูปภาพของคุณ
+    local FIREBASE_URL = "https://global-chat-445de-default-rtdb.firebaseio.com/"
     local MYNAME = game:GetService("Players").LocalPlayer.Name
     local Http = game:GetService("HttpService")
 
-    -- สร้างหน้าใหม่ (Page) สำหรับ Global Chat ในเมนูเดิมของคุณ
     pages.globalChat = createPage()
-    
-    label(pages.globalChat, "--- GLOBAL CHAT HUB (ENGLISH) ---")
+    label(pages.globalChat, "--- GLOBAL CHAT HUB ---")
 
-    -- Chat Display Area
     local display = Instance.new("ScrollingFrame", pages.globalChat)
     display.Size = UDim2.new(1, 0, 0, 200)
-    display.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    display.BorderSizePixel = 0
+    display.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     display.CanvasSize = UDim2.new(0, 0, 0, 0)
     display.AutomaticCanvasSize = Enum.AutomaticSize.Y
     
     local layout = Instance.new("UIListLayout", display)
-    layout.Padding = UDim.new(0, 4)
+    layout.Padding = UDim.new(0, 5)
 
-    -- Function to add message to UI
-    local function addMsg(user, text, color)
-        local f = Instance.new("Frame", display)
-        f.Size = UDim2.new(1, -10, 0, 0)
-        f.AutomaticSize = Enum.AutomaticSize.Y
-        f.BackgroundTransparency = 0.8
-        f.BackgroundColor3 = color or Color3.fromRGB(50, 50, 50)
-        Instance.new("UICorner", f)
-
-        local l = Instance.new("TextLabel", f)
-        l.Size = UDim2.new(1, -10, 1, -10)
-        l.Position = UDim2.fromOffset(5, 5)
+    local function addMsg(user, text)
+        local l = Instance.new("TextLabel", display)
+        l.Size = UDim2.new(1, -10, 0, 20)
+        l.BackgroundTransparency = 1
         l.Text = "[" .. user .. "]: " .. text
         l.TextColor3 = Color3.new(1, 1, 1)
-        l.TextWrapped = true
         l.TextXAlignment = Enum.TextXAlignment.Left
-        l.Font = Enum.Font.Gotham
-        l.TextSize = 12
-        l.BackgroundTransparency = 1
+        l.Font = Enum.Font.GothamSemibold
+        l.TextSize = 14
     end
 
-    -- Input Area
     local input = Instance.new("TextBox", pages.globalChat)
     input.Size = UDim2.new(1, 0, 0, 35)
-    input.PlaceholderText = "Type global message..."
-    input.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    input.PlaceholderText = "Type message here..."
+    input.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     input.TextColor3 = Color3.new(1, 1, 1)
-    Instance.new("UICorner", input)
 
     btn(pages.globalChat, "SEND MESSAGE", function()
         local msg = input.Text
         if msg == "" then return end
         
-        -- Firebase Post Logic (Simplified for brevity)
+        -- แก้ไขการส่งข้อมูล: ใช้สไตล์ปุ่มเดิมของคุณเรียกใช้
         task.spawn(function()
-            pcall(function()
-                local data = {user = MYNAME, msg = msg, time = os.time()}
-                local url = FIREBASE_URL .. "/chat.json?auth=" .. FIREBASE_SECRET
-                -- ใช้ request/http_request ตามชนิดของ Executor
-                local req = (syn and syn.request) or (http and http.request) or http_request or request
-                if req then
-                    req({
-                        Url = url,
-                        Method = "POST",
-                        Headers = {["Content-Type"] = "application/json"},
-                        Body = Http:JSONEncode(data)
-                    })
-                end
+            local success, err = pcall(function()
+                local data = Http:JSONEncode({
+                    user = MYNAME,
+                    msg = msg,
+                    time = os.time()
+                })
+                -- ใช้การสุ่ม ID เพื่อให้ข้อความไม่ทับกัน
+                local randomID = tostring(math.random(100000, 999999))
+                game:HttpPost(FIREBASE_URL .. "chat/" .. randomID .. ".json", data)
             end)
+            
+            if success then
+                input.Text = ""
+                print("Message Sent!")
+            else
+                warn("Send Failed: " .. tostring(err))
+            end
         end)
-        input.Text = ""
     end)
 
     btn(pages.globalChat, "BACK TO MAIN", function()
         showPage("main")
     end)
 
-    -- Auto Refresh Messages (Loop)
+    -- ดึงข้อมูลแบบวนลูป
     task.spawn(function()
-        while _G.GlobalChatLoaded do
+        while true do
             pcall(function()
-                local url = FIREBASE_URL .. "/chat.json?auth=" .. FIREBASE_SECRET .. "&orderBy=\"time\"&limitToLast=10"
-                local res = game:HttpGet(url)
+                local res = game:HttpGet(FIREBASE_URL .. "chat.json")
                 local data = Http:JSONDecode(res)
                 if data then
-                    for _, v in pairs(display:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
+                    -- ล้างข้อความเก่า
+                    for _, v in pairs(display:GetChildren()) do
+                        if v:IsA("TextLabel") then v:Destroy() end
+                    end
+                    -- เรียงและแสดงข้อความใหม่
                     for _, m in pairs(data) do
                         addMsg(m.user, m.msg)
                     end
                 end
             end)
-            task.wait(5)
+            task.wait(3) -- อัปเดตทุก 3 วินาที
         end
     end)
     
     showPage("globalChat")
 end
 
--- เพิ่มปุ่มเปิด Global Chat ในหน้าหลัก (ต่อจากปุ่ม FEEDBACK เดิมของคุณ)
-btn(pages.main, "OPEN GLOBAL CHAT HUB", function()
+-- เพิ่มปุ่มในหน้าหลัก
+btn(pages.main, "OPEN GLOBAL CHAT", function()
     StartGlobalChatHub()
 end)
 
