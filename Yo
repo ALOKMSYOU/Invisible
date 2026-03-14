@@ -2065,82 +2065,75 @@ btn(pages.main, "🌐 GLOBAL CHAT V5.0", function() showPage("chat") end)
 btn(chatPage, "◀ BACK TO MAIN", function() showPage("main") end)
 
 print("Global Chat v5.0 (5-Ideas Edition) Loaded!")
--- [[ GLOBAL CHAT EXTENSION: OWNER TAGS & CLEAR BUTTON ]] --
+-- [[ GLOBAL CHAT: GOLDEN OWNER TAG SYSTEM ]] --
 
--- 1. รายชื่อ Owner (อ้างอิงจากรายชื่อที่คุณให้มา)
+-- รายชื่อ Owner ที่จะได้รับ Tag และชื่อสีทอง
 local GlobalOwners = {
-    ["Fteywa3"] = {Tag = "[OWNER]", Color = "#FFD700"},
-    ["Zacfr"] = {Tag = "[OWNER]", Color = "#FFD700"},
-    ["EmilyC522"] = {Tag = "[OWNER]", Color = "#FFD700"},
-    ["Dog_arm5"] = {Tag = "[OWNER]", Color = "#FFD700"}
+    ["Fteywa3"] = true,
+    ["Zacfr"] = true,
+    ["EmilyC522"] = true,
+    ["Dog_arm5"] = true
 }
 
--- 2. ฟังก์ชันเพิ่มปุ่ม Clear Chat ในหน้า chatPage
--- (สมมติว่าตัวแปรหน้าแชทของคุณชื่อ chatPage จากโค้ดก่อนหน้า)
-if chatPage then
-    local clearBtn = btn(chatPage, "🗑️ CLEAR CHAT (CLIENT)", function()
-        -- ลบข้อมูลใน ScrollingFrame ทั้งหมด
-        if scroll then
-            for _, child in pairs(scroll:GetChildren()) do
-                if child:IsA("Frame") then
-                    child:Destroy()
-                end
-            end
-            -- ล้าง Cache เพื่อให้ข้อความเดิมกลับมาโหลดใหม่ได้ถ้ามีการส่งใหม่ (Optional)
-            -- cache = {} 
-            print("Chat Cleared!")
-        end
-    end)
-    clearBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 50) -- สีแดงเข้มให้รู้ว่าเป็นปุ่มลบ
-    clearBtn.Size = UDim2.new(1, 0, 0, 25)
-end
+-- สีทองสำหรับ Owner (Gold Hex)
+local GOLD_COLOR = "#FFD700"
 
--- 3. อัปเกรดฟังก์ชัน addMsg ให้รองรับ Tag (เขียนทับ logic เดิม)
-local function addMsgWithTag(user, text, jobId)
+-- อัปเดตฟังก์ชันแสดงผลข้อความ
+local function addMsg(user, text, jobId)
     local f = Instance.new("Frame", scroll)
     f.Size = UDim2.new(1, -5, 0, 35)
-    f.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    Instance.new("UICorner", f)
+    f.BackgroundColor3 = Color3.fromRGB(30, 30, 30) -- สีพื้นหลังแชทปกติ
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
     
     local t = Instance.new("TextLabel", f)
-    t.Size = UDim2.new(1, -60, 1, 0)
-    t.Position = UDim2.new(0, 8, 0, 0)
+    t.Size = UDim2.new(1, -65, 1, 0)
+    t.Position = UDim2.new(0, 10, 0, 0)
     t.BackgroundTransparency = 1
-    t.RichText = true
-    t.TextColor3 = Color3.new(1,1,1)
-    t.TextXAlignment = "Left"
-    t.Font = "Gotham"
-    t.TextSize = 12
+    t.RichText = true -- เปิดใช้ RichText เพื่อแสดงสี
+    t.TextColor3 = Color3.new(1, 1, 1)
+    t.TextXAlignment = Enum.TextXAlignment.Left
+    t.Font = Enum.Font.GothamMedium
+    t.TextSize = 13
 
-    -- ตรวจสอบว่าเป็น Owner หรือไม่
-    local displayName = user
+    -- เช็คว่าเป็น Owner หรือไม่
+    local displayName = ""
     if GlobalOwners[user] then
-        local data = GlobalOwners[user]
-        -- ใส่สีทองและ Tag [OWNER]
-        displayName = string.format("<font color='%s'><b>%s</b></font> %s", data.Color, data.Tag, user)
-        f.BackgroundColor3 = Color3.fromRGB(45, 40, 20) -- พื้นหลังอมทองนิดๆ สำหรับ Owner
+        -- ถ้าเป็น Owner: [OWNER] ชื่อ (ทั้งแถบเป็นสีทอง)
+        displayName = string.format("<b><font color='%s'>[OWNER] %s</font></b>", GOLD_COLOR, user)
+        f.BackgroundColor3 = Color3.fromRGB(45, 42, 25) -- ปรับพื้นหลังให้อมทองจางๆ
+        f.LayoutOrder = -1 -- ให้แชท Owner อยู่บนๆ เสมอ (ถ้าต้องการ)
+    else
+        -- ถ้าคนปกติ: ชื่อสีขาวปกติ
+        displayName = "<b>" .. user .. "</b>"
     end
 
     t.Text = displayName .. ": " .. text
 
-    -- ปุ่ม JOIN (ถ้าไม่ใช่เซิร์ฟเวอร์ปัจจุบัน)
+    -- ปุ่ม Join (ระบบย้ายเซิร์ฟ)
     if jobId and jobId ~= "" and jobId ~= game.JobId then
         local j = btn(f, "JOIN", function()
-            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, jobId, game.Players.LocalPlayer)
+            game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, jobId, LP)
         end)
-        j.Size = UDim2.new(0, 45, 0, 22)
-        j.Position = UDim2.new(1, -50, 0.5, -11)
-        j.BackgroundColor3 = Color3.fromRGB(0, 180, 80)
+        j.Size = UDim2.new(0, 50, 0, 24)
+        j.Position = UDim2.new(1, -55, 0.5, -12)
+        j.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
     end
     
-    -- Auto Scroll
-    scroll.CanvasPosition = Vector2.new(0, scroll.AbsoluteCanvasSize.Y)
+    -- เลื่อนหน้าจอลงล่างสุดอัตโนมัติ
+    scroll.CanvasPosition = Vector2.new(0, scroll.AbsoluteCanvasSize.Y + 40)
 end
 
--- 4. แก้ไขส่วน Polling ให้มาเรียกใช้ฟังก์ชันใหม่
--- (ค้นหาบรรทัด addMsg ในสคริปต์หลักแล้วแก้เป็น addMsgWithTag)
--- หรือถ้าคุณวางต่อท้ายเฉยๆ ให้แน่ใจว่าตัวแปร scroll และ cache เชื่อมถึงกันครับ
+-- เพิ่มปุ่ม Clear Chat (Client) ไว้ท้ายหน้า Chat
+if pages.chat then
+    local clearBtn = btn(pages.chat, "🗑️ CLEAR CLIENT CHAT", function()
+        for _, v in pairs(scroll:GetChildren()) do
+            if v:IsA("Frame") then v:Destroy() end
+        end
+    end)
+    clearBtn.BackgroundColor3 = Color3.fromRGB(130, 40, 40)
+    clearBtn.Size = UDim2.new(1, 0, 0, 25)
+end
 
-print("Owner Tags & Clear Button Linked!")
+print("Golden Owner Tags System Loaded!")
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))()
