@@ -2039,60 +2039,109 @@ task.spawn(function()
         task.wait(3)
     end
 end)
--- ==========================================
--- ระบบรวม: Global Chat Tag [Owner] & Join Button
--- ==========================================
+-- =======================================================
+-- GLOBAL CHAT SYSTEM (REAL-TIME + OWNER TAG + JOIN JOBID)
+-- =======================================================
 
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 
--- รายชื่อผู้ได้รับฉายา (แก้ไขชื่อได้ที่นี่)
-local specialUsers = {
-    ["EmilyC522"] = {tag = "[Owner]", color = "rgb(255, 215, 0)"},
-    ["Fteywa3"] = {tag = "[Owner]", color = "rgb(255, 215, 0)"},
-    ["Dog_arm5"] = {tag = "[Owner]", color = "rgb(255, 215, 0)"},
-    ["Zacfr"] = {tag = "[Owner]", color = "rgb(255, 215, 0)"}
+-- 1. Configuration (รายชื่อเจ้าของ)
+local ownerConfig = {
+    ["EmilyC522"] = {tag = "[Owner]", color = "#FFD700"},
+    ["Fteywa3"] = {tag = "[Owner]", color = "#FFD700"},
+    ["Dog_arm5"] = {tag = "[Owner]", color = "#FFD700"},
+    ["Zacfr"] = {tag = "[Owner]", color = "#FFD700"}
 }
 
--- 1. ฟังก์ชันจัดการชื่อและปุ่ม (เอาไปใช้ในฟังก์ชัน Update Global Chat ของคุณ)
-local function ProcessGlobalEntry(nameTextObject, parentFrame, targetJobId)
-    local playerName = nameTextObject.Text -- ดึงชื่อจาก Text Label ของแชท
-    
-    -- เช็คว่าเป็น Owner หรือไม่
-    if specialUsers[playerName] then
-        local data = specialUsers[playerName]
-        -- เปลี่ยน Text ให้มีฉายา (รองรับ RichText)
-        nameTextObject.RichText = true
-        nameTextObject.Text = string.format("<font color='%s'>%s</font> %s", data.color, data.tag, playerName)
-    end
+-- 2. อ้างอิง UI (ปรับชื่อให้ตรงกับ UI ของคุณ)
+local GlobalScrollingFrame = script.Parent:WaitForChild("ScrollingFrame") -- ช่องที่ข้อความแชทเด้งขึ้นมา
+local RefreshButton = script.Parent:WaitForChild("RefreshButton") -- ปุ่ม Refresh
+local ClearButton = script.Parent:WaitForChild("ClearButton") -- ปุ่ม Clear Chat
 
-    -- 2. สร้างปุ่ม Join ไว้ข้างชื่อในช่องแชท/ลิสต์
-    local JoinBtn = Instance.new("TextButton")
-    JoinBtn.Name = "GlobalJoinBtn"
-    JoinBtn.Size = UDim2.new(0, 45, 0, 18)
-    JoinBtn.Position = UDim2.new(1, -50, 0, 2) -- ปรับตำแหน่งตาม Layout ของคุณ
-    JoinBtn.Text = "JOIN"
-    JoinBtn.Font = Enum.Font.SourceSansBold
-    JoinBtn.TextSize = 12
-    JoinBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-    JoinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+-- 3. ฟังก์ชันปรับแต่งข้อความ (เพิ่ม Tag และปุ่ม Join)
+local function StyleChatRow(frame)
+    if not frame:IsA("Frame") then return end
     
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 4)
-    Corner.Parent = JoinBtn
+    -- รอให้ระบบหลักใส่ข้อมูลสักครู่
+    task.wait(0.05)
     
-    JoinBtn.Parent = parentFrame
-
-    JoinBtn.MouseButton1Click:Connect(function()
-        if targetJobId and targetJobId ~= "" then
-            setclipboard(targetJobId)
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, targetJobId, Players.LocalPlayer)
+    local nameLabel = frame:FindFirstChild("NameLabel") or frame:FindFirstChildOfClass("TextLabel")
+    local jobId = frame:GetAttribute("JobID") or "" 
+    
+    if nameLabel then
+        local rawName = nameLabel.Text:gsub("%s+", "") -- ลบช่องว่างเพื่อเช็คชื่อ
+        
+        -- ถ้าเป็น Owner ให้ใส่ฉายา
+        if ownerConfig[rawName] then
+            local data = ownerConfig[rawName]
+            nameLabel.RichText = true
+            nameLabel.Text = string.format("<font color='%s'>%s</font> %s", data.color, data.tag, rawName)
         end
+        
+        -- สร้างปุ่ม JoinJobID (เพิ่มไว้ท้ายแถว)
+        if not frame:FindFirstChild("JoinBtn") then
+            local JoinBtn = Instance.new("TextButton")
+            JoinBtn.Name = "JoinBtn"
+            JoinBtn.Size = UDim2.new(0, 40, 0, 18)
+            JoinBtn.Position = UDim2.new(1, -45, 0.5, -9)
+            JoinBtn.Text = "JOIN"
+            JoinBtn.Font = Enum.Font.SourceSansBold
+            JoinBtn.TextSize = 10
+            JoinBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+            JoinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            JoinBtn.ZIndex = 10
+            
+            local Corner = Instance.new("UICorner")
+            Corner.CornerRadius = UDim.new(0, 4)
+            Corner.Parent = JoinBtn
+            
+            JoinBtn.Parent = frame
+            
+            JoinBtn.MouseButton1Click:Connect(function()
+                if jobId ~= "" then
+                    setclipboard(jobId)
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, Players.LocalPlayer)
+                end
+            end)
+        end
+    end
+end
+
+-- 4. ระบบ Real-time (เด้งทันทีที่มีคนแชท)
+GlobalScrollingFrame.ChildAdded:Connect(function(child)
+    StyleChatRow(child)
+end)
+
+-- 5. ระบบ Clear & Refresh แบบไม่โหลดของเก่า
+local function ClearCurrentChat()
+    for _, child in pairs(GlobalScrollingFrame:GetChildren()) do
+        if child:IsA("Frame") or child:IsA("TextLabel") then
+            child:Destroy()
+        end
+    end
+end
+
+-- เมื่อกด Clear Chat
+if ClearButton then
+    ClearButton.MouseButton1Click:Connect(function()
+        ClearCurrentChat()
+        -- ส่งสัญญาณไปบอก Script หลักของคุณว่าไม่ต้องโหลดแชทชุดเก่า (ถ้ามีระบบเก็บ Cache)
     end)
 end
 
--- [วิธีใช้งาน] 
--- ใน Script แชทของคุณ ตรงจังหวะที่สร้าง Label ใหม่ ให้เรียกใช้แบบนี้:
--- ProcessGlobalEntry(ข้อความชื่อ, เฟรมแชทนั้นๆ, JobIdของคนส่ง)
+-- เมื่อกด Refresh (ล้างของเก่าและรอรับเฉพาะของใหม่)
+if RefreshButton then
+    RefreshButton.MouseButton1Click:Connect(function()
+        ClearCurrentChat()
+        -- ตรงนี้มักจะไปสั่งยิง RemoteEvent เพื่อดึงข้อมูลล่าสุด (ถ้าคุณมีระบบ Backend)
+        -- แต่ตามเงื่อนไขของคุณคือ Refresh แล้วจะไม่โชว์อันที่เพิ่งลบไป
+    end)
+end
+
+-- รันครั้งแรกเผื่อมีค้างอยู่
+for _, child in pairs(GlobalScrollingFrame:GetChildren()) do
+    StyleChatRow(child)
+end
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvityo
