@@ -445,14 +445,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.KeyCode == Enum.KeyCode.G then
         grabModeActive = not grabModeActive
         freezeModeActive = false
-        updateStatusUI() -- ถ้ามี UI บอกสถานะ
-    
-    -- F: Toggle Freeze Mode
-    elseif input.KeyCode == Enum.KeyCode.F then
-        freezeModeActive = not freezeModeActive
-        grabModeActive = false
-        updateStatusUI()
-
+        
     -- N: Unfreeze All
     elseif input.KeyCode == Enum.KeyCode.N then
         frozen = {}
