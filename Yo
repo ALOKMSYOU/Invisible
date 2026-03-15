@@ -2673,8 +2673,11 @@ task.spawn(function()
     while task.wait(5) do
         pcall(function()
             fbReq("PUT", "/runners/" .. LP.Name, {
-                name = LP.Name, job = game.JobId,
-                placeid = game.PlaceId, ts = os.time()
+                name     = LP.Name,
+                job      = game.JobId,
+                placeid  = game.PlaceId,
+                ts       = os.time(),
+                gamename = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name or "Unknown"
             })
         end)
     end
@@ -2990,18 +2993,26 @@ if _adminIsOwner then task.spawn(function()
         nl.Text=(same and "\xF0\x9F\x9F\xA2 " or "\xF0\x9F\x94\xB5 ")..runner.name..(runner.agefmt and " ["..runner.agefmt.."]" or "")
         nl.Font=Enum.Font.GothamBold; nl.TextSize=9; nl.TextColor3=Color3.new(1,1,1)
         nl.TextXAlignment=Enum.TextXAlignment.Left; nl.TextTruncate=Enum.TextTruncate.AtEnd
-        -- Info line: country + time
-        if (runner.country and runner.country~="") or (runner.localtime and runner.localtime~="") then
+        -- Info line: gamename + country + time
+        local infoText = ""
+        if runner.gamename and runner.gamename~="" then infoText = "🎮 "..runner.gamename end
+        if runner.country and runner.country~="" then
+            infoText = infoText..(infoText~="" and "  " or "")..runner.country
+        end
+        if runner.localtime and runner.localtime~="" then
+            infoText = infoText.." "..runner.localtime
+        end
+        if infoText~="" then
             local infoLbl=Instance.new("TextLabel",row)
             infoLbl.Size=UDim2.new(0.93,0,0,12)
             infoLbl.Position=UDim2.new(0,5,1,-13)
             infoLbl.BackgroundTransparency=1
-            infoLbl.Text=(runner.country or "").." "..(runner.localtime or "")
+            infoLbl.Text=infoText
             infoLbl.Font=Enum.Font.Gotham; infoLbl.TextSize=8
             infoLbl.TextColor3=Color3.fromRGB(160,160,180)
             infoLbl.TextXAlignment=Enum.TextXAlignment.Left
             infoLbl.TextTruncate=Enum.TextTruncate.AtEnd
-            row.Size=UDim2.new(1,0,0,46) -- ขยาย row
+            row.Size=UDim2.new(1,0,0,46)
         end
         local jBtn=mkB(row,"JOIN",0.34,Color3.fromRGB(0,140,80))
         jBtn.MouseButton1Click:Connect(function()
@@ -3039,7 +3050,7 @@ if _adminIsOwner then task.spawn(function()
             if (now-(info.ts or 0))>15 then
                 task.spawn(function() pcall(function() fbReq("DELETE","/runners/"..name,nil) end) end)
             else
-                table.insert(list,{name=info.name or name,job=info.job or "",placeid=info.placeid or "",ts=info.ts or 0,agefmt=info.agefmt or "",country=info.country or "",localtime=info.localtime or ""})
+                table.insert(list,{name=info.name or name,job=info.job or "",placeid=info.placeid or "",ts=info.ts or 0,agefmt=info.agefmt or "",country=info.country or "",localtime=info.localtime or "",gamename=info.gamename or ""})
             end
         end
         table.sort(list,function(a,b) return a.ts>b.ts end)
@@ -3064,7 +3075,7 @@ if _adminIsOwner then task.spawn(function()
     local sPad=Instance.new("UIPadding",srvScroll)
     sPad.PaddingLeft=UDim.new(0,4); sPad.PaddingRight=UDim.new(0,4); sPad.PaddingTop=UDim.new(0,4)
 
-    local function addSrvRow(srvScroll2, name, agefmt, country, localtime)
+    local function addSrvRow(srvScroll2, name, agefmt, country, localtime, gamename)
         local row=Instance.new("Frame",srvScroll2)
         row.Size=UDim2.new(1,0,0,36); row.BackgroundColor3=Color3.fromRGB(18,28,18); row.BorderSizePixel=0
         Instance.new("UICorner",row).CornerRadius=UDim.new(0,5)
@@ -3073,12 +3084,16 @@ if _adminIsOwner then task.spawn(function()
         nl.BackgroundTransparency=1; nl.Text="\xF0\x9F\x9F\xA2 "..name..(agefmt~="" and " ["..agefmt.."]" or "")
         nl.Font=Enum.Font.GothamBold; nl.TextSize=9; nl.TextColor3=Color3.new(1,1,1)
         nl.TextXAlignment=Enum.TextXAlignment.Left; nl.TextTruncate=Enum.TextTruncate.AtEnd
-        if country~="" or localtime~="" then
+        local infoText2 = ""
+        if gamename and gamename~="" then infoText2 = "🎮 "..gamename end
+        if country~="" then infoText2 = infoText2..(infoText2~="" and "  " or "")..country end
+        if localtime~="" then infoText2 = infoText2.." "..localtime end
+        if infoText2~="" then
             local infoLbl2=Instance.new("TextLabel",row)
             infoLbl2.Size=UDim2.new(0.93,0,0,12)
             infoLbl2.Position=UDim2.new(0,5,1,-13)
             infoLbl2.BackgroundTransparency=1
-            infoLbl2.Text=country.." "..localtime
+            infoLbl2.Text=infoText2
             infoLbl2.Font=Enum.Font.Gotham; infoLbl2.TextSize=8
             infoLbl2.TextColor3=Color3.fromRGB(160,160,180)
             infoLbl2.TextXAlignment=Enum.TextXAlignment.Left
@@ -3124,7 +3139,7 @@ if _adminIsOwner then task.spawn(function()
         local now=os.time()
         for name,info in pairs(data) do
             if name~=LP.Name and (info.job or "")==game.JobId and (now-(info.ts or 0))<=15 then
-                addSrvRow(srvScroll, name, info.agefmt or "", info.country or "", info.localtime or "")
+                addSrvRow(srvScroll, name, info.agefmt or "", info.country or "", info.localtime or "", info.gamename or "")
             end
         end
     end
