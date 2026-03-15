@@ -2632,18 +2632,13 @@ for i,v in pairs(cors) do
 	end)
 end
 -- ══════════════════════════════════════════════════════════════
---  ADMIN PANEL v1.0 — OWNER ONLY
---  วางต่อท้ายสคริปต์หลักได้เลย
+--  ADMIN PANEL + ADDON v3.0
 -- ══════════════════════════════════════════════════════════════
-
--- ── Admin Owner Check ─────────────────────────────────────────
+task.spawn(function()
 local isOwner = GlobalOwners[LP.Name] == true
+local StarterGui = game:GetService("StarterGui")
 
--- ── Active Script Runners List ────────────────────────────────
--- เก็บข้อมูลผู้เล่นที่รันสคริปต์ (ดึงจาก Firebase /runners)
-local RUNNER_TIMEOUT = 15  -- ลบออกถ้าไม่ส่ง heartbeat ภายใน 30 วินาที
-
--- ประกาศตัวเองเป็น runner ใน Firebase
+-- ── Heartbeat: register self as runner ───────────────────────
 task.spawn(function()
     while task.wait(5) do
         pcall(function()
@@ -2656,238 +2651,8 @@ task.spawn(function()
         end)
     end
 end)
--- ── สร้างหน้า Admin ───────────────────────────────────────────
-if isOwner then
-    pages.admin = createPage()
 
-    label(pages.main, "--- ADMIN PANEL ---")
-    local adminOpenBtn = btn(pages.main, "👑 ADMIN PANEL", function()
-        showPage("admin")
-    end)
-    adminOpenBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 10)
-    adminOpenBtn.Font = Enum.Font.GothamBold
-
-    -- หัวข้อ
-    local adminTitle = Instance.new("TextLabel", pages.admin)
-    adminTitle.Size             = UDim2.new(1, 0, 0, 22)
-    adminTitle.BackgroundColor3 = Color3.fromRGB(60, 40, 10)
-    adminTitle.Text             = "👑  ADMIN PANEL  — OWNER ONLY"
-    adminTitle.Font             = Enum.Font.GothamBold
-    adminTitle.TextSize         = 12
-    adminTitle.TextColor3       = Color3.fromRGB(255, 215, 0)
-    adminTitle.BorderSizePixel  = 0
-    Instance.new("UICorner", adminTitle).CornerRadius = UDim.new(0, 6)
-
-    -- กรอบแสดง Runner List
-    local runnerTitle = Instance.new("TextLabel", pages.admin)
-    runnerTitle.Size             = UDim2.new(1, 0, 0, 16)
-    runnerTitle.BackgroundTransparency = 1
-    runnerTitle.Text             = "🟢 Active Script Runners:"
-    runnerTitle.Font             = Enum.Font.GothamBold
-    runnerTitle.TextSize         = 11
-    runnerTitle.TextColor3       = Color3.fromRGB(100, 220, 100)
-    runnerTitle.TextXAlignment   = Enum.TextXAlignment.Left
-
-    local runnerScroll = Instance.new("ScrollingFrame", pages.admin)
-    runnerScroll.Size                 = UDim2.new(1, 0, 0, 130)
-    runnerScroll.BackgroundColor3     = Color3.fromRGB(15, 15, 25)
-    runnerScroll.BorderSizePixel      = 0
-    runnerScroll.AutomaticCanvasSize  = Enum.AutomaticSize.Y
-    runnerScroll.ScrollBarThickness   = 3
-    Instance.new("UICorner", runnerScroll).CornerRadius = UDim.new(0, 6)
-
-    local runnerLayout = Instance.new("UIListLayout", runnerScroll)
-    runnerLayout.Padding   = UDim.new(0, 3)
-    runnerLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-    local runnerPad = Instance.new("UIPadding", runnerScroll)
-    runnerPad.PaddingLeft   = UDim.new(0, 4)
-    runnerPad.PaddingRight  = UDim.new(0, 4)
-    runnerPad.PaddingTop    = UDim.new(0, 4)
-
-    -- เก็บข้อมูล runners ที่โหลดมา
-    local currentRunners = {}
-
-    -- ฟังก์ชัน Refresh รายชื่อ
-    local function refreshRunners()
-        -- ลบปุ่มเก่า
-        for _, v in ipairs(runnerScroll:GetChildren()) do
-            if v:IsA("Frame") then v:Destroy() end
-        end
-
-        local data = fbReq("GET", "/runners")
-        currentRunners = {}
-
-        if not data then
-            local noData = Instance.new("TextLabel", runnerScroll)
-            noData.Size             = UDim2.new(1, 0, 0, 20)
-            noData.BackgroundTransparency = 1
-            noData.Text             = "No runners found."
-            noData.Font             = Enum.Font.Gotham
-            noData.TextSize         = 11
-            noData.TextColor3       = Color3.fromRGB(150, 150, 150)
-            return
-        end
-
-        local now = os.time()
-        for name, info in pairs(data) do
-            -- ถ้า heartbeat เกิน RUNNER_TIMEOUT วินาที ให้ลบออกจาก Firebase
-            if (now - (info.ts or 0)) > RUNNER_TIMEOUT then
-                task.spawn(function()
-                    pcall(function()
-                        fbReq("DELETE", "/runners/" .. name, nil)
-                    end)
-                end)
-            else
-                table.insert(currentRunners, {
-                    name    = info.name or name,
-                    job     = info.job or "",
-                    placeid = info.placeid or "",
-                    ts      = info.ts or 0
-                })
-            end
-        end
-
-        -- เรียงตามเวลาล่าสุด
-        table.sort(currentRunners, function(a, b) return a.ts > b.ts end)
-
-        for _, runner in ipairs(currentRunners) do
-            -- กรอบแต่ละ runner
-            local row = Instance.new("Frame", runnerScroll)
-            row.Size             = UDim2.new(1, 0, 0, 34)
-            row.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
-            row.BorderSizePixel  = 0
-            Instance.new("UICorner", row).CornerRadius = UDim.new(0, 5)
-
-            -- ชื่อ
-            local nameLbl = Instance.new("TextLabel", row)
-            nameLbl.Size             = UDim2.new(0.45, 0, 1, 0)
-            nameLbl.Position         = UDim2.new(0, 6, 0, 0)
-            nameLbl.BackgroundTransparency = 1
-            nameLbl.Text             = "🟢 " .. runner.name
-            nameLbl.Font             = Enum.Font.GothamBold
-            nameLbl.TextSize         = 10
-            nameLbl.TextColor3       = Color3.new(1, 1, 1)
-            nameLbl.TextXAlignment   = Enum.TextXAlignment.Left
-            nameLbl.TextTruncate     = Enum.TextTruncate.AtEnd
-
-            -- ปุ่ม JOIN
-            local joinB = Instance.new("TextButton", row)
-            joinB.Size             = UDim2.fromOffset(38, 22)
-            joinB.Position         = UDim2.new(0.48, 0, 0.5, -11)
-            joinB.BackgroundColor3 = Color3.fromRGB(0, 140, 80)
-            joinB.Text             = "JOIN"
-            joinB.Font             = Enum.Font.GothamBold
-            joinB.TextSize         = 9
-            joinB.TextColor3       = Color3.new(1, 1, 1)
-            joinB.BorderSizePixel  = 0
-            Instance.new("UICorner", joinB).CornerRadius = UDim.new(0, 4)
-            joinB.MouseButton1Click:Connect(function()
-                if runner.job ~= "" and runner.job ~= game.JobId then
-                    joinB.Text = "..."
-                    pcall(function()
-                        CoreGui.RobloxPromptGui.promptOverlay.Visible = false
-                    end)
-                    local targetPlace = runner.placeid or game.PlaceId
-                    TeleportService:TeleportToPlaceInstance(targetPlace, runner.job, LP)
-                    task.wait(0.5)
-                    pcall(function()
-                        if CoreGui.RobloxPromptGui.promptOverlay:WaitForChild("ErrorPrompt", 2) then
-                            game:GetService("GuiService"):ClearError()
-                            joinB.Text = "FAIL"
-                            joinB.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
-                            setStatus("⚠ Invalid JobID or server closed", Color3.fromRGB(255, 180, 0), 4)
-                            task.wait(2)
-                            joinB.Text = "JOIN"
-                            joinB.BackgroundColor3 = Color3.fromRGB(0, 140, 80)
-                        end
-                    end)
-                elseif runner.job == game.JobId then
-                    setStatus("⚠ You're already in this server!", Color3.fromRGB(255, 180, 0), 3)
-                else
-                    setStatus("⚠ No JobID available", Color3.fromRGB(255, 180, 0), 3)
-                end
-            end)
-
-            -- ปุ่ม BRING
-            local bringB = Instance.new("TextButton", row)
-            bringB.Size             = UDim2.fromOffset(38, 22)
-            bringB.Position         = UDim2.new(0.66, 0, 0.5, -11)
-            bringB.BackgroundColor3 = Color3.fromRGB(30, 80, 200)
-            bringB.Text             = "BRING"
-            bringB.Font             = Enum.Font.GothamBold
-            bringB.TextSize         = 9
-            bringB.TextColor3       = Color3.new(1, 1, 1)
-            bringB.BorderSizePixel  = 0
-            Instance.new("UICorner", bringB).CornerRadius = UDim.new(0, 4)
-            bringB.MouseButton1Click:Connect(function()
-                task.spawn(function()
-                    pcall(function()
-                        fbReq("PUT", "/bring_request/" .. runner.name, {
-                            from    = LP.Name,
-                            job     = game.JobId,
-                            placeid = game.PlaceId,
-                            ts      = os.time()
-                        })
-                    end)
-                end)
-                setStatus("📡 Bring request sent to " .. runner.name, Color3.fromRGB(100, 200, 255), 3)
-            end)
-
-            -- ปุ่ม KICK
-            local kickB = Instance.new("TextButton", row)
-            kickB.Size             = UDim2.fromOffset(34, 22)
-            kickB.Position         = UDim2.new(0.84, 0, 0.5, -11)
-            kickB.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
-            kickB.Text             = "KICK"
-            kickB.Font             = Enum.Font.GothamBold
-            kickB.TextSize         = 9
-            kickB.TextColor3       = Color3.new(1, 1, 1)
-            kickB.BorderSizePixel  = 0
-            Instance.new("UICorner", kickB).CornerRadius = UDim.new(0, 4)
-            kickB.MouseButton1Click:Connect(function()
-                -- เขียน kick command ลง Firebase
-                task.spawn(function()
-                    pcall(function()
-                        fbReq("PUT", "/kick_request/" .. runner.name, {
-                            from = LP.Name,
-                            ts   = os.time()
-                        })
-                    end)
-                end)
-                setStatus("🥾 Kick sent to " .. runner.name, Color3.fromRGB(255, 100, 100), 3)
-            end)
-        end
-    end
-
-    -- ปุ่ม Refresh
-    local refreshBtn = btn(pages.admin, "🔄 REFRESH LIST", function()
-        task.spawn(refreshRunners)
-    end)
-    refreshBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 40)
-
-    -- ปุ่ม Back
-    local adminBack = btn(pages.admin, "◀ BACK", function()
-        showPage("main")
-    end)
-    adminBack.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-
-    -- Auto refresh ทุก 15 วินาทีถ้าหน้า admin เปิดอยู่
-    task.spawn(function()
-        while task.wait(15) do
-            if pages.admin and pages.admin.Visible then
-                pcall(refreshRunners)
-            end
-        end
-    end)
-
-    -- Refresh ครั้งแรกเมื่อเปิดหน้า
-    adminOpenBtn.MouseButton1Click:Connect(function()
-        task.spawn(refreshRunners)
-    end)
-end
-
--- ── รับ Bring Request (ตรวจทุก 5 วินาที) ──────────────────────
+-- ── Receive: bring_request (cross-server) ────────────────────
 task.spawn(function()
     while task.wait(5) do
         pcall(function()
@@ -2905,7 +2670,7 @@ task.spawn(function()
     end
 end)
 
--- ── รับ Kick Request (ตรวจทุก 5 วินาที) ──────────────────────
+-- ── Receive: kick_request ─────────────────────────────────────
 task.spawn(function()
     while task.wait(5) do
         pcall(function()
@@ -2914,7 +2679,6 @@ task.spawn(function()
                 local age = os.time() - (req.ts or 0)
                 if age < 30 then
                     fbReq("DELETE", "/kick_request/" .. LP.Name, nil)
-                    -- Kick = Teleport ออกไปที่ lobby (place เดิมแต่ server ใหม่)
                     TeleportService:Teleport(game.PlaceId, LP)
                 end
             end
@@ -2922,7 +2686,104 @@ task.spawn(function()
     end
 end)
 
--- ── Show warning count on login ─────────────────────────────
+-- ── Receive: bring_here (in-server teleport to owner) ────────
+task.spawn(function()
+    while task.wait(3) do
+        pcall(function()
+            local req = fbReq("GET", "/bring_here/" .. LP.Name)
+            if req and req.from and req.ts then
+                local age = os.time() - (req.ts or 0)
+                if age < 15 then
+                    fbReq("DELETE", "/bring_here/" .. LP.Name, nil)
+                    if req.job == game.JobId then
+                        local ownerP = Players:FindFirstChild(req.from)
+                        if ownerP and ownerP.Character and ownerP.Character:FindFirstChild("HumanoidRootPart") then
+                            local cf = ownerP.Character.HumanoidRootPart.CFrame
+                            if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+                                LP.Character.HumanoidRootPart.CFrame = cf * CFrame.new(0, 0, -3)
+                            end
+                        end
+                    else
+                        TeleportService:TeleportToPlaceInstance(req.placeid or game.PlaceId, req.job, LP)
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- ── Receive: kill_request ─────────────────────────────────────
+task.spawn(function()
+    while task.wait(3) do
+        pcall(function()
+            local req = fbReq("GET", "/kill_request/" .. LP.Name)
+            if req and req.from and req.ts then
+                local age = os.time() - (req.ts or 0)
+                if age < 15 then
+                    fbReq("DELETE", "/kill_request/" .. LP.Name, nil)
+                    if LP.Character then
+                        local hum = LP.Character:FindFirstChildOfClass("Humanoid")
+                        if hum then hum.Health = 0 end
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- ── Receive: join_notify ─────────────────────────────────────
+task.spawn(function()
+    while task.wait(4) do
+        pcall(function()
+            local data = fbReq("GET", "/join_notify/" .. LP.Name)
+            if data and data.owner and data.ts then
+                local age = os.time() - (data.ts or 0)
+                if age < 15 then
+                    fbReq("DELETE", "/join_notify/" .. LP.Name, nil)
+                    pcall(function()
+                        StarterGui:SetCore("SendNotification", {
+                            Title    = "👑 Owner Joined",
+                            Text     = data.owner .. " has joined your server!",
+                            Duration = 8,
+                        })
+                    end)
+                    -- Popup UI
+                    local ng = Instance.new("ScreenGui")
+                    pcall(function() ng.Parent = game:GetService("CoreGui") end)
+                    if ng.Parent ~= game:GetService("CoreGui") then ng.Parent = LP.PlayerGui end
+                    ng.ResetOnSpawn = false
+                    local nf = Instance.new("Frame", ng)
+                    nf.Size             = UDim2.fromOffset(280, 60)
+                    nf.Position         = UDim2.new(0.5, -140, 0, 20)
+                    nf.BackgroundColor3 = Color3.fromRGB(30, 22, 5)
+                    nf.Active           = true
+                    nf.Draggable        = true
+                    nf.BorderSizePixel  = 0
+                    Instance.new("UICorner", nf).CornerRadius = UDim.new(0, 10)
+                    local ac = Instance.new("Frame", nf)
+                    ac.Size             = UDim2.new(0, 4, 1, 0)
+                    ac.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+                    ac.BorderSizePixel  = 0
+                    Instance.new("UICorner", ac).CornerRadius = UDim.new(0, 4)
+                    local nl = Instance.new("TextLabel", nf)
+                    nl.Size               = UDim2.new(1, -14, 1, 0)
+                    nl.Position           = UDim2.new(0, 12, 0, 0)
+                    nl.BackgroundTransparency = 1
+                    nl.RichText           = true
+                    nl.TextWrapped        = true
+                    nl.TextXAlignment     = Enum.TextXAlignment.Left
+                    nl.Font               = Enum.Font.GothamBold
+                    nl.TextSize           = 12
+                    nl.TextColor3         = Color3.new(1, 1, 1)
+                    nl.Text = string.format("<font color='#FFD700'>👑 %s</font> has joined your server!", data.owner)
+                    task.delay(8, function() if ng and ng.Parent then ng:Destroy() end end)
+                end
+            end
+        end)
+    end
+end)
+
+-- ── Warning count check on load ──────────────────────────────
 task.spawn(function()
     task.wait(3)
     pcall(function()
@@ -2939,62 +2800,505 @@ task.spawn(function()
     end)
 end)
 
--- ── Owner สามารถ Reset Warning / Unmute ผู้เล่นได้ ──────────
-if isOwner then
-    if pages.admin then
-        label(pages.admin, "--- MODERATION ---")
+-- ── Private Chat UI ───────────────────────────────────────────
+local privateChatOpen  = false
+local privateChatWith  = nil
+local privateChatCache = {}
+local privateMsgCount  = 0
 
-        -- กรอบใส่ชื่อ
-        local modInputBg = Instance.new("Frame", pages.admin)
-        modInputBg.Size             = UDim2.new(1, 0, 0, 30)
-        modInputBg.BackgroundColor3 = Color3.fromRGB(28, 28, 44)
-        modInputBg.BorderSizePixel  = 0
-        Instance.new("UICorner", modInputBg).CornerRadius = UDim.new(0, 6)
+local pcGui = Instance.new("ScreenGui")
+pcall(function() pcGui.Parent = game:GetService("CoreGui") end)
+if pcGui.Parent ~= game:GetService("CoreGui") then pcGui.Parent = LP.PlayerGui end
+pcGui.ResetOnSpawn = false
 
-        local modInput = Instance.new("TextBox", modInputBg)
-        modInput.Size               = UDim2.new(1, -10, 1, -6)
-        modInput.Position           = UDim2.new(0, 5, 0, 3)
-        modInput.BackgroundTransparency = 1
-        modInput.PlaceholderText    = "Enter username to unmute/clear..."
-        modInput.Text               = ""
-        modInput.Font               = Enum.Font.Gotham
-        modInput.TextSize           = 11
-        modInput.TextColor3         = Color3.new(1, 1, 1)
-        modInput.ClearTextOnFocus   = false
+local pcFrame = Instance.new("Frame", pcGui)
+pcFrame.Size             = UDim2.fromOffset(260, 300)
+pcFrame.Position         = UDim2.new(0.75, 0, 0.28, 0)
+pcFrame.BackgroundColor3 = Color3.fromRGB(14, 14, 22)
+pcFrame.Active           = true
+pcFrame.Draggable        = true
+pcFrame.Visible          = false
+pcFrame.BorderSizePixel  = 0
+Instance.new("UICorner", pcFrame).CornerRadius = UDim.new(0, 10)
+Instance.new("UIStroke", pcFrame).Color        = Color3.fromRGB(60, 60, 120)
 
-        local modRow = Instance.new("Frame", pages.admin)
-        modRow.Size             = UDim2.new(1, 0, 0, 28)
-        modRow.BackgroundTransparency = 1
-        Instance.new("UIListLayout", modRow).FillDirection = Enum.FillDirection.Horizontal
+local pcHeader = Instance.new("Frame", pcFrame)
+pcHeader.Size             = UDim2.new(1, 0, 0, 30)
+pcHeader.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
+pcHeader.BorderSizePixel  = 0
+Instance.new("UICorner", pcHeader).CornerRadius = UDim.new(0, 10)
 
-        -- ปุ่ม Unmute
-        local unmuteBtn = btn(modRow, "UNMUTE", function()
-            local target = modInput.Text:match("^%s*(.-)%s*$")
-            if target == "" then return end
-            task.spawn(function()
-                fbReq("DELETE", "/warnings/" .. target, nil)
-                setStatus("✅ Cleared warnings for " .. target, Color3.fromRGB(100, 220, 100), 3)
-            end)
-        end)
-        unmuteBtn.Size = UDim2.new(0.5, -2, 1, 0)
-        unmuteBtn.BackgroundColor3 = Color3.fromRGB(0, 130, 70)
+local pcTitle = Instance.new("TextLabel", pcHeader)
+pcTitle.Size               = UDim2.new(1, -34, 1, 0)
+pcTitle.Position           = UDim2.new(0, 8, 0, 0)
+pcTitle.BackgroundTransparency = 1
+pcTitle.Text               = "💬 Private Chat"
+pcTitle.Font               = Enum.Font.GothamBold
+pcTitle.TextSize           = 12
+pcTitle.TextColor3         = Color3.fromRGB(160, 180, 255)
+pcTitle.TextXAlignment     = Enum.TextXAlignment.Left
 
-        -- ปุ่ม Force Mute
-        local forceMuteBtn = btn(modRow, "FORCE MUTE", function()
-            local target = modInput.Text:match("^%s*(.-)%s*$")
-            if target == "" then return end
-            task.spawn(function()
-                fbReq("PUT", "/warnings/" .. target, {
-                    count       = 3,
-                    muted_until = os.time() + MUTE_DURATION,
-                    muted_by    = LP.Name
-                })
-                setStatus("🔇 Force-muted " .. target .. " for 30 min", Color3.fromRGB(255, 100, 100), 3)
-            end)
-        end)
-        forceMuteBtn.Size = UDim2.new(0.5, -2, 1, 0)
-        forceMuteBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
-    end
+local pcClose = Instance.new("TextButton", pcHeader)
+pcClose.Size             = UDim2.fromOffset(24, 24)
+pcClose.Position         = UDim2.new(1, -28, 0.5, -12)
+pcClose.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+pcClose.Text             = "X"
+pcClose.Font             = Enum.Font.GothamBold
+pcClose.TextSize         = 11
+pcClose.TextColor3       = Color3.new(1, 1, 1)
+pcClose.BorderSizePixel  = 0
+Instance.new("UICorner", pcClose).CornerRadius = UDim.new(0, 5)
+pcClose.MouseButton1Click:Connect(function()
+    pcFrame.Visible = false
+    privateChatOpen = false
+end)
+
+local pcScrollBg = Instance.new("Frame", pcFrame)
+pcScrollBg.Size             = UDim2.new(1, -10, 0, 200)
+pcScrollBg.Position         = UDim2.new(0, 5, 0, 35)
+pcScrollBg.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
+pcScrollBg.BorderSizePixel  = 0
+Instance.new("UICorner", pcScrollBg).CornerRadius = UDim.new(0, 6)
+
+local pcScroll = Instance.new("ScrollingFrame", pcScrollBg)
+pcScroll.Size                 = UDim2.new(1, -4, 1, -4)
+pcScroll.Position             = UDim2.new(0, 2, 0, 2)
+pcScroll.BackgroundTransparency = 1
+pcScroll.BorderSizePixel      = 0
+pcScroll.ScrollBarThickness   = 3
+pcScroll.AutomaticCanvasSize  = Enum.AutomaticSize.Y
+pcScroll.CanvasSize           = UDim2.new(0, 0, 0, 0)
+local pcMsgLayout = Instance.new("UIListLayout", pcScroll)
+pcMsgLayout.Padding   = UDim.new(0, 3)
+pcMsgLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local pcInputBg = Instance.new("Frame", pcFrame)
+pcInputBg.Size             = UDim2.new(1, -10, 0, 28)
+pcInputBg.Position         = UDim2.new(0, 5, 0, 242)
+pcInputBg.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
+pcInputBg.BorderSizePixel  = 0
+Instance.new("UICorner", pcInputBg).CornerRadius = UDim.new(0, 6)
+
+local pcInput = Instance.new("TextBox", pcInputBg)
+pcInput.Size               = UDim2.new(1, -60, 1, -6)
+pcInput.Position           = UDim2.new(0, 6, 0, 3)
+pcInput.BackgroundTransparency = 1
+pcInput.PlaceholderText    = "Type here..."
+pcInput.PlaceholderColor3  = Color3.fromRGB(80, 80, 100)
+pcInput.Text               = ""
+pcInput.Font               = Enum.Font.Gotham
+pcInput.TextSize           = 11
+pcInput.TextColor3         = Color3.new(1, 1, 1)
+pcInput.ClearTextOnFocus   = false
+
+local pcSendBtn = Instance.new("TextButton", pcInputBg)
+pcSendBtn.Size             = UDim2.fromOffset(50, 22)
+pcSendBtn.Position         = UDim2.new(1, -54, 0.5, -11)
+pcSendBtn.BackgroundColor3 = Color3.fromRGB(50, 80, 200)
+pcSendBtn.Text             = "SEND"
+pcSendBtn.Font             = Enum.Font.GothamBold
+pcSendBtn.TextSize         = 10
+pcSendBtn.TextColor3       = Color3.new(1, 1, 1)
+pcSendBtn.BorderSizePixel  = 0
+Instance.new("UICorner", pcSendBtn).CornerRadius = UDim.new(0, 5)
+
+local function getPrivateRoomId(a, b)
+    local names = {a, b}
+    table.sort(names)
+    return names[1] .. "_" .. names[2]
 end
 
-print("✅ Admin Panel + Profanity Filter Loaded!")
+local function addPrivateMsg(sender, text)
+    privateMsgCount = privateMsgCount + 1
+    local isSelf = (sender == LP.Name)
+    local row = Instance.new("Frame", pcScroll)
+    row.Size             = UDim2.new(1, 0, 0, 0)
+    row.AutomaticSize    = Enum.AutomaticSize.Y
+    row.BackgroundColor3 = isSelf and Color3.fromRGB(30, 40, 80) or Color3.fromRGB(22, 22, 34)
+    row.BorderSizePixel  = 0
+    row.LayoutOrder      = privateMsgCount
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 5)
+    local lbl = Instance.new("TextLabel", row)
+    lbl.Size               = UDim2.new(1, -8, 0, 0)
+    lbl.Position           = UDim2.new(0, 4, 0, 3)
+    lbl.AutomaticSize      = Enum.AutomaticSize.Y
+    lbl.BackgroundTransparency = 1
+    lbl.RichText           = true
+    lbl.TextWrapped        = true
+    lbl.TextXAlignment     = Enum.TextXAlignment.Left
+    lbl.Font               = Enum.Font.GothamMedium
+    lbl.TextSize           = 11
+    lbl.TextColor3         = Color3.new(1, 1, 1)
+    lbl.Text = string.format("<b><font color='%s'>%s</font></b>: %s",
+        isSelf and "#88AAFF" or "#FFD700", sender, text)
+    task.defer(function()
+        pcScroll.CanvasPosition = Vector2.new(0, pcScroll.AbsoluteCanvasSize.Y + 9999)
+    end)
+end
+
+local function openPrivateChat(targetName)
+    privateChatWith  = targetName
+    privateChatOpen  = true
+    privateChatCache = {}
+    privateMsgCount  = 0
+    for _, v in ipairs(pcScroll:GetChildren()) do
+        if v:IsA("Frame") then v:Destroy() end
+    end
+    pcTitle.Text    = "💬 Chat with " .. targetName
+    pcFrame.Visible = true
+end
+
+local function sendPrivateMsg()
+    if not privateChatWith or pcInput.Text == "" then return end
+    local msg = pcInput.Text:match("^%s*(.-)%s*$")
+    if msg == "" then return end
+    local roomId = getPrivateRoomId(LP.Name, privateChatWith)
+    pcInput.Text = ""
+    addPrivateMsg(LP.Name, msg)
+    task.spawn(function()
+        pcall(function()
+            fbReq("POST", "/private_chat/" .. roomId, {
+                sender = LP.Name, text = msg, ts = os.time()
+            })
+        end)
+    end)
+end
+
+pcSendBtn.MouseButton1Click:Connect(sendPrivateMsg)
+pcInput.FocusLost:Connect(function(enter) if enter then sendPrivateMsg() end end)
+
+task.spawn(function()
+    while task.wait(2) do
+        if privateChatOpen and privateChatWith then
+            pcall(function()
+                local roomId = getPrivateRoomId(LP.Name, privateChatWith)
+                local data   = fbReq("GET", "/private_chat/" .. roomId)
+                if data then
+                    local sorted = {}
+                    for id, m in pairs(data) do
+                        if not privateChatCache[id] then
+                            table.insert(sorted, {id = id, msg = m})
+                        end
+                    end
+                    table.sort(sorted, function(a, b) return (a.msg.ts or 0) < (b.msg.ts or 0) end)
+                    for _, entry in ipairs(sorted) do
+                        privateChatCache[entry.id] = true
+                        if entry.msg.sender ~= LP.Name then
+                            addPrivateMsg(entry.msg.sender or "?", entry.msg.text or "")
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ── Admin Panel UI (Owner only) ───────────────────────────────
+if isOwner then
+    pages.admin = createPage()
+
+    label(pages.main, "--- ADMIN PANEL ---")
+    local adminOpenBtn = btn(pages.main, "👑 ADMIN PANEL", function()
+        showPage("admin")
+    end)
+    adminOpenBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 10)
+    adminOpenBtn.Font = Enum.Font.GothamBold
+
+    local adminTitle = Instance.new("TextLabel", pages.admin)
+    adminTitle.Size             = UDim2.new(1, 0, 0, 22)
+    adminTitle.BackgroundColor3 = Color3.fromRGB(60, 40, 10)
+    adminTitle.Text             = "👑  ADMIN PANEL  — OWNER ONLY"
+    adminTitle.Font             = Enum.Font.GothamBold
+    adminTitle.TextSize         = 12
+    adminTitle.TextColor3       = Color3.fromRGB(255, 215, 0)
+    adminTitle.BorderSizePixel  = 0
+    Instance.new("UICorner", adminTitle).CornerRadius = UDim.new(0, 6)
+
+    -- All Runners section
+    local runnerTitle = Instance.new("TextLabel", pages.admin)
+    runnerTitle.Size             = UDim2.new(1, 0, 0, 16)
+    runnerTitle.BackgroundTransparency = 1
+    runnerTitle.Text             = "🌐 All Runners (Any Server):"
+    runnerTitle.Font             = Enum.Font.GothamBold
+    runnerTitle.TextSize         = 10
+    runnerTitle.TextColor3       = Color3.fromRGB(100, 220, 100)
+    runnerTitle.TextXAlignment   = Enum.TextXAlignment.Left
+
+    local runnerScroll = Instance.new("ScrollingFrame", pages.admin)
+    runnerScroll.Size                = UDim2.new(1, 0, 0, 110)
+    runnerScroll.BackgroundColor3    = Color3.fromRGB(15, 15, 25)
+    runnerScroll.BorderSizePixel     = 0
+    runnerScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    runnerScroll.ScrollBarThickness  = 3
+    Instance.new("UICorner", runnerScroll).CornerRadius = UDim.new(0, 6)
+    local runnerLayout = Instance.new("UIListLayout", runnerScroll)
+    runnerLayout.Padding   = UDim.new(0, 3)
+    runnerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    local runnerPad = Instance.new("UIPadding", runnerScroll)
+    runnerPad.PaddingLeft  = UDim.new(0, 4)
+    runnerPad.PaddingRight = UDim.new(0, 4)
+    runnerPad.PaddingTop   = UDim.new(0, 4)
+
+    local function mkBtn(parent, txt, xPos, col)
+        local b = Instance.new("TextButton", parent)
+        b.Size             = UDim2.fromOffset(34, 22)
+        b.Position         = UDim2.new(xPos, 0, 0.5, -11)
+        b.BackgroundColor3 = col
+        b.Text             = txt
+        b.Font             = Enum.Font.GothamBold
+        b.TextSize         = 8
+        b.TextColor3       = Color3.new(1, 1, 1)
+        b.BorderSizePixel  = 0
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+        return b
+    end
+
+    local function refreshRunners()
+        for _, v in ipairs(runnerScroll:GetChildren()) do
+            if v:IsA("Frame") then v:Destroy() end
+        end
+        local data = fbReq("GET", "/runners")
+        if not data then return end
+        local now = os.time()
+        local list = {}
+        for name, info in pairs(data) do
+            if (now - (info.ts or 0)) > 15 then
+                task.spawn(function() pcall(function() fbReq("DELETE", "/runners/" .. name, nil) end) end)
+            else
+                table.insert(list, {name = info.name or name, job = info.job or "", placeid = info.placeid or "", ts = info.ts or 0})
+            end
+        end
+        table.sort(list, function(a, b) return a.ts > b.ts end)
+        for _, runner in ipairs(list) do
+            local sameServer = runner.job == game.JobId
+            local row = Instance.new("Frame", runnerScroll)
+            row.Size             = UDim2.new(1, 0, 0, 34)
+            row.BackgroundColor3 = sameServer and Color3.fromRGB(20, 30, 20) or Color3.fromRGB(25, 25, 40)
+            row.BorderSizePixel  = 0
+            Instance.new("UICorner", row).CornerRadius = UDim.new(0, 5)
+
+            local nl = Instance.new("TextLabel", row)
+            nl.Size             = UDim2.new(0.35, 0, 1, 0)
+            nl.Position         = UDim2.new(0, 5, 0, 0)
+            nl.BackgroundTransparency = 1
+            nl.Text             = (sameServer and "🟢 " or "🔵 ") .. runner.name
+            nl.Font             = Enum.Font.GothamBold
+            nl.TextSize         = 9
+            nl.TextColor3       = Color3.new(1, 1, 1)
+            nl.TextXAlignment   = Enum.TextXAlignment.Left
+            nl.TextTruncate     = Enum.TextTruncate.AtEnd
+
+            local joinB = mkBtn(row, "JOIN", 0.36, Color3.fromRGB(0, 140, 80))
+            joinB.MouseButton1Click:Connect(function()
+                if sameServer then setStatus("Already in same server!", Color3.fromRGB(255, 180, 0), 3) return end
+                if runner.job == "" then setStatus("No JobID!", Color3.fromRGB(255, 180, 0), 3) return end
+                joinB.Text = "..."
+                pcall(function() game:GetService("CoreGui").RobloxPromptGui.promptOverlay.Visible = false end)
+                task.spawn(function()
+                    pcall(function()
+                        fbReq("PUT", "/join_notify/" .. runner.name, {owner = LP.Name, ts = os.time()})
+                    end)
+                end)
+                TeleportService:TeleportToPlaceInstance(runner.placeid ~= "" and runner.placeid or game.PlaceId, runner.job, LP)
+            end)
+
+            local bringB = mkBtn(row, "BRING", 0.50, Color3.fromRGB(30, 80, 200))
+            bringB.MouseButton1Click:Connect(function()
+                task.spawn(function()
+                    pcall(function()
+                        fbReq("PUT", "/bring_request/" .. runner.name, {from = LP.Name, job = game.JobId, placeid = game.PlaceId, ts = os.time()})
+                    end)
+                end)
+                setStatus("Bring sent to " .. runner.name, Color3.fromRGB(100, 200, 255), 3)
+            end)
+
+            local kickB = mkBtn(row, "KICK", 0.64, Color3.fromRGB(180, 30, 30))
+            kickB.MouseButton1Click:Connect(function()
+                task.spawn(function()
+                    pcall(function()
+                        fbReq("PUT", "/kick_request/" .. runner.name, {from = LP.Name, ts = os.time()})
+                    end)
+                end)
+                setStatus("Kick sent to " .. runner.name, Color3.fromRGB(255, 100, 100), 3)
+            end)
+        end
+    end
+
+    btn(pages.admin, "🔄 REFRESH ALL RUNNERS", function()
+        task.spawn(refreshRunners)
+    end).BackgroundColor3 = Color3.fromRGB(40, 80, 40)
+
+    -- In-Server section
+    local srvTitle = Instance.new("TextLabel", pages.admin)
+    srvTitle.Size             = UDim2.new(1, 0, 0, 16)
+    srvTitle.BackgroundTransparency = 1
+    srvTitle.Text             = "🟢 In This Server:"
+    srvTitle.Font             = Enum.Font.GothamBold
+    srvTitle.TextSize         = 10
+    srvTitle.TextColor3       = Color3.fromRGB(100, 255, 130)
+    srvTitle.TextXAlignment   = Enum.TextXAlignment.Left
+
+    local srvScroll = Instance.new("ScrollingFrame", pages.admin)
+    srvScroll.Size                = UDim2.new(1, 0, 0, 110)
+    srvScroll.BackgroundColor3    = Color3.fromRGB(10, 18, 12)
+    srvScroll.BorderSizePixel     = 0
+    srvScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    srvScroll.ScrollBarThickness  = 3
+    Instance.new("UICorner", srvScroll).CornerRadius = UDim.new(0, 6)
+    local srvLayout = Instance.new("UIListLayout", srvScroll)
+    srvLayout.Padding   = UDim.new(0, 3)
+    srvLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    local srvPad = Instance.new("UIPadding", srvScroll)
+    srvPad.PaddingLeft  = UDim.new(0, 4)
+    srvPad.PaddingRight = UDim.new(0, 4)
+    srvPad.PaddingTop   = UDim.new(0, 4)
+
+    local function refreshServerList()
+        for _, v in ipairs(srvScroll:GetChildren()) do
+            if v:IsA("Frame") then v:Destroy() end
+        end
+        local data = fbReq("GET", "/runners")
+        if not data then return end
+        local now = os.time()
+        for name, info in pairs(data) do
+            if name ~= LP.Name and (info.job or "") == game.JobId and (now - (info.ts or 0)) <= 15 then
+                local row = Instance.new("Frame", srvScroll)
+                row.Size             = UDim2.new(1, 0, 0, 36)
+                row.BackgroundColor3 = Color3.fromRGB(18, 28, 18)
+                row.BorderSizePixel  = 0
+                Instance.new("UICorner", row).CornerRadius = UDim.new(0, 5)
+
+                local nl = Instance.new("TextLabel", row)
+                nl.Size             = UDim2.new(0.32, 0, 1, 0)
+                nl.Position         = UDim2.new(0, 5, 0, 0)
+                nl.BackgroundTransparency = 1
+                nl.Text             = "🟢 " .. name
+                nl.Font             = Enum.Font.GothamBold
+                nl.TextSize         = 9
+                nl.TextColor3       = Color3.new(1, 1, 1)
+                nl.TextXAlignment   = Enum.TextXAlignment.Left
+                nl.TextTruncate     = Enum.TextTruncate.AtEnd
+
+                local chatB = mkBtn(row, "CHAT", 0.33, Color3.fromRGB(50, 80, 200))
+                chatB.MouseButton1Click:Connect(function() openPrivateChat(name) end)
+
+                local killB = mkBtn(row, "KILL", 0.48, Color3.fromRGB(180, 20, 20))
+                killB.MouseButton1Click:Connect(function()
+                    task.spawn(function()
+                        pcall(function()
+                            fbReq("PUT", "/kill_request/" .. name, {from = LP.Name, ts = os.time()})
+                        end)
+                    end)
+                    setStatus("Kill sent to " .. name, Color3.fromRGB(255, 80, 80), 3)
+                end)
+
+                local bringB = mkBtn(row, "BRING", 0.63, Color3.fromRGB(30, 100, 180))
+                bringB.MouseButton1Click:Connect(function()
+                    task.spawn(function()
+                        pcall(function()
+                            fbReq("PUT", "/bring_here/" .. name, {from = LP.Name, job = game.JobId, placeid = game.PlaceId, ts = os.time()})
+                        end)
+                    end)
+                    setStatus("Bring sent to " .. name, Color3.fromRGB(100, 200, 255), 3)
+                end)
+
+                local gotoB = mkBtn(row, "GOTO", 0.78, Color3.fromRGB(100, 60, 180))
+                gotoB.MouseButton1Click:Connect(function()
+                    local targetP = Players:FindFirstChild(name)
+                    if targetP and targetP.Character and targetP.Character:FindFirstChild("HumanoidRootPart") then
+                        local cf = targetP.Character.HumanoidRootPart.CFrame
+                        if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+                            LP.Character.HumanoidRootPart.CFrame = cf * CFrame.new(3, 0, 0)
+                            setStatus("Teleported to " .. name, Color3.fromRGB(200, 200, 100), 3)
+                        end
+                    else
+                        setStatus(name .. " not found in server", Color3.fromRGB(255, 180, 0), 3)
+                    end
+                end)
+            end
+        end
+    end
+
+    btn(pages.admin, "🔄 REFRESH SERVER LIST", function()
+        task.spawn(refreshServerList)
+    end).BackgroundColor3 = Color3.fromRGB(30, 60, 30)
+
+    -- Moderation
+    label(pages.admin, "--- MODERATION ---")
+    local modInputBg = Instance.new("Frame", pages.admin)
+    modInputBg.Size             = UDim2.new(1, 0, 0, 30)
+    modInputBg.BackgroundColor3 = Color3.fromRGB(28, 28, 44)
+    modInputBg.BorderSizePixel  = 0
+    Instance.new("UICorner", modInputBg).CornerRadius = UDim.new(0, 6)
+    local modInput = Instance.new("TextBox", modInputBg)
+    modInput.Size               = UDim2.new(1, -10, 1, -6)
+    modInput.Position           = UDim2.new(0, 5, 0, 3)
+    modInput.BackgroundTransparency = 1
+    modInput.PlaceholderText    = "Username to unmute/force mute..."
+    modInput.Text               = ""
+    modInput.Font               = Enum.Font.Gotham
+    modInput.TextSize           = 11
+    modInput.TextColor3         = Color3.new(1, 1, 1)
+    modInput.ClearTextOnFocus   = false
+
+    local modRow = Instance.new("Frame", pages.admin)
+    modRow.Size             = UDim2.new(1, 0, 0, 28)
+    modRow.BackgroundTransparency = 1
+    Instance.new("UIListLayout", modRow).FillDirection = Enum.FillDirection.Horizontal
+
+    local unmuteBtn = btn(modRow, "UNMUTE", function()
+        local target = modInput.Text:match("^%s*(.-)%s*$")
+        if target == "" then return end
+        task.spawn(function()
+            fbReq("DELETE", "/warnings/" .. target, nil)
+            setStatus("Cleared warnings for " .. target, Color3.fromRGB(100, 220, 100), 3)
+        end)
+    end)
+    unmuteBtn.Size = UDim2.new(0.5, -2, 1, 0)
+    unmuteBtn.BackgroundColor3 = Color3.fromRGB(0, 130, 70)
+
+    local forceMuteBtn = btn(modRow, "FORCE MUTE", function()
+        local target = modInput.Text:match("^%s*(.-)%s*$")
+        if target == "" then return end
+        task.spawn(function()
+            fbReq("PUT", "/warnings/" .. target, {count = 3, muted_until = os.time() + MUTE_DURATION, muted_by = LP.Name})
+            setStatus("Force-muted " .. target, Color3.fromRGB(255, 100, 100), 3)
+        end)
+    end)
+    forceMuteBtn.Size = UDim2.new(0.5, -2, 1, 0)
+    forceMuteBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+
+    btn(pages.admin, "◀ BACK TO MAIN", function() showPage("main") end).BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+
+    adminOpenBtn.MouseButton1Click:Connect(function()
+        task.spawn(refreshRunners)
+        task.spawn(refreshServerList)
+    end)
+
+    task.spawn(function()
+        while task.wait(10) do
+            if pages.admin and pages.admin.Visible then
+                pcall(refreshRunners)
+                pcall(refreshServerList)
+            end
+        end
+    end)
+
+    -- Send join notify to everyone in server on load
+    task.spawn(function()
+        task.wait(2)
+        pcall(function()
+            local data = fbReq("GET", "/runners")
+            if data then
+                for name, info in pairs(data) do
+                    if name ~= LP.Name and (info.job or "") == game.JobId then
+                        fbReq("PUT", "/join_notify/" .. name, {owner = LP.Name, ts = os.time()})
+                    end
+                end
+            end
+        end)
+    end)
+end
+
+print("✅ Admin Panel + Addon v3.0 Loaded!")
+end) -- end task.spawn wrapper
