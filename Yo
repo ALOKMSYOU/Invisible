@@ -2256,19 +2256,17 @@ end)
 
 print("✅ Global Chat v6.0 (Telekinesis Edition) Loaded!")
 -- ══════════════════════════════════════════════════════════════
---  ADMIN PANEL v1.0 — TELEKINESIS UI EDITION
+--  ADMIN PANEL v1.1 — FIXED
 --  วิธีใช้: วางต่อท้ายสคริปต์ Telekinesis หลัก
---  ต้องการ: Firebase URL เดิม + pages/createPage/btn/label/showPage/LP
 -- ══════════════════════════════════════════════════════════════
 
 local HttpService_A     = game:GetService("HttpService")
 local TeleportService_A = game:GetService("TeleportService")
 
--- ── Config ────────────────────────────────────────────────────
 local FIREBASE_A  = "https://global-chat-445de-default-rtdb.firebaseio.com"
-local HEARTBEAT   = 8   -- วินาที: อัปเดตสถานะตัวเองใน Firebase
-local POLL_ADMIN  = 5   -- วินาที: refresh user list อัตโนมัติ
-local SESSION_TTL = 20  -- วินาที: ถือว่า offline ถ้าไม่ heartbeat
+local HEARTBEAT   = 8
+local POLL_ADMIN  = 5
+local SESSION_TTL = 20
 
 local AdminOwners = {
     ["Fteywa3"]   = true,
@@ -2278,12 +2276,9 @@ local AdminOwners = {
 }
 
 local isAdmin = AdminOwners[LP.Name] == true
--- unique key ต่อ session (กัน key ชน)
 local myKey   = LP.Name .. "_" .. tostring(math.random(100000, 999999))
 
--- ══════════════════════════════════════════════════════════════
---  FIREBASE HELPER
--- ══════════════════════════════════════════════════════════════
+-- ── Firebase helper ───────────────────────────────────────────
 local function fbA(method, path, data)
     local req = (syn and syn.request)
              or (http and http.request)
@@ -2303,7 +2298,7 @@ local function fbA(method, path, data)
 end
 
 -- ══════════════════════════════════════════════════════════════
---  PRESENCE SYSTEM — ทุกคนที่รันสคริปจะลงทะเบียนตัวเองใน Firebase
+--  PRESENCE — ทุกคนลงทะเบียนตัวเองใน Firebase
 -- ══════════════════════════════════════════════════════════════
 local function pushPresence()
     fbA("PUT", "/scriptusers/" .. myKey, {
@@ -2315,479 +2310,427 @@ local function pushPresence()
 end
 
 task.spawn(pushPresence)
-
 task.spawn(function()
-    while task.wait(HEARTBEAT) do
-        pcall(pushPresence)
-    end
+    while task.wait(HEARTBEAT) do pcall(pushPresence) end
 end)
-
 game:BindToClose(function()
     pcall(function() fbA("DELETE", "/scriptusers/" .. myKey) end)
 end)
 
 -- ══════════════════════════════════════════════════════════════
---  NON-ADMIN: รับ Broadcast / Kick / Bring เท่านั้น
+--  NON-ADMIN LISTENERS (ทุกคนได้รับ broadcast / kick / bring)
 -- ══════════════════════════════════════════════════════════════
-if not isAdmin then
 
-    -- Broadcast notification
-    task.spawn(function()
-        local lastBc = 0
-        while task.wait(4) do
-            local bc = fbA("GET", "/adminbroadcast")
-            if bc and type(bc) == "table" and (bc.ts or 0) > lastBc and bc.msg and bc.msg ~= "" then
-                lastBc = bc.ts
+-- Broadcast popup
+task.spawn(function()
+    local lastBc = 0
+    while task.wait(4) do
+        local bc = fbA("GET", "/adminbroadcast")
+        if bc and type(bc) == "table" and (bc.ts or 0) > lastBc and bc.msg and bc.msg ~= "" then
+            lastBc = bc.ts
+            local notif = Instance.new("ScreenGui")
+            notif.ResetOnSpawn = false
+            notif.Name = "AdminBroadcastNotif_A"
+            pcall(function() notif.Parent = game:GetService("CoreGui") end)
+            if notif.Parent ~= game:GetService("CoreGui") then notif.Parent = LP.PlayerGui end
 
-                local notif = Instance.new("ScreenGui")
-                notif.ResetOnSpawn = false
-                notif.Name = "AdminBroadcastNotif"
-                pcall(function() notif.Parent = game:GetService("CoreGui") end)
-                if notif.Parent ~= game:GetService("CoreGui") then
-                    notif.Parent = LP.PlayerGui
-                end
+            local frame = Instance.new("Frame", notif)
+            frame.Size             = UDim2.fromOffset(320, 68)
+            frame.Position         = UDim2.new(0.5, -160, 0, 14)
+            frame.BackgroundColor3 = Color3.fromRGB(160, 100, 0)
+            frame.BorderSizePixel  = 0
+            Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+            Instance.new("UIStroke", frame).Color = Color3.fromRGB(255, 200, 0)
 
-                local frame = Instance.new("Frame", notif)
-                frame.Size             = UDim2.fromOffset(320, 68)
-                frame.Position         = UDim2.new(0.5, -160, 0, 14)
-                frame.BackgroundColor3 = Color3.fromRGB(160, 100, 0)
-                frame.BorderSizePixel  = 0
-                Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
-                Instance.new("UIStroke", frame).Color = Color3.fromRGB(255, 200, 0)
+            local ico = Instance.new("TextLabel", frame)
+            ico.Size = UDim2.fromOffset(44, 68)
+            ico.BackgroundTransparency = 1
+            ico.Text = "📢" ; ico.TextSize = 26
+            ico.Font = Enum.Font.GothamBold
+            ico.TextColor3 = Color3.new(1,1,1)
 
-                local ico = Instance.new("TextLabel", frame)
-                ico.Size = UDim2.fromOffset(44, 68)
-                ico.BackgroundTransparency = 1
-                ico.Text = "📢"
-                ico.TextSize = 26
-                ico.Font = Enum.Font.GothamBold
-                ico.TextColor3 = Color3.new(1,1,1)
+            local lbl = Instance.new("TextLabel", frame)
+            lbl.Size = UDim2.new(1, -50, 1, 0)
+            lbl.Position = UDim2.fromOffset(48, 0)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = "[ADMIN] " .. bc.msg
+            lbl.TextWrapped = true
+            lbl.Font = Enum.Font.GothamBold
+            lbl.TextSize = 13
+            lbl.TextColor3 = Color3.new(1,1,1)
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+            lbl.TextYAlignment = Enum.TextYAlignment.Center
 
-                local lbl = Instance.new("TextLabel", frame)
-                lbl.Size = UDim2.new(1, -50, 1, 0)
-                lbl.Position = UDim2.fromOffset(48, 0)
-                lbl.BackgroundTransparency = 1
-                lbl.Text = "[ADMIN] " .. bc.msg
-                lbl.TextWrapped = true
-                lbl.Font = Enum.Font.GothamBold
-                lbl.TextSize = 13
-                lbl.TextColor3 = Color3.new(1,1,1)
-                lbl.TextXAlignment = Enum.TextXAlignment.Left
-                lbl.TextYAlignment = Enum.TextYAlignment.Center
-
-                task.delay(6, function() pcall(function() notif:Destroy() end) end)
-            end
+            task.delay(6, function() pcall(function() notif:Destroy() end) end)
         end
-    end)
-
-    -- Kick command
-    task.spawn(function()
-        while task.wait(3) do
-            local kicks = fbA("GET", "/adminkick")
-            if kicks and type(kicks) == "table" then
-                for _, kname in pairs(kicks) do
-                    if kname == LP.Name then
-                        pcall(function()
-                            TeleportService_A:Teleport(game.PlaceId, LP)
-                        end)
-                    end
-                end
-            end
-        end
-    end)
-
-    -- Bring command
-    task.spawn(function()
-        while task.wait(3) do
-            local brings = fbA("GET", "/adminbring")
-            if brings and type(brings) == "table" then
-                for _, entry in pairs(brings) do
-                    if type(entry) == "table" and entry.target == LP.Name and entry.job and entry.job ~= "" then
-                        pcall(function()
-                            TeleportService_A:TeleportToPlaceInstance(game.PlaceId, entry.job, LP)
-                        end)
-                    end
-                end
-            end
-        end
-    end)
-
-    print("✅ Presence registered: " .. LP.Name)
-    return
-end
-
--- ══════════════════════════════════════════════════════════════
---  ADMIN UI
--- ══════════════════════════════════════════════════════════════
-pages.admin = createPage()
-local adminPage = pages.admin
-
--- ปุ่มเปิดจากหน้าหลัก
-label(pages.main, "--- ADMIN PANEL ---")
-local adminOpenBtn = btn(pages.main, "🔐 ADMIN PANEL", function()
-    showPage("admin")
-end)
-adminOpenBtn.BackgroundColor3 = Color3.fromRGB(120, 15, 15)
-adminOpenBtn.Font = Enum.Font.GothamBold
-
--- ── Title ─────────────────────────────────────────────────
-local adTitle = Instance.new("TextLabel", adminPage)
-adTitle.Size               = UDim2.new(1, 0, 0, 24)
-adTitle.BackgroundColor3   = Color3.fromRGB(90, 10, 10)
-adTitle.Text               = "🔐  ADMIN PANEL  v1.0  —  " .. LP.Name
-adTitle.Font               = Enum.Font.GothamBold
-adTitle.TextSize           = 11
-adTitle.TextColor3         = Color3.fromRGB(255, 180, 180)
-adTitle.BorderSizePixel    = 0
-Instance.new("UICorner", adTitle).CornerRadius = UDim.new(0, 6)
-
--- ── Stats ─────────────────────────────────────────────────
-local statsLbl = Instance.new("TextLabel", adminPage)
-statsLbl.Size               = UDim2.new(1, 0, 0, 15)
-statsLbl.BackgroundTransparency = 1
-statsLbl.Text               = "👥 Script users online: ..."
-statsLbl.Font               = Enum.Font.Gotham
-statsLbl.TextSize           = 10
-statsLbl.TextColor3         = Color3.fromRGB(160, 220, 160)
-statsLbl.TextXAlignment     = Enum.TextXAlignment.Left
-
--- ── User List ─────────────────────────────────────────────
-local listHdr = Instance.new("TextLabel", adminPage)
-listHdr.Size               = UDim2.new(1, 0, 0, 13)
-listHdr.BackgroundTransparency = 1
-listHdr.Text               = "── SCRIPT USERS ──"
-listHdr.Font               = Enum.Font.GothamBold
-listHdr.TextSize           = 9
-listHdr.TextColor3         = Color3.fromRGB(200, 200, 200)
-
-local listBg = Instance.new("Frame", adminPage)
-listBg.Size             = UDim2.new(1, 0, 0, 165)
-listBg.BackgroundColor3 = Color3.fromRGB(10, 10, 16)
-listBg.BorderSizePixel  = 0
-Instance.new("UICorner", listBg).CornerRadius = UDim.new(0, 8)
-Instance.new("UIStroke", listBg).Color = Color3.fromRGB(80, 15, 15)
-
-local userScroll = Instance.new("ScrollingFrame", listBg)
-userScroll.Size                  = UDim2.new(1, -4, 1, -4)
-userScroll.Position              = UDim2.new(0, 2, 0, 2)
-userScroll.BackgroundTransparency = 1
-userScroll.BorderSizePixel       = 0
-userScroll.ScrollBarThickness    = 3
-userScroll.ScrollBarImageColor3  = Color3.fromRGB(200, 50, 50)
-userScroll.AutomaticCanvasSize   = Enum.AutomaticSize.Y
-userScroll.CanvasSize            = UDim2.new(0,0,0,0)
-
-local userLayout = Instance.new("UIListLayout", userScroll)
-userLayout.Padding   = UDim.new(0, 3)
-userLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-local userPad = Instance.new("UIPadding", userScroll)
-userPad.PaddingLeft   = UDim.new(0, 3)
-userPad.PaddingRight  = UDim.new(0, 3)
-userPad.PaddingTop    = UDim.new(0, 3)
-userPad.PaddingBottom = UDim.new(0, 3)
-
--- ── Broadcast ─────────────────────────────────────────────
-local bcHdr = Instance.new("TextLabel", adminPage)
-bcHdr.Size               = UDim2.new(1, 0, 0, 13)
-bcHdr.BackgroundTransparency = 1
-bcHdr.Text               = "── BROADCAST TO ALL ──"
-bcHdr.Font               = Enum.Font.GothamBold
-bcHdr.TextSize           = 9
-bcHdr.TextColor3         = Color3.fromRGB(200, 200, 200)
-
-local bcBg = Instance.new("Frame", adminPage)
-bcBg.Size             = UDim2.new(1, 0, 0, 30)
-bcBg.BackgroundColor3 = Color3.fromRGB(28, 20, 8)
-bcBg.BorderSizePixel  = 0
-Instance.new("UICorner", bcBg).CornerRadius = UDim.new(0, 8)
-Instance.new("UIStroke", bcBg).Color = Color3.fromRGB(160, 110, 0)
-
-local bcInput = Instance.new("TextBox", bcBg)
-bcInput.Size               = UDim2.new(1, -78, 1, -6)
-bcInput.Position           = UDim2.new(0, 8, 0, 3)
-bcInput.BackgroundTransparency = 1
-bcInput.PlaceholderText    = "ข้อความ Broadcast..."
-bcInput.PlaceholderColor3  = Color3.fromRGB(120, 100, 50)
-bcInput.Text               = ""
-bcInput.Font               = Enum.Font.Gotham
-bcInput.TextSize           = 11
-bcInput.TextColor3         = Color3.new(1,1,1)
-bcInput.ClearTextOnFocus   = false
-
-local bcSend = Instance.new("TextButton", bcBg)
-bcSend.Size             = UDim2.fromOffset(64, 22)
-bcSend.Position         = UDim2.new(1, -68, 0.5, -11)
-bcSend.BackgroundColor3 = Color3.fromRGB(180, 110, 0)
-bcSend.Text             = "📢 SEND"
-bcSend.Font             = Enum.Font.GothamBold
-bcSend.TextSize         = 10
-bcSend.TextColor3       = Color3.new(1,1,1)
-bcSend.BorderSizePixel  = 0
-Instance.new("UICorner", bcSend).CornerRadius = UDim.new(0, 6)
-
--- ── Status bar ────────────────────────────────────────────
-local adStatus = Instance.new("TextLabel", adminPage)
-adStatus.Size               = UDim2.new(1, 0, 0, 13)
-adStatus.BackgroundTransparency = 1
-adStatus.Text               = "● Firebase connected"
-adStatus.Font               = Enum.Font.Gotham
-adStatus.TextSize           = 9
-adStatus.TextColor3         = Color3.fromRGB(70, 200, 90)
-adStatus.TextXAlignment     = Enum.TextXAlignment.Left
-
-local function setAdStatus(msg, col, resetSec)
-    adStatus.Text      = msg
-    adStatus.TextColor3= col
-    if resetSec then
-        task.delay(resetSec, function()
-            adStatus.Text      = "● Firebase connected"
-            adStatus.TextColor3= Color3.fromRGB(70, 200, 90)
-        end)
     end
-end
+end)
 
--- ── Bottom buttons ────────────────────────────────────────
-local adBottom = Instance.new("Frame", adminPage)
-adBottom.Size             = UDim2.new(1, 0, 0, 26)
-adBottom.BackgroundTransparency = 1
-local adBotL = Instance.new("UIListLayout", adBottom)
-adBotL.FillDirection = Enum.FillDirection.Horizontal
-adBotL.Padding       = UDim.new(0, 5)
+-- Kick listener
+task.spawn(function()
+    while task.wait(3) do
+        local kicks = fbA("GET", "/adminkick")
+        if kicks and type(kicks) == "table" then
+            for _, kname in pairs(kicks) do
+                if kname == LP.Name then
+                    pcall(function() TeleportService_A:Teleport(game.PlaceId, LP) end)
+                end
+            end
+        end
+    end
+end)
 
-local function adBotBtn(txt, col)
-    local b = Instance.new("TextButton", adBottom)
-    b.BackgroundColor3 = col
-    b.Text             = txt
-    b.Font             = Enum.Font.GothamBold
-    b.TextSize         = 10
-    b.TextColor3       = Color3.new(1,1,1)
-    b.BorderSizePixel  = 0
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
-    return b
-end
-
-local refreshBtn = adBotBtn("🔄 REFRESH", Color3.fromRGB(35, 70, 150))
-local backBtn    = adBotBtn("◀ BACK",    Color3.fromRGB(50, 50, 50))
-refreshBtn.Size  = UDim2.new(0.55, -2, 1, 0)
-backBtn.Size     = UDim2.new(0.45, -3, 1, 0)
-backBtn.MouseButton1Click:Connect(function() showPage("main") end)
+-- Bring listener
+task.spawn(function()
+    while task.wait(3) do
+        local brings = fbA("GET", "/adminbring")
+        if brings and type(brings) == "table" then
+            for _, entry in pairs(brings) do
+                if type(entry) == "table" and entry.target == LP.Name
+                and entry.job and entry.job ~= "" then
+                    pcall(function()
+                        TeleportService_A:TeleportToPlaceInstance(game.PlaceId, entry.job, LP)
+                    end)
+                end
+            end
+        end
+    end
+end)
 
 -- ══════════════════════════════════════════════════════════════
---  BUILD USER ROW
+--  ADMIN UI — ห่อใน if isAdmin แทนการใช้ return
 -- ══════════════════════════════════════════════════════════════
-local function buildUserRow(info, isSameServer)
-    local name  = info.name  or "?"
-    local jobId = info.job   or ""
+if isAdmin then
 
-    local row = Instance.new("Frame", userScroll)
-    row.Size             = UDim2.new(1, 0, 0, 38)
-    row.BackgroundColor3 = isSameServer
-                           and Color3.fromRGB(18, 36, 18)
-                           or  Color3.fromRGB(20, 20, 32)
-    row.BorderSizePixel  = 0
-    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+    pages.admin = createPage()
+    local adminPage = pages.admin
 
-    -- สถานะ dot
-    local dot = Instance.new("TextLabel", row)
-    dot.Size = UDim2.fromOffset(14, 38)
-    dot.Position = UDim2.fromOffset(3, 0)
-    dot.BackgroundTransparency = 1
-    dot.Text = "●"
-    dot.TextSize = 9
-    dot.Font = Enum.Font.GothamBold
-    dot.TextColor3 = isSameServer
-                     and Color3.fromRGB(80, 255, 100)
-                     or  Color3.fromRGB(120, 120, 130)
+    -- ปุ่มเปิดจากหน้าหลัก
+    label(pages.main, "--- ADMIN PANEL ---")
+    local adminOpenBtn = btn(pages.main, "🔐 ADMIN PANEL", function()
+        showPage("admin")
+    end)
+    adminOpenBtn.BackgroundColor3 = Color3.fromRGB(120, 15, 15)
+    adminOpenBtn.Font = Enum.Font.GothamBold
 
-    -- ชื่อ + เซิร์ฟ
-    local nameCol = Instance.new("Frame", row)
-    nameCol.Size = UDim2.new(1, -128, 1, 0)
-    nameCol.Position = UDim2.fromOffset(18, 0)
-    nameCol.BackgroundTransparency = 1
+    -- Title
+    local adTitle = Instance.new("TextLabel", adminPage)
+    adTitle.Size               = UDim2.new(1, 0, 0, 24)
+    adTitle.BackgroundColor3   = Color3.fromRGB(90, 10, 10)
+    adTitle.Text               = "🔐  ADMIN PANEL  v1.1  —  " .. LP.Name
+    adTitle.Font               = Enum.Font.GothamBold
+    adTitle.TextSize           = 11
+    adTitle.TextColor3         = Color3.fromRGB(255, 180, 180)
+    adTitle.BorderSizePixel    = 0
+    Instance.new("UICorner", adTitle).CornerRadius = UDim.new(0, 6)
 
-    local nameLbl = Instance.new("TextLabel", nameCol)
-    nameLbl.Size = UDim2.new(1, 0, 0.55, 0)
-    nameLbl.BackgroundTransparency = 1
-    nameLbl.Text = (AdminOwners[name] and "👑 " or "👤 ") .. name
-    nameLbl.Font = Enum.Font.GothamBold
-    nameLbl.TextSize = 11
-    nameLbl.TextColor3 = AdminOwners[name]
-                         and Color3.fromRGB(255, 215, 0)
-                         or  Color3.new(1,1,1)
-    nameLbl.TextXAlignment = Enum.TextXAlignment.Left
-    nameLbl.TextYAlignment = Enum.TextYAlignment.Bottom
+    -- Stats
+    local statsLbl = Instance.new("TextLabel", adminPage)
+    statsLbl.Size               = UDim2.new(1, 0, 0, 15)
+    statsLbl.BackgroundTransparency = 1
+    statsLbl.Text               = "👥 Script users online: ..."
+    statsLbl.Font               = Enum.Font.Gotham
+    statsLbl.TextSize           = 10
+    statsLbl.TextColor3         = Color3.fromRGB(160, 220, 160)
+    statsLbl.TextXAlignment     = Enum.TextXAlignment.Left
 
-    local serverLbl = Instance.new("TextLabel", nameCol)
-    serverLbl.Size = UDim2.new(1, 0, 0.45, 0)
-    serverLbl.Position = UDim2.new(0, 0, 0.55, 0)
-    serverLbl.BackgroundTransparency = 1
-    serverLbl.Text = isSameServer and "📍 Same server" or ("🌐 " .. string.sub(jobId, 1, 16) .. "...")
-    serverLbl.Font = Enum.Font.Gotham
-    serverLbl.TextSize = 8
-    serverLbl.TextColor3 = isSameServer
-                           and Color3.fromRGB(100, 220, 120)
-                           or  Color3.fromRGB(140, 140, 180)
-    serverLbl.TextXAlignment = Enum.TextXAlignment.Left
-    serverLbl.TextYAlignment = Enum.TextYAlignment.Top
+    -- User list header
+    local listHdr = Instance.new("TextLabel", adminPage)
+    listHdr.Size               = UDim2.new(1, 0, 0, 13)
+    listHdr.BackgroundTransparency = 1
+    listHdr.Text               = "── SCRIPT USERS ──"
+    listHdr.Font               = Enum.Font.GothamBold
+    listHdr.TextSize           = 9
+    listHdr.TextColor3         = Color3.fromRGB(200, 200, 200)
 
-    -- Action buttons
-    local btnGroup = Instance.new("Frame", row)
-    btnGroup.Size = UDim2.fromOffset(118, 24)
-    btnGroup.Position = UDim2.new(1, -122, 0.5, -12)
-    btnGroup.BackgroundTransparency = 1
-    local bgl = Instance.new("UIListLayout", btnGroup)
-    bgl.FillDirection = Enum.FillDirection.Horizontal
-    bgl.Padding = UDim.new(0, 3)
+    -- User list scroll
+    local listBg = Instance.new("Frame", adminPage)
+    listBg.Size             = UDim2.new(1, 0, 0, 165)
+    listBg.BackgroundColor3 = Color3.fromRGB(10, 10, 16)
+    listBg.BorderSizePixel  = 0
+    Instance.new("UICorner", listBg).CornerRadius = UDim.new(0, 8)
+    Instance.new("UIStroke", listBg).Color = Color3.fromRGB(80, 15, 15)
 
-    local function miniBtn(txt, col, cb)
-        local b = Instance.new("TextButton", btnGroup)
-        b.Size = UDim2.fromOffset(34, 24)
+    local userScroll = Instance.new("ScrollingFrame", listBg)
+    userScroll.Size                   = UDim2.new(1, -4, 1, -4)
+    userScroll.Position               = UDim2.new(0, 2, 0, 2)
+    userScroll.BackgroundTransparency = 1
+    userScroll.BorderSizePixel        = 0
+    userScroll.ScrollBarThickness     = 3
+    userScroll.ScrollBarImageColor3   = Color3.fromRGB(200, 50, 50)
+    userScroll.AutomaticCanvasSize    = Enum.AutomaticSize.Y
+    userScroll.CanvasSize             = UDim2.new(0,0,0,0)
+
+    local userLayout = Instance.new("UIListLayout", userScroll)
+    userLayout.Padding   = UDim.new(0, 3)
+    userLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local userPad = Instance.new("UIPadding", userScroll)
+    userPad.PaddingLeft   = UDim.new(0, 3)
+    userPad.PaddingRight  = UDim.new(0, 3)
+    userPad.PaddingTop    = UDim.new(0, 3)
+    userPad.PaddingBottom = UDim.new(0, 3)
+
+    -- Broadcast section
+    local bcHdr = Instance.new("TextLabel", adminPage)
+    bcHdr.Size               = UDim2.new(1, 0, 0, 13)
+    bcHdr.BackgroundTransparency = 1
+    bcHdr.Text               = "── BROADCAST TO ALL ──"
+    bcHdr.Font               = Enum.Font.GothamBold
+    bcHdr.TextSize           = 9
+    bcHdr.TextColor3         = Color3.fromRGB(200, 200, 200)
+
+    local bcBg = Instance.new("Frame", adminPage)
+    bcBg.Size             = UDim2.new(1, 0, 0, 30)
+    bcBg.BackgroundColor3 = Color3.fromRGB(28, 20, 8)
+    bcBg.BorderSizePixel  = 0
+    Instance.new("UICorner", bcBg).CornerRadius = UDim.new(0, 8)
+    Instance.new("UIStroke", bcBg).Color = Color3.fromRGB(160, 110, 0)
+
+    local bcInput = Instance.new("TextBox", bcBg)
+    bcInput.Size               = UDim2.new(1, -78, 1, -6)
+    bcInput.Position           = UDim2.new(0, 8, 0, 3)
+    bcInput.BackgroundTransparency = 1
+    bcInput.PlaceholderText    = "ข้อความ Broadcast..."
+    bcInput.PlaceholderColor3  = Color3.fromRGB(120, 100, 50)
+    bcInput.Text               = ""
+    bcInput.Font               = Enum.Font.Gotham
+    bcInput.TextSize           = 11
+    bcInput.TextColor3         = Color3.new(1,1,1)
+    bcInput.ClearTextOnFocus   = false
+
+    local bcSend = Instance.new("TextButton", bcBg)
+    bcSend.Size             = UDim2.fromOffset(64, 22)
+    bcSend.Position         = UDim2.new(1, -68, 0.5, -11)
+    bcSend.BackgroundColor3 = Color3.fromRGB(180, 110, 0)
+    bcSend.Text             = "📢 SEND"
+    bcSend.Font             = Enum.Font.GothamBold
+    bcSend.TextSize         = 10
+    bcSend.TextColor3       = Color3.new(1,1,1)
+    bcSend.BorderSizePixel  = 0
+    Instance.new("UICorner", bcSend).CornerRadius = UDim.new(0, 6)
+
+    -- Status bar
+    local adStatus = Instance.new("TextLabel", adminPage)
+    adStatus.Size               = UDim2.new(1, 0, 0, 13)
+    adStatus.BackgroundTransparency = 1
+    adStatus.Text               = "● Firebase connected"
+    adStatus.Font               = Enum.Font.Gotham
+    adStatus.TextSize           = 9
+    adStatus.TextColor3         = Color3.fromRGB(70, 200, 90)
+    adStatus.TextXAlignment     = Enum.TextXAlignment.Left
+
+    local function setAdStatus(msg, col, resetSec)
+        adStatus.Text      = msg
+        adStatus.TextColor3= col
+        if resetSec then
+            task.delay(resetSec, function()
+                adStatus.Text      = "● Firebase connected"
+                adStatus.TextColor3= Color3.fromRGB(70, 200, 90)
+            end)
+        end
+    end
+
+    -- Bottom buttons
+    local adBottom = Instance.new("Frame", adminPage)
+    adBottom.Size             = UDim2.new(1, 0, 0, 26)
+    adBottom.BackgroundTransparency = 1
+    local adBotL = Instance.new("UIListLayout", adBottom)
+    adBotL.FillDirection = Enum.FillDirection.Horizontal
+    adBotL.Padding       = UDim.new(0, 5)
+
+    local function adBotBtn(txt, col)
+        local b = Instance.new("TextButton", adBottom)
         b.BackgroundColor3 = col
-        b.Text = txt
-        b.Font = Enum.Font.GothamBold
-        b.TextSize = 8
-        b.TextColor3 = Color3.new(1,1,1)
-        b.BorderSizePixel = 0
-        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 5)
-        b.MouseButton1Click:Connect(cb)
+        b.Text             = txt
+        b.Font             = Enum.Font.GothamBold
+        b.TextSize         = 10
+        b.TextColor3       = Color3.new(1,1,1)
+        b.BorderSizePixel  = 0
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
         return b
     end
 
-    -- KICK
-    miniBtn("KICK", Color3.fromRGB(180, 25, 25), function()
-        fbA("POST", "/adminkick", name)
-        setAdStatus("⚡ Kicked: " .. name, Color3.fromRGB(255, 100, 100), 4)
-        -- ล้าง kick list หลัง 5 วิ
-        task.delay(5, function() fbA("DELETE", "/adminkick") end)
-    end)
+    local refreshBtn = adBotBtn("🔄 REFRESH", Color3.fromRGB(35, 70, 150))
+    local backBtn    = adBotBtn("◀ BACK",    Color3.fromRGB(50, 50, 50))
+    refreshBtn.Size  = UDim2.new(0.55, -2, 1, 0)
+    backBtn.Size     = UDim2.new(0.45, -3, 1, 0)
+    backBtn.MouseButton1Click:Connect(function() showPage("main") end)
 
-    -- BRING
-    miniBtn("BRING", Color3.fromRGB(25, 90, 180), function()
-        fbA("POST", "/adminbring", {
-            target = name,
-            job    = game.JobId
-        })
-        setAdStatus("🔵 Bringing: " .. name, Color3.fromRGB(100, 180, 255), 4)
-        task.delay(10, function() fbA("DELETE", "/adminbring") end)
-    end)
+    -- Build user row
+    local function buildUserRow(info, isSameServer)
+        local name  = info.name or "?"
+        local jobId = info.job  or ""
 
-    -- JOIN (ถ้าคนละเซิร์ฟ)
-    if not isSameServer and jobId ~= "" then
-        miniBtn("JOIN", Color3.fromRGB(15, 140, 70), function()
-            TeleportService_A:TeleportToPlaceInstance(game.PlaceId, jobId, LP)
+        local row = Instance.new("Frame", userScroll)
+        row.Size             = UDim2.new(1, 0, 0, 38)
+        row.BackgroundColor3 = isSameServer
+                               and Color3.fromRGB(18, 36, 18)
+                               or  Color3.fromRGB(20, 20, 32)
+        row.BorderSizePixel  = 0
+        Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+
+        local dot = Instance.new("TextLabel", row)
+        dot.Size = UDim2.fromOffset(14, 38) ; dot.Position = UDim2.fromOffset(3, 0)
+        dot.BackgroundTransparency = 1 ; dot.Text = "●" ; dot.TextSize = 9
+        dot.Font = Enum.Font.GothamBold
+        dot.TextColor3 = isSameServer
+                         and Color3.fromRGB(80, 255, 100)
+                         or  Color3.fromRGB(120, 120, 130)
+
+        local nameCol = Instance.new("Frame", row)
+        nameCol.Size = UDim2.new(1, -128, 1, 0) ; nameCol.Position = UDim2.fromOffset(18, 0)
+        nameCol.BackgroundTransparency = 1
+
+        local nameLbl = Instance.new("TextLabel", nameCol)
+        nameLbl.Size = UDim2.new(1, 0, 0.55, 0)
+        nameLbl.BackgroundTransparency = 1
+        nameLbl.Text = (AdminOwners[name] and "👑 " or "👤 ") .. name
+        nameLbl.Font = Enum.Font.GothamBold ; nameLbl.TextSize = 11
+        nameLbl.TextColor3 = AdminOwners[name]
+                             and Color3.fromRGB(255, 215, 0)
+                             or  Color3.new(1,1,1)
+        nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+        nameLbl.TextYAlignment = Enum.TextYAlignment.Bottom
+
+        local serverLbl = Instance.new("TextLabel", nameCol)
+        serverLbl.Size = UDim2.new(1, 0, 0.45, 0) ; serverLbl.Position = UDim2.new(0,0,0.55,0)
+        serverLbl.BackgroundTransparency = 1
+        serverLbl.Text = isSameServer and "📍 Same server"
+                         or ("🌐 " .. string.sub(jobId,1,16) .. "...")
+        serverLbl.Font = Enum.Font.Gotham ; serverLbl.TextSize = 8
+        serverLbl.TextColor3 = isSameServer
+                               and Color3.fromRGB(100, 220, 120)
+                               or  Color3.fromRGB(140, 140, 180)
+        serverLbl.TextXAlignment = Enum.TextXAlignment.Left
+        serverLbl.TextYAlignment = Enum.TextYAlignment.Top
+
+        local btnGroup = Instance.new("Frame", row)
+        btnGroup.Size = UDim2.fromOffset(118, 24)
+        btnGroup.Position = UDim2.new(1, -122, 0.5, -12)
+        btnGroup.BackgroundTransparency = 1
+        local bgl = Instance.new("UIListLayout", btnGroup)
+        bgl.FillDirection = Enum.FillDirection.Horizontal
+        bgl.Padding = UDim.new(0, 3)
+
+        local function miniBtn(txt, col, cb)
+            local b = Instance.new("TextButton", btnGroup)
+            b.Size = UDim2.fromOffset(34, 24)
+            b.BackgroundColor3 = col ; b.Text = txt
+            b.Font = Enum.Font.GothamBold ; b.TextSize = 8
+            b.TextColor3 = Color3.new(1,1,1) ; b.BorderSizePixel = 0
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 5)
+            b.MouseButton1Click:Connect(cb)
+            return b
+        end
+
+        miniBtn("KICK", Color3.fromRGB(180, 25, 25), function()
+            fbA("POST", "/adminkick", name)
+            setAdStatus("⚡ Kicked: " .. name, Color3.fromRGB(255, 100, 100), 4)
+            task.delay(5, function() fbA("DELETE", "/adminkick") end)
         end)
-    end
-end
 
--- ══════════════════════════════════════════════════════════════
---  REFRESH USER LIST
--- ══════════════════════════════════════════════════════════════
-local function refreshUserList()
-    for _, v in ipairs(userScroll:GetChildren()) do
-        if v:IsA("Frame") or v:IsA("TextLabel") then v:Destroy() end
-    end
+        miniBtn("BRING", Color3.fromRGB(25, 90, 180), function()
+            fbA("POST", "/adminbring", { target = name, job = game.JobId })
+            setAdStatus("🔵 Bringing: " .. name, Color3.fromRGB(100, 180, 255), 4)
+            task.delay(10, function() fbA("DELETE", "/adminbring") end)
+        end)
 
-    setAdStatus("⏳ Loading...", Color3.fromRGB(200, 200, 80))
-
-    local data = fbA("GET", "/scriptusers")
-    if not data or type(data) ~= "table" then
-        setAdStatus("✕ Firebase error", Color3.fromRGB(220, 60, 60))
-        statsLbl.Text = "👥 Script users online: ?"
-        return
+        if not isSameServer and jobId ~= "" then
+            miniBtn("JOIN", Color3.fromRGB(15, 140, 70), function()
+                TeleportService_A:TeleportToPlaceInstance(game.PlaceId, jobId, LP)
+            end)
+        end
     end
 
-    local now = os.time()
-    local sameServer  = {}
-    local otherServer = {}
-    local totalOnline = 0
+    -- Refresh user list
+    local function refreshUserList()
+        for _, v in ipairs(userScroll:GetChildren()) do
+            if v:IsA("Frame") or v:IsA("TextLabel") then v:Destroy() end
+        end
+        setAdStatus("⏳ Loading...", Color3.fromRGB(200, 200, 80))
 
-    for key, info in pairs(data) do
-        if type(info) == "table" and info.name and info.ts then
-            if (now - (info.ts or 0)) <= SESSION_TTL then
-                totalOnline += 1
-                if info.job == game.JobId then
-                    table.insert(sameServer, info)
+        local data = fbA("GET", "/scriptusers")
+        if not data or type(data) ~= "table" then
+            setAdStatus("✕ Firebase error", Color3.fromRGB(220, 60, 60))
+            statsLbl.Text = "👥 Script users online: ?"
+            return
+        end
+
+        local now = os.time()
+        local sameServer, otherServer = {}, {}
+        local totalOnline = 0
+
+        for key, info in pairs(data) do
+            if type(info) == "table" and info.name and info.ts then
+                if (now - (info.ts or 0)) <= SESSION_TTL then
+                    totalOnline += 1
+                    if info.job == game.JobId then
+                        table.insert(sameServer, info)
+                    else
+                        table.insert(otherServer, info)
+                    end
                 else
-                    table.insert(otherServer, info)
+                    task.spawn(function()
+                        pcall(function() fbA("DELETE", "/scriptusers/" .. key) end)
+                    end)
                 end
-            else
-                -- ลบ stale
-                task.spawn(function()
-                    pcall(function() fbA("DELETE", "/scriptusers/" .. key) end)
-                end)
             end
         end
-    end
 
-    table.sort(sameServer,  function(a,b) return a.name < b.name end)
-    table.sort(otherServer, function(a,b) return a.name < b.name end)
+        table.sort(sameServer,  function(a,b) return a.name < b.name end)
+        table.sort(otherServer, function(a,b) return a.name < b.name end)
 
-    -- Same server section
-    if #sameServer > 0 then
-        local h = Instance.new("TextLabel", userScroll)
-        h.Size = UDim2.new(1, 0, 0, 14)
-        h.BackgroundTransparency = 1
-        h.Text = "📍 THIS SERVER  (" .. #sameServer .. ")"
-        h.Font = Enum.Font.GothamBold
-        h.TextSize = 9
-        h.TextColor3 = Color3.fromRGB(80, 255, 110)
-        h.TextXAlignment = Enum.TextXAlignment.Left
-    end
-    for _, info in ipairs(sameServer) do
-        buildUserRow(info, true)
-    end
-
-    -- Other servers section
-    if #otherServer > 0 then
-        local h2 = Instance.new("TextLabel", userScroll)
-        h2.Size = UDim2.new(1, 0, 0, 14)
-        h2.BackgroundTransparency = 1
-        h2.Text = "🌐 OTHER SERVERS  (" .. #otherServer .. ")"
-        h2.Font = Enum.Font.GothamBold
-        h2.TextSize = 9
-        h2.TextColor3 = Color3.fromRGB(160, 160, 255)
-        h2.TextXAlignment = Enum.TextXAlignment.Left
-    end
-    for _, info in ipairs(otherServer) do
-        buildUserRow(info, false)
-    end
-
-    statsLbl.Text = "👥 Script users online: " .. totalOnline
-                 .. "  (this server: " .. #sameServer .. ")"
-    setAdStatus("● Refreshed  [" .. os.date("%H:%M:%S") .. "]",
-                Color3.fromRGB(70, 200, 90))
-end
-
--- ══════════════════════════════════════════════════════════════
---  EVENTS
--- ══════════════════════════════════════════════════════════════
-refreshBtn.MouseButton1Click:Connect(refreshUserList)
-
-bcSend.MouseButton1Click:Connect(function()
-    local msg = bcInput.Text:match("^%s*(.-)%s*$")
-    if msg == "" then return end
-    fbA("PUT", "/adminbroadcast", {
-        msg    = msg,
-        sender = LP.Name,
-        ts     = os.time()
-    })
-    bcInput.Text = ""
-    setAdStatus("📢 Broadcast sent!", Color3.fromRGB(255, 200, 80), 3)
-end)
-
--- Auto refresh ถ้าหน้า admin เปิดอยู่
-task.spawn(function()
-    while task.wait(POLL_ADMIN) do
-        if pages.admin and pages.admin.Visible then
-            pcall(refreshUserList)
+        if #sameServer > 0 then
+            local h = Instance.new("TextLabel", userScroll)
+            h.Size = UDim2.new(1,0,0,14) ; h.BackgroundTransparency = 1
+            h.Text = "📍 THIS SERVER  (" .. #sameServer .. ")"
+            h.Font = Enum.Font.GothamBold ; h.TextSize = 9
+            h.TextColor3 = Color3.fromRGB(80, 255, 110)
+            h.TextXAlignment = Enum.TextXAlignment.Left
         end
+        for _, info in ipairs(sameServer) do buildUserRow(info, true) end
+
+        if #otherServer > 0 then
+            local h2 = Instance.new("TextLabel", userScroll)
+            h2.Size = UDim2.new(1,0,0,14) ; h2.BackgroundTransparency = 1
+            h2.Text = "🌐 OTHER SERVERS  (" .. #otherServer .. ")"
+            h2.Font = Enum.Font.GothamBold ; h2.TextSize = 9
+            h2.TextColor3 = Color3.fromRGB(160, 160, 255)
+            h2.TextXAlignment = Enum.TextXAlignment.Left
+        end
+        for _, info in ipairs(otherServer) do buildUserRow(info, false) end
+
+        statsLbl.Text = "👥 Script users online: " .. totalOnline
+                     .. "  (this server: " .. #sameServer .. ")"
+        setAdStatus("● Refreshed  [" .. os.date("%H:%M:%S") .. "]",
+                    Color3.fromRGB(70, 200, 90))
     end
-end)
 
--- load ครั้งแรก
-task.spawn(refreshUserList)
+    -- Events
+    refreshBtn.MouseButton1Click:Connect(refreshUserList)
 
-print("✅ Admin Panel v1.0 Loaded — Welcome, " .. LP.Name)
+    bcSend.MouseButton1Click:Connect(function()
+        local msg = bcInput.Text:match("^%s*(.-)%s*$")
+        if msg == "" then return end
+        fbA("PUT", "/adminbroadcast", {
+            msg = msg, sender = LP.Name, ts = os.time()
+        })
+        bcInput.Text = ""
+        setAdStatus("📢 Broadcast sent!", Color3.fromRGB(255, 200, 80), 3)
+    end)
+
+    task.spawn(function()
+        while task.wait(POLL_ADMIN) do
+            if pages.admin and pages.admin.Visible then
+                pcall(refreshUserList)
+            end
+        end
+    end)
+
+    task.spawn(refreshUserList)
+    print("✅ Admin Panel v1.1 Loaded — Welcome, " .. LP.Name)
+
+end -- end if isAdmin
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))()
