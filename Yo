@@ -3428,167 +3428,163 @@ task.spawn(function()
     end)
 
     print("✅ Tutorial System Loaded!")
-end)
+
 -- ══════════════════════════════════════════════════════════════
---  TUTORIAL SYSTEM v3.0
---  ปุ่ม ? ข้างแต่ละปุ่ม กดแล้วขึ้น popup "How To X"
+--  TUTORIAL SYSTEM v4.0
+--  ปุ่ม ? อยู่ขวาของปุ่มเดิมในแถวเดียวกัน
 -- ══════════════════════════════════════════════════════════════
 task.spawn(function()
     task.wait(2)
 
-    local TUTORIALS = {
-        ["GRAB (LOOK)"]           = { title="How To Grab",          desc="Look at any part and press GRAB.\nThe part will float in front of you.\nMove your camera to move the part." },
-        ["DROP (LOOK)"]           = { title="How To Drop",          desc="Look at a part you are holding\nand press DROP to release it." },
-        ["DROP ALL"]              = { title="How To Drop All",       desc="Releases every part you\nare currently holding at once." },
-        ["FREEZE (LOOK)"]         = { title="How To Freeze",        desc="Look at a grabbed part and press FREEZE.\nThe part will stay locked in place." },
-        ["UNFREEZE (LOOK)"]       = { title="How To Unfreeze",      desc="Look at a frozen part and press UNFREEZE\nto let it move freely again." },
-        ["UNFREEZE ALL"]          = { title="How To Unfreeze All",  desc="Unfreezes every frozen part at once." },
-        ["THROW (LOOK)"]          = { title="How To Throw",         desc="Look at a held part and press THROW.\nIt will launch in the direction\nyou are facing." },
-        ["DELETE PART(LOOK)"]     = { title="How To Delete",        desc="Look at any part and press DELETE.\nThe part launches at extreme speed\nand flies far away." },
-        ["HIGHLIGHT : ON"]        = { title="About Highlight",      desc="When ON, parts you look at\nwill glow with an outline.\nToggle it off to disable the glow." },
-        ["HIGHLIGHT : OFF"]       = { title="About Highlight",      desc="Highlight is currently OFF.\nPress to turn it back ON." },
-        ["▶ MOVE / ROTATE MODE"]  = { title="How To Move/Rotate",   desc="Go to Move page to precisely\nmove or rotate frozen parts.\nFreeze parts first, then select them." },
-        ["DESTROY UI"]            = { title="How To Close UI",      desc="Removes the entire UI.\nYou will need to re-run\nthe script to get it back." },
-        ["OPEN PUPPET MASTER"]    = { title="How To Use Puppet",    desc="Click to add NPCs to the list.\nSelect them and press START CONTROL\nto move them with your character." },
-        ["BUILDER MODE (3D)"]     = { title="How To Build",         desc="Draw a pattern on the grid.\nNearby parts will form that shape\nin 3D in front of you." },
-        ["🌐 GLOBAL CHAT v6.0"]   = { title="How To Use Global Chat",desc="Chat with players across\nall servers in real time.\nPress JOIN to visit their server." },
-        ["👑 ADMIN PANEL"]        = { title="How To Use Admin Panel",desc="Owner-only panel.\nSee all players running this script,\nJoin / Bring / Kick / Chat with them." },
-        ["FEEDBACK"]              = { title="How To Send Feedback", desc="Type a message and press SEND\nto send feedback via webhook." },
-        ["AUTO GRAB NPC : OFF"]   = { title="How To Auto Grab NPC", desc="When ON, NPCs that enter\nyour radius will be grabbed\nautomatically." },
-        ["AUTO GRAB PART : OFF"]  = { title="How To Auto Grab Part",desc="When ON, loose parts that enter\nyour radius will be grabbed\nautomatically." },
-        ["AUTO FREEZE : OFF"]     = { title="How To Auto Freeze",   desc="When ON, every part you grab\nwill be frozen immediately." },
-        ["AUTO THROW : OFF"]      = { title="How To Auto Throw",    desc="When ON, every part you grab\nwill be thrown immediately." },
-        ["AUTO DELETE : OFF"]     = { title="How To Auto Delete",   desc="When ON, all nearby parts\nwill be launched into the sky\nautomatically." },
-        ["🛡️ AUTO SHIELD : OFF"]  = { title="How To Use Shield",    desc="When ON, parts flying toward you\nwill be grabbed automatically\nto protect you." },
-        ["FOLLOW OWNER : OFF"]    = { title="How To Follow Owner",  desc="When ON, grabbed parts\nwill float behind you\nas you walk." },
-        ["ENABLE CAR MODE: OFF"]  = { title="How To Drive",         desc="Turn ON then tap any part\nto start driving it.\nW/S = Fwd/Back, A/D = Turn." },
-        ["REFRESH LIST"]          = { title="How To Refresh List",  desc="Reloads the list of frozen parts\nso you can select them\nfor Move/Rotate." },
-        ["SELECT ALL"]            = { title="How To Select All",    desc="Selects all frozen parts\nfor multi-part editing." },
-        ["UNSELECT ALL"]          = { title="How To Deselect",      desc="Deselects all currently\nselected parts." },
-        ["TELEPORT PART(SELECT FIRST)"] = { title="How To Teleport Part", desc="Select parts first, then press\nthis button to teleport them\nright in front of you." },
-        ["◀ BACK"]                = { title="Go Back",              desc="Returns to the main page." },
-        ["◀ BACK TO MAIN"]        = { title="Go Back",              desc="Returns to the main page." },
-        ["🔄 REFRESH ALL RUNNERS"]= { title="How To Refresh Runners",desc="Reloads the list of all players\ncurrently running this script\nacross all servers." },
-        ["🔄 REFRESH SERVER LIST"]= { title="How To Refresh Server", desc="Reloads players running\nthis script in THIS server only." },
-        ["JOIN"]                  = { title="How To Join",          desc="Teleports you to that player's\nserver. Owner only." },
-        ["BRING"]                 = { title="How To Bring",         desc="Sends a request to pull that\nplayer to your current server." },
-        ["KICK"]                  = { title="How To Kick",          desc="Teleports that player out\nto a new empty server." },
-        ["CHAT"]                  = { title="How To Private Chat",  desc="Opens a private chat window\nwith that player.\nBoth sides see the same chat." },
-        ["KILL"]                  = { title="How To Kill",          desc="Sets that player's health to 0.\nThey will respawn normally." },
-        ["GOTO"]                  = { title="How To Go To Player",  desc="Teleports you directly\nto that player's position\n(same server only)." },
-        ["UNMUTE"]                = { title="How To Unmute",        desc="Type a username above\nthen press UNMUTE to clear\nall their warnings." },
-        ["FORCE MUTE"]            = { title="How To Force Mute",    desc="Type a username above\nthen press FORCE MUTE\nto silence them for 30 min." },
-        ["SEND"]                  = { title="How To Send Message",  desc="Type in the box then press SEND\nto broadcast to Global Chat.\nAll runners will see your message." },
-        ["🗑 CLEAR"]              = { title="How To Clear Chat",    desc="Clears all messages from\nyour local chat view.\nOther players are not affected." },
+    local T = {
+        ["GRAB (LOOK)"]={t="How To Grab",d="Look at any part then press GRAB.\nIt floats in front of you.\nMove camera to move the part."},
+        ["DROP (LOOK)"]={t="How To Drop",d="Look at a held part\nand press DROP to release it."},
+        ["DROP ALL"]={t="How To Drop All",d="Releases every part\nyou are currently holding."},
+        ["FREEZE (LOOK)"]={t="How To Freeze",d="Grab a part first, then look at it\nand press FREEZE to lock it in place."},
+        ["UNFREEZE (LOOK)"]={t="How To Unfreeze",d="Look at a frozen part\nand press UNFREEZE to free it."},
+        ["UNFREEZE ALL"]={t="How To Unfreeze All",d="Unfreezes every frozen part at once."},
+        ["THROW (LOOK)"]={t="How To Throw",d="Look at a held part and press THROW.\nIt launches forward at high speed."},
+        ["DELETE PART(LOOK)"]={t="How To Delete",d="Look at any part and press DELETE.\nIt launches at extreme speed and flies away."},
+        ["HIGHLIGHT : ON"]={t="About Highlight",d="Parts you look at will glow.\nPress to toggle it OFF."},
+        ["HIGHLIGHT : OFF"]={t="About Highlight",d="Highlight is OFF.\nPress to turn it back ON."},
+        ["▶ MOVE / ROTATE MODE"]={t="How To Move/Rotate",d="Freeze parts first, then go here\nto precisely move or rotate them."},
+        ["DESTROY UI"]={t="How To Close UI",d="Removes the entire UI.\nRe-run the script to get it back."},
+        ["OPEN PUPPET MASTER"]={t="How To Use Puppet",d="Add NPCs to the list then\npress START CONTROL to move them\nwith your character."},
+        ["BUILDER MODE (3D)"]={t="How To Build",d="Draw a pattern on the grid.\nNearby parts will form that\nshape in 3D in front of you."},
+        ["🌐 GLOBAL CHAT v6.0"]={t="How To Use Global Chat",d="Chat with players across all servers.\nPress JOIN on a message to visit\nthat player's server."},
+        ["👑 ADMIN PANEL"]={t="How To Use Admin Panel",d="Owner-only panel.\nSee all script runners,\nJoin/Bring/Kick/Chat with them."},
+        ["FEEDBACK"]={t="How To Send Feedback",d="Type a message and press SEND\nto send feedback via webhook."},
+        ["AUTO GRAB NPC : OFF"]={t="Auto Grab NPC",d="When ON, NPCs that enter\nyour radius are grabbed automatically."},
+        ["AUTO GRAB PART : OFF"]={t="Auto Grab Part",d="When ON, loose parts that enter\nyour radius are grabbed automatically."},
+        ["AUTO FREEZE : OFF"]={t="Auto Freeze",d="When ON, every part you grab\nis frozen immediately."},
+        ["AUTO THROW : OFF"]={t="Auto Throw",d="When ON, every part you grab\nis thrown immediately."},
+        ["AUTO DELETE : OFF"]={t="Auto Delete",d="When ON, all nearby parts\nare launched into the sky automatically."},
+        ["🛡️ AUTO SHIELD : OFF"]={t="How To Use Shield",d="When ON, parts flying toward you\nare grabbed automatically to protect you."},
+        ["FOLLOW OWNER : OFF"]={t="Follow Owner",d="When ON, grabbed parts float\nbehind you as you walk."},
+        ["ENABLE CAR MODE: OFF"]={t="How To Drive",d="Turn ON then tap any part\nto start driving it.\nW/S=Fwd/Back, A/D=Turn."},
+        ["REFRESH LIST"]={t="Refresh List",d="Reloads the list of frozen parts\nso you can select them."},
+        ["SELECT ALL"]={t="Select All",d="Selects all frozen parts\nfor multi-part editing."},
+        ["UNSELECT ALL"]={t="Deselect All",d="Deselects all currently selected parts."},
+        ["TELEPORT PART(SELECT FIRST)"]={t="Teleport Part",d="Select parts first, then press this\nto teleport them in front of you."},
+        ["◀ BACK"]={t="Go Back",d="Returns to the main page."},
+        ["◀ BACK TO MAIN"]={t="Go Back",d="Returns to the main page."},
+        ["🔄 REFRESH ALL RUNNERS"]={t="Refresh Runners",d="Reloads all players running\nthis script across all servers."},
+        ["🔄 REFRESH SERVER LIST"]={t="Refresh Server",d="Reloads players running\nthis script in THIS server only."},
+        ["JOIN"]={t="How To Join",d="Teleports you to that player's server.\nOwner only."},
+        ["BRING"]={t="How To Bring",d="Sends a request to pull that\nplayer to your current server."},
+        ["KICK"]={t="How To Kick",d="Teleports that player out\nto a new empty server."},
+        ["CHAT"]={t="How To Private Chat",d="Opens a private chat window\nwith that player.\nBoth sides see the same chat."},
+        ["KILL"]={t="How To Kill",d="Sets that player's health to 0.\nThey will respawn normally."},
+        ["GOTO"]={t="How To Go To Player",d="Teleports you directly to that\nplayer's position (same server only)."},
+        ["UNMUTE"]={t="How To Unmute",d="Type a username above\nthen press UNMUTE to clear all warnings."},
+        ["FORCE MUTE"]={t="How To Force Mute",d="Type a username above\nthen press FORCE MUTE to mute them 30 min."},
+        ["SEND"]={t="How To Send Message",d="Type in the box then press SEND\nto broadcast to Global Chat."},
+        ["🗑 CLEAR"]={t="How To Clear Chat",d="Clears all messages from your\nlocal chat view. Others not affected."},
     }
 
-    -- ── Popup UI ──────────────────────────────────────────────
+    -- popup UI
     local pg = Instance.new("ScreenGui")
-    pg.ResetOnSpawn = false; pg.Name = "TutPopupV3"
+    pg.ResetOnSpawn = false; pg.Name = "TutV4"
     pcall(function() pg.Parent = game:GetService("CoreGui") end)
     if pg.Parent ~= game:GetService("CoreGui") then pg.Parent = LP.PlayerGui end
 
     local pf = Instance.new("Frame", pg)
-    pf.Size = UDim2.fromOffset(230, 100)
+    pf.Size = UDim2.fromOffset(220,80)
     pf.BackgroundColor3 = Color3.fromRGB(12,12,22)
-    pf.BorderSizePixel = 0
-    pf.Visible = false
-    pf.Active = true
-    pf.Draggable = true
-    Instance.new("UICorner", pf).CornerRadius = UDim.new(0,10)
-    local stroke = Instance.new("UIStroke", pf)
-    stroke.Color = Color3.fromRGB(80,80,200)
-    stroke.Thickness = 1.5
+    pf.BorderSizePixel = 0; pf.Visible = false
+    pf.Active = true; pf.Draggable = true
+    Instance.new("UICorner",pf).CornerRadius = UDim.new(0,10)
+    local st = Instance.new("UIStroke",pf)
+    st.Color = Color3.fromRGB(80,80,200); st.Thickness = 1.5
 
-    local ptitle = Instance.new("TextLabel", pf)
-    ptitle.Size = UDim2.new(1,-32,0,20)
-    ptitle.Position = UDim2.new(0,8,0,6)
+    local ptitle = Instance.new("TextLabel",pf)
+    ptitle.Size = UDim2.new(1,-30,0,20)
+    ptitle.Position = UDim2.new(0,8,0,5)
     ptitle.BackgroundTransparency = 1
-    ptitle.Font = Enum.Font.GothamBold
-    ptitle.TextSize = 13
+    ptitle.Font = Enum.Font.GothamBold; ptitle.TextSize = 13
     ptitle.TextColor3 = Color3.fromRGB(160,200,255)
     ptitle.TextXAlignment = Enum.TextXAlignment.Left
 
-    local pdesc = Instance.new("TextLabel", pf)
+    local pdesc = Instance.new("TextLabel",pf)
     pdesc.Size = UDim2.new(1,-16,0,0)
-    pdesc.Position = UDim2.new(0,8,0,30)
+    pdesc.Position = UDim2.new(0,8,0,28)
     pdesc.AutomaticSize = Enum.AutomaticSize.Y
     pdesc.BackgroundTransparency = 1
-    pdesc.Font = Enum.Font.Gotham
-    pdesc.TextSize = 11
+    pdesc.Font = Enum.Font.Gotham; pdesc.TextSize = 11
     pdesc.TextColor3 = Color3.fromRGB(200,200,210)
     pdesc.TextXAlignment = Enum.TextXAlignment.Left
     pdesc.TextWrapped = true
 
-    local px = Instance.new("TextButton", pf)
-    px.Size = UDim2.fromOffset(20,20)
-    px.Position = UDim2.new(1,-24,0,4)
-    px.BackgroundColor3 = Color3.fromRGB(160,30,30)
-    px.Text = "X"; px.Font = Enum.Font.GothamBold
-    px.TextSize = 10; px.TextColor3 = Color3.new(1,1,1)
-    px.BorderSizePixel = 0
-    Instance.new("UICorner", px).CornerRadius = UDim.new(0,4)
-    px.MouseButton1Click:Connect(function() pf.Visible = false end)
+    local xb = Instance.new("TextButton",pf)
+    xb.Size = UDim2.fromOffset(20,20)
+    xb.Position = UDim2.new(1,-24,0,4)
+    xb.BackgroundColor3 = Color3.fromRGB(160,30,30)
+    xb.Text = "X"; xb.Font = Enum.Font.GothamBold
+    xb.TextSize = 10; xb.TextColor3 = Color3.new(1,1,1)
+    xb.BorderSizePixel = 0
+    Instance.new("UICorner",xb).CornerRadius = UDim.new(0,4)
+    xb.MouseButton1Click:Connect(function() pf.Visible = false end)
 
-    local function showPopup(tdata, pos)
-        ptitle.Text = tdata.title
-        pdesc.Text  = tdata.desc
+    local function showPopup(tdata, absPos)
+        ptitle.Text = tdata.t
+        pdesc.Text  = tdata.d
         task.defer(function()
-            pf.Size = UDim2.fromOffset(230, 34 + pdesc.AbsoluteSize.Y + 8)
+            pf.Size = UDim2.fromOffset(220, 32 + pdesc.AbsoluteSize.Y + 8)
         end)
-        local sx = game:GetService("GuiService"):GetScreenResolution()
-        local px2 = math.clamp(pos.X + 20, 5, sx.X - 240)
-        local py2 = math.clamp(pos.Y - 50, 5, sx.Y - 120)
-        pf.Position = UDim2.fromOffset(px2, py2)
+        local sx = game:GetService("Workspace").CurrentCamera.ViewportSize
+        pf.Position = UDim2.fromOffset(
+            math.clamp(absPos.X + 22, 5, sx.X - 230),
+            math.clamp(absPos.Y - 40, 5, sx.Y - 120)
+        )
         pf.Visible = true
     end
 
-    -- ── ? button factory ──────────────────────────────────────
     local added = {}
 
-    local function addQBtn(b)
-        local bid = tostring(b)
-        if added[bid] then return end
-
-        -- หา tutorial data
-        local tdata = TUTORIALS[b.Text]
-        if not tdata then
-            for key, val in pairs(TUTORIALS) do
-                local k = key:gsub(" : ON",""):gsub(" : OFF",""):gsub(": ON",""):gsub(": OFF","")
-                local t = b.Text:gsub(" : ON",""):gsub(" : OFF",""):gsub(": ON",""):gsub(": OFF","")
-                if k == t then tdata = val break end
-            end
+    local function getTdata(txt)
+        if T[txt] then return T[txt] end
+        for k,v in pairs(T) do
+            local a = k:gsub(" : ON",""):gsub(" : OFF",""):gsub(": ON",""):gsub(": OFF","")
+            local b = txt:gsub(" : ON",""):gsub(" : OFF",""):gsub(": ON",""):gsub(": OFF","")
+            if a == b then return v end
         end
+    end
+
+    local function addQ(b)
+        local id = tostring(b)
+        if added[id] then return end
+        local tdata = getTdata(b.Text)
         if not tdata then return end
+        added[id] = true
 
-        added[bid] = true
+        -- ย่อปุ่มเดิมให้สั้นลงทางขวา 22px เพื่อเปิดพื้นที่
+        b.Size = UDim2.new(1, -24, b.Size.Y.Scale, b.Size.Y.Offset)
 
-        local qb = Instance.new("TextButton", b)
-        qb.Size = UDim2.fromOffset(14,14)
-        qb.Position = UDim2.new(1,-16, 0.5,-7)
-        qb.BackgroundColor3 = Color3.fromRGB(40,40,100)
-        qb.Text = "?"
-        qb.Font = Enum.Font.GothamBold
-        qb.TextSize = 9
-        qb.TextColor3 = Color3.fromRGB(160,180,255)
+        -- สร้างปุ่ม ? ข้างขวา
+        local qb = Instance.new("TextButton", b.Parent)
+        qb.Size = UDim2.fromOffset(20, b.AbsoluteSize.Y > 0 and b.AbsoluteSize.Y or 28)
+        qb.AnchorPoint = Vector2.new(1, 0)
+        qb.Position = UDim2.new(1, 0, b.Position.Y.Scale, b.Position.Y.Offset)
+        qb.BackgroundColor3 = Color3.fromRGB(40,40,110)
+        qb.Text = "?"; qb.Font = Enum.Font.GothamBold
+        qb.TextSize = 10; qb.TextColor3 = Color3.fromRGB(160,180,255)
         qb.BorderSizePixel = 0
-        qb.ZIndex = b.ZIndex + 2
-        Instance.new("UICorner", qb).CornerRadius = UDim.new(1,0)
+        qb.ZIndex = b.ZIndex + 1
+        Instance.new("UICorner",qb).CornerRadius = UDim.new(0,4)
         qb.MouseButton1Click:Connect(function()
             showPopup(tdata, qb.AbsolutePosition)
         end)
     end
 
-    -- ── Scan loop ─────────────────────────────────────────────
     task.spawn(function()
         while true do
             task.wait(2)
             pcall(function()
                 if not pages then return end
-                for _, page in pairs(pages) do
-                    for _, child in ipairs(page:GetDescendants()) do
-                        if child:IsA("TextButton") then
-                            addQBtn(child)
+                for _,page in pairs(pages) do
+                    for _,child in ipairs(page:GetDescendants()) do
+                        if child:IsA("TextButton") and child.Text ~= "?" then
+                            addQ(child)
                         end
                     end
                 end
@@ -3596,5 +3592,5 @@ task.spawn(function()
         end
     end)
 
-    print("✅ Tutorial v3.0 Loaded!")
+    print("✅ Tutorial v4.0 Loaded!")
 end)
