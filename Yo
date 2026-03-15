@@ -2710,20 +2710,24 @@ if isOwner then
             joinB.MouseButton1Click:Connect(function()
                 if runner.job ~= "" and runner.job ~= game.JobId then
                     joinB.Text = "..."
-                    joinB.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-                    local ok, err = pcall(function()
-                      local teleportOptions = Instance.new("TeleportOptions")
-teleportOptions.ServerInstanceId = runner.job
-TeleportService:TeleportAsync(game.PlaceId, {LP}, teleportOptions)
+                    -- ซ่อน error prompt ก่อน join (วิธีเดียวกับสคริปที่ใช้ได้)
+                    pcall(function()
+                        CoreGui.RobloxPromptGui.promptOverlay.Visible = false
                     end)
-                    if not ok then
-                        joinB.Text = "FAIL"
-                        joinB.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
-                        setStatus("⚠ Join failed (server may be full/closed)", Color3.fromRGB(255, 180, 0), 4)
-                        task.wait(2)
-                        joinB.Text = "JOIN"
-                        joinB.BackgroundColor3 = Color3.fromRGB(0, 140, 80)
-                    end
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, runner.job, LP)
+                    -- ตรวจสอบ error หลัง teleport
+                    task.wait(0.5)
+                    pcall(function()
+                        if CoreGui.RobloxPromptGui.promptOverlay:WaitForChild("ErrorPrompt", 2) then
+                            game:GetService("GuiService"):ClearError()
+                            joinB.Text = "FAIL"
+                            joinB.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+                            setStatus("⚠ Invalid JobID or server closed", Color3.fromRGB(255, 180, 0), 4)
+                            task.wait(2)
+                            joinB.Text = "JOIN"
+                            joinB.BackgroundColor3 = Color3.fromRGB(0, 140, 80)
+                        end
+                    end)
                 elseif runner.job == game.JobId then
                     setStatus("⚠ You're already in this server!", Color3.fromRGB(255, 180, 0), 3)
                 else
