@@ -2708,10 +2708,24 @@ if isOwner then
             joinB.BorderSizePixel  = 0
             Instance.new("UICorner", joinB).CornerRadius = UDim.new(0, 4)
             joinB.MouseButton1Click:Connect(function()
-                if runner.job ~= "" then
-                    TeleportService:TeleportToPlaceInstance(game.PlaceId, runner.job, LP)
+                if runner.job ~= "" and runner.job ~= game.JobId then
+                    joinB.Text = "..."
+                    joinB.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+                    local ok, err = pcall(function()
+                        TeleportService:TeleportToPlaceInstance(game.PlaceId, runner.job, LP)
+                    end)
+                    if not ok then
+                        joinB.Text = "FAIL"
+                        joinB.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+                        setStatus("⚠ Join failed (server may be full/closed)", Color3.fromRGB(255, 180, 0), 4)
+                        task.wait(2)
+                        joinB.Text = "JOIN"
+                        joinB.BackgroundColor3 = Color3.fromRGB(0, 140, 80)
+                    end
+                elseif runner.job == game.JobId then
+                    setStatus("⚠ You're already in this server!", Color3.fromRGB(255, 180, 0), 3)
                 else
-                    setStatus("⚠ No JobID for " .. runner.name, Color3.fromRGB(255, 180, 0), 3)
+                    setStatus("⚠ No JobID available", Color3.fromRGB(255, 180, 0), 3)
                 end
             end)
 
