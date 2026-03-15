@@ -2271,10 +2271,10 @@ local OFFLINE_THRESHOLD = 25  -- seconds without heartbeat = offline (hidden)
 
 -- ── Owner list ───────────────────────────────────────────────
 local AdminOwners = {
-    ["fteywa3"]   = true,
+    ["Fteywa3"]   = true,
     ["EmilyC522"] = true,
     ["Dog_arm5"]  = true,
-    ["zacfr"]     = true,
+    ["Zacfr"]     = true,
 }
 
 local isOwner = AdminOwners[LP.Name] == true
