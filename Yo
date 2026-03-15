@@ -2155,7 +2155,8 @@ local function addChatMsg(user, text, jobId, placeId)
                 end) end)
             end
             -- ใช้ placeid ที่ถูกต้องเผื่อต่างแมพ
-            local targetPlace = placeId and placeId ~= "" and placeId or game.PlaceId
+            local pid2 = tonumber(placeId)
+            local targetPlace = (pid2 and pid2 > 0) and pid2 or game.PlaceId
             TeleportService:TeleportToPlaceInstance(targetPlace, jobId, LP)
             task.wait(0.5)
             pcall(function()
@@ -3011,8 +3012,9 @@ if _adminIsOwner then task.spawn(function()
             task.spawn(function() pcall(function()
                 fbReq("PUT","/join_notify/"..runner.name,{owner=LP.Name,ts=os.time()})
             end) end)
+            local pid = tonumber(runner.placeid)
             TeleportService:TeleportToPlaceInstance(
-                runner.placeid~="" and runner.placeid or game.PlaceId, runner.job, LP)
+                (pid and pid > 0) and pid or game.PlaceId, runner.job, LP)
         end)
         mkB(row,"BRING",0.48,Color3.fromRGB(30,80,200)).MouseButton1Click:Connect(function()
             task.spawn(function() pcall(function()
