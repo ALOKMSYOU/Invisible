@@ -2998,3 +2998,625 @@ if isOwner then
 end
 
 print("✅ Admin Panel + Profanity Filter Loaded!")
+-- ══════════════════════════════════════════════════════════════
+--  ADMIN PANEL ADDON v2.0
+--  - Join notification to target player
+--  - Private chat UI (draggable)
+--  - In-server player list (Kill / Bring / Goto)
+--  วางต่อท้าย fixed_script.lua ได้เลย
+-- ══════════════════════════════════════════════════════════════
+
+local StarterGui   = game:GetService("StarterGui")
+local FIREBASE_URL = "https://global-chat-445de-default-rtdb.firebaseio.com"
+
+-- ── Helper: Firebase request (ใช้ fbReq เดิมจากสคริปหลัก) ──
+
+-- ══════════════════════════════════════════════════════════════
+--  1. JOIN NOTIFICATION
+--  เมื่อ Owner กด JOIN ใครในหน้า Admin
+--  ระบบจะเขียน /join_notify/<target> ลง Firebase
+--  และคนนั้นจะเห็น popup ขึ้นมา
+-- ══════════════════════════════════════════════════════════════
+
+-- ── ส่ง notification เมื่อ Owner join ──────────────────────
+-- (เรียกฟังก์ชันนี้จากปุ่ม JOIN ใน Admin Panel)
+local function sendJoinNotify(targetName)
+    task.spawn(function()
+        pcall(function()
+            fbReq("PUT", "/join_notify/" .. targetName, {
+                owner = LP.Name,
+                ts    = os.time()
+            })
+        end)
+    end)
+end
+
+-- ── รับ notification (ทุกคนที่รันสคริปตรวจ) ────────────────
+task.spawn(function()
+    while task.wait(4) do
+        pcall(function()
+            local data = fbReq("GET", "/join_notify/" .. LP.Name)
+            if data and data.owner then
+                local age = os.time() - (data.ts or 0)
+                if age < 15 then
+                    fbReq("DELETE", "/join_notify/" .. LP.Name, nil)
+
+                    -- แสดง notification popup
+                    pcall(function()
+                        StarterGui:SetCore("SendNotification", {
+                            Title    = "👑 Owner Joined",
+                            Text     = data.owner .. " has joined your server!",
+                            Duration = 8,
+                        })
+                    end)
+
+                    -- แสดง UI popup แบบลากได้
+                    local notifGui = Instance.new("ScreenGui")
+                    pcall(function() notifGui.Parent = game:GetService("CoreGui") end)
+                    if notifGui.Parent ~= game:GetService("CoreGui") then
+                        notifGui.Parent = LP.PlayerGui
+                    end
+                    notifGui.ResetOnSpawn = false
+
+                    local notifFrame = Instance.new("Frame", notifGui)
+                    notifFrame.Size             = UDim2.fromOffset(280, 70)
+                    notifFrame.Position         = UDim2.new(0.5, -140, 0, 20)
+                    notifFrame.BackgroundColor3 = Color3.fromRGB(30, 22, 5)
+                    notifFrame.Active           = true
+                    notifFrame.Draggable        = true
+                    notifFrame.BorderSizePixel  = 0
+                    Instance.new("UICorner", notifFrame).CornerRadius = UDim.new(0, 10)
+
+                    local accent = Instance.new("Frame", notifFrame)
+                    accent.Size             = UDim2.new(0, 4, 1, 0)
+                    accent.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+                    accent.BorderSizePixel  = 0
+                    Instance.new("UICorner", accent).CornerRadius = UDim.new(0, 4)
+
+                    local notifLbl = Instance.new("TextLabel", notifFrame)
+                    notifLbl.Size               = UDim2.new(1, -20, 1, 0)
+                    notifLbl.Position           = UDim2.new(0, 14, 0, 0)
+                    notifLbl.BackgroundTransparency = 1
+                    notifLbl.RichText           = true
+                    notifLbl.TextWrapped        = true
+                    notifLbl.TextXAlignment     = Enum.TextXAlignment.Left
+                    notifLbl.Font               = Enum.Font.GothamBold
+                    notifLbl.TextSize           = 13
+                    notifLbl.TextColor3         = Color3.new(1, 1, 1)
+                    notifLbl.Text               = string.format(
+                        "<font color='#FFD700'>👑 %s</font> has joined your server!",
+                        data.owner
+                    )
+
+                    -- ลบออกหลัง 8 วินาที
+                    task.delay(8, function()
+                        if notifGui and notifGui.Parent then
+                            notifGui:Destroy()
+                        end
+                    end)
+                end
+            end
+        end)
+    end
+end)
+
+-- ── Patch ปุ่ม JOIN ใน Admin Panel ให้ส่ง notify ด้วย ──────
+-- (แทรกหลังจาก pages.admin ถูกสร้างแล้ว)
+-- วิธี: override refreshRunners ไม่ได้ตรงๆ
+-- แต่จะ hook ผ่าน Firebase join_notify แทน
+-- เมื่อ Owner กด JOIN ในหน้า Admin ให้ call sendJoinNotify
+-- โดยสร้าง wrapper listener บน Firebase /join_outgoing/<ownerName>
+
+task.spawn(function()
+    while task.wait(3) do
+        pcall(function()
+            local data = fbReq("GET", "/join_outgoing/" .. LP.Name)
+            if data and data.target and data.ts then
+                local age = os.time() - (data.ts or 0)
+                if age < 10 then
+                    fbReq("DELETE", "/join_outgoing/" .. LP.Name, nil)
+                    sendJoinNotify(data.target)
+                end
+            end
+        end)
+    end
+end)
+
+-- ══════════════════════════════════════════════════════════════
+--  2. PRIVATE CHAT (Draggable UI)
+--  - ใช้ Firebase /private_chat/<roomId>
+--  - roomId = sort ชื่อสองคนแล้วต่อกัน เพื่อให้ unique
+-- ══════════════════════════════════════════════════════════════
+
+local privateChatOpen  = false
+local privateChatWith  = nil
+local privateChatCache = {}
+local privateMsgCount  = 0
+
+local function getPrivateRoomId(a, b)
+    local names = {a, b}
+    table.sort(names)
+    return names[1] .. "_" .. names[2]
+end
+
+-- ── สร้าง Private Chat GUI ──────────────────────────────────
+local pcGui = Instance.new("ScreenGui")
+pcall(function() pcGui.Parent = game:GetService("CoreGui") end)
+if pcGui.Parent ~= game:GetService("CoreGui") then pcGui.Parent = LP.PlayerGui end
+pcGui.ResetOnSpawn = false
+pcGui.Name         = "PrivateChatUI"
+
+local pcFrame = Instance.new("Frame", pcGui)
+pcFrame.Size             = UDim2.fromOffset(260, 300)
+pcFrame.Position         = UDim2.new(0.75, 0, 0.3, 0)
+pcFrame.BackgroundColor3 = Color3.fromRGB(14, 14, 22)
+pcFrame.Active           = true
+pcFrame.Draggable        = true
+pcFrame.Visible          = false
+pcFrame.BorderSizePixel  = 0
+Instance.new("UICorner", pcFrame).CornerRadius = UDim.new(0, 10)
+Instance.new("UIStroke", pcFrame).Color        = Color3.fromRGB(60, 60, 120)
+
+-- Header
+local pcHeader = Instance.new("Frame", pcFrame)
+pcHeader.Size             = UDim2.new(1, 0, 0, 30)
+pcHeader.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
+pcHeader.BorderSizePixel  = 0
+Instance.new("UICorner", pcHeader).CornerRadius = UDim.new(0, 10)
+
+local pcTitle = Instance.new("TextLabel", pcHeader)
+pcTitle.Size               = UDim2.new(1, -34, 1, 0)
+pcTitle.Position           = UDim2.new(0, 8, 0, 0)
+pcTitle.BackgroundTransparency = 1
+pcTitle.Text               = "💬 Private Chat"
+pcTitle.Font               = Enum.Font.GothamBold
+pcTitle.TextSize           = 12
+pcTitle.TextColor3         = Color3.fromRGB(160, 180, 255)
+pcTitle.TextXAlignment     = Enum.TextXAlignment.Left
+
+local pcClose = Instance.new("TextButton", pcHeader)
+pcClose.Size             = UDim2.fromOffset(24, 24)
+pcClose.Position         = UDim2.new(1, -28, 0.5, -12)
+pcClose.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+pcClose.Text             = "✕"
+pcClose.Font             = Enum.Font.GothamBold
+pcClose.TextSize         = 11
+pcClose.TextColor3       = Color3.new(1, 1, 1)
+pcClose.BorderSizePixel  = 0
+Instance.new("UICorner", pcClose).CornerRadius = UDim.new(0, 5)
+pcClose.MouseButton1Click:Connect(function()
+    pcFrame.Visible = false
+    privateChatOpen = false
+end)
+
+-- Chat scroll
+local pcScrollBg = Instance.new("Frame", pcFrame)
+pcScrollBg.Size             = UDim2.new(1, -10, 0, 200)
+pcScrollBg.Position         = UDim2.new(0, 5, 0, 35)
+pcScrollBg.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
+pcScrollBg.BorderSizePixel  = 0
+Instance.new("UICorner", pcScrollBg).CornerRadius = UDim.new(0, 6)
+
+local pcScroll = Instance.new("ScrollingFrame", pcScrollBg)
+pcScroll.Size                 = UDim2.new(1, -4, 1, -4)
+pcScroll.Position             = UDim2.new(0, 2, 0, 2)
+pcScroll.BackgroundTransparency = 1
+pcScroll.BorderSizePixel      = 0
+pcScroll.ScrollBarThickness   = 3
+pcScroll.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 180)
+pcScroll.AutomaticCanvasSize  = Enum.AutomaticSize.Y
+pcScroll.CanvasSize           = UDim2.new(0, 0, 0, 0)
+
+local pcLayout = Instance.new("UIListLayout", pcScroll)
+pcLayout.Padding   = UDim.new(0, 3)
+pcLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Input
+local pcInputBg = Instance.new("Frame", pcFrame)
+pcInputBg.Size             = UDim2.new(1, -10, 0, 28)
+pcInputBg.Position         = UDim2.new(0, 5, 0, 242)
+pcInputBg.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
+pcInputBg.BorderSizePixel  = 0
+Instance.new("UICorner", pcInputBg).CornerRadius = UDim.new(0, 6)
+
+local pcInput = Instance.new("TextBox", pcInputBg)
+pcInput.Size               = UDim2.new(1, -60, 1, -6)
+pcInput.Position           = UDim2.new(0, 6, 0, 3)
+pcInput.BackgroundTransparency = 1
+pcInput.PlaceholderText    = "Type here..."
+pcInput.PlaceholderColor3  = Color3.fromRGB(80, 80, 100)
+pcInput.Text               = ""
+pcInput.Font               = Enum.Font.Gotham
+pcInput.TextSize           = 11
+pcInput.TextColor3         = Color3.new(1, 1, 1)
+pcInput.ClearTextOnFocus   = false
+
+local pcSendBtn = Instance.new("TextButton", pcInputBg)
+pcSendBtn.Size             = UDim2.fromOffset(50, 22)
+pcSendBtn.Position         = UDim2.new(1, -54, 0.5, -11)
+pcSendBtn.BackgroundColor3 = Color3.fromRGB(50, 80, 200)
+pcSendBtn.Text             = "SEND"
+pcSendBtn.Font             = Enum.Font.GothamBold
+pcSendBtn.TextSize         = 10
+pcSendBtn.TextColor3       = Color3.new(1, 1, 1)
+pcSendBtn.BorderSizePixel  = 0
+Instance.new("UICorner", pcSendBtn).CornerRadius = UDim.new(0, 5)
+
+-- Status
+local pcStatus = Instance.new("TextLabel", pcFrame)
+pcStatus.Size               = UDim2.new(1, -10, 0, 12)
+pcStatus.Position           = UDim2.new(0, 5, 0, 276)
+pcStatus.BackgroundTransparency = 1
+pcStatus.Text               = ""
+pcStatus.Font               = Enum.Font.Gotham
+pcStatus.TextSize           = 9
+pcStatus.TextColor3         = Color3.fromRGB(100, 100, 140)
+pcStatus.TextXAlignment     = Enum.TextXAlignment.Left
+
+-- ── ฟังก์ชันแสดงข้อความใน Private Chat ─────────────────────
+local function addPrivateMsg(sender, text)
+    privateMsgCount += 1
+    local isSelf = (sender == LP.Name)
+
+    local row = Instance.new("Frame", pcScroll)
+    row.Size             = UDim2.new(1, 0, 0, 0)
+    row.AutomaticSize    = Enum.AutomaticSize.Y
+    row.BackgroundColor3 = isSelf and Color3.fromRGB(30, 40, 80) or Color3.fromRGB(22, 22, 34)
+    row.BorderSizePixel  = 0
+    row.LayoutOrder      = privateMsgCount
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 5)
+
+    local lbl = Instance.new("TextLabel", row)
+    lbl.Size               = UDim2.new(1, -8, 0, 0)
+    lbl.Position           = UDim2.new(0, 4, 0, 3)
+    lbl.AutomaticSize      = Enum.AutomaticSize.Y
+    lbl.BackgroundTransparency = 1
+    lbl.RichText           = true
+    lbl.TextWrapped        = true
+    lbl.TextXAlignment     = Enum.TextXAlignment.Left
+    lbl.Font               = Enum.Font.GothamMedium
+    lbl.TextSize           = 11
+    lbl.TextColor3         = Color3.new(1, 1, 1)
+
+    local nameColor = isSelf and "#88AAFF" or "#FFD700"
+    lbl.Text = string.format("<b><font color='%s'>%s</font></b>: %s", nameColor, sender, text)
+
+    task.defer(function()
+        pcScroll.CanvasPosition = Vector2.new(0, pcScroll.AbsoluteCanvasSize.Y + 9999)
+    end)
+end
+
+-- ── เปิด Private Chat กับ player ────────────────────────────
+local function openPrivateChat(targetName)
+    privateChatWith   = targetName
+    privateChatOpen   = true
+    privateChatCache  = {}
+    privateMsgCount   = 0
+
+    -- ล้างข้อความเก่า
+    for _, v in ipairs(pcScroll:GetChildren()) do
+        if v:IsA("Frame") then v:Destroy() end
+    end
+
+    pcTitle.Text    = "💬 Chat with " .. targetName
+    pcStatus.Text   = "● Connected"
+    pcFrame.Visible = true
+end
+
+-- ── ส่งข้อความ Private Chat ─────────────────────────────────
+local function sendPrivateMsg()
+    if not privateChatWith or pcInput.Text == "" then return end
+    local msg  = pcInput.Text:match("^%s*(.-)%s*$")
+    if msg == "" then return end
+
+    local roomId = getPrivateRoomId(LP.Name, privateChatWith)
+    pcInput.Text = ""
+
+    addPrivateMsg(LP.Name, msg)
+
+    task.spawn(function()
+        pcall(function()
+            fbReq("POST", "/private_chat/" .. roomId, {
+                sender = LP.Name,
+                text   = msg,
+                ts     = os.time()
+            })
+        end)
+    end)
+end
+
+pcSendBtn.MouseButton1Click:Connect(sendPrivateMsg)
+pcInput.FocusLost:Connect(function(enter) if enter then sendPrivateMsg() end end)
+
+-- ── Polling Private Chat ─────────────────────────────────────
+task.spawn(function()
+    while task.wait(2) do
+        if privateChatOpen and privateChatWith then
+            pcall(function()
+                local roomId = getPrivateRoomId(LP.Name, privateChatWith)
+                local data   = fbReq("GET", "/private_chat/" .. roomId)
+                if data then
+                    local sorted = {}
+                    for id, msg in pairs(data) do
+                        if not privateChatCache[id] then
+                            table.insert(sorted, {id = id, msg = msg})
+                        end
+                    end
+                    table.sort(sorted, function(a, b)
+                        return (a.msg.ts or 0) < (b.msg.ts or 0)
+                    end)
+                    for _, entry in ipairs(sorted) do
+                        privateChatCache[entry.id] = true
+                        if entry.msg.sender ~= LP.Name then
+                            addPrivateMsg(entry.msg.sender or "?", entry.msg.text or "")
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ══════════════════════════════════════════════════════════════
+--  3. IN-SERVER PLAYER LIST (เฉพาะ Admin Panel)
+--  แสดงผู้เล่นที่อยู่ใน server เดียวกันและรันสคริปอยู่
+--  ปุ่ม: CHAT / KILL / BRING / GOTO
+-- ══════════════════════════════════════════════════════════════
+
+if isOwner and pages.admin then
+
+    label(pages.admin, "— IN-SERVER RUNNERS —")
+
+    local serverListScroll = Instance.new("ScrollingFrame", pages.admin)
+    serverListScroll.Size                 = UDim2.new(1, 0, 0, 140)
+    serverListScroll.BackgroundColor3     = Color3.fromRGB(12, 12, 22)
+    serverListScroll.BorderSizePixel      = 0
+    serverListScroll.AutomaticCanvasSize  = Enum.AutomaticSize.Y
+    serverListScroll.ScrollBarThickness   = 3
+    Instance.new("UICorner", serverListScroll).CornerRadius = UDim.new(0, 6)
+
+    local serverListLayout = Instance.new("UIListLayout", serverListScroll)
+    serverListLayout.Padding   = UDim.new(0, 3)
+    serverListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local serverListPad = Instance.new("UIPadding", serverListScroll)
+    serverListPad.PaddingLeft  = UDim.new(0, 4)
+    serverListPad.PaddingRight = UDim.new(0, 4)
+    serverListPad.PaddingTop   = UDim.new(0, 4)
+
+    -- ── ฟังก์ชัน Refresh In-Server List ─────────────────────
+    local function refreshServerList()
+        for _, v in ipairs(serverListScroll:GetChildren()) do
+            if v:IsA("Frame") then v:Destroy() end
+        end
+
+        local data = fbReq("GET", "/runners")
+        if not data then
+            local noData = Instance.new("TextLabel", serverListScroll)
+            noData.Size               = UDim2.new(1, 0, 0, 20)
+            noData.BackgroundTransparency = 1
+            noData.Text               = "No runners in this server."
+            noData.Font               = Enum.Font.Gotham
+            noData.TextSize           = 10
+            noData.TextColor3         = Color3.fromRGB(120, 120, 120)
+            return
+        end
+
+        local now = os.time()
+        for name, info in pairs(data) do
+            -- เฉพาะคนที่อยู่ใน server เดียวกัน และไม่ใช่ตัวเอง
+            if name ~= LP.Name
+                and (info.job or "") == game.JobId
+                and (now - (info.ts or 0)) <= 15
+            then
+                local row = Instance.new("Frame", serverListScroll)
+                row.Size             = UDim2.new(1, 0, 0, 36)
+                row.BackgroundColor3 = Color3.fromRGB(18, 18, 32)
+                row.BorderSizePixel  = 0
+                Instance.new("UICorner", row).CornerRadius = UDim.new(0, 5)
+
+                -- ชื่อ
+                local nameLbl = Instance.new("TextLabel", row)
+                nameLbl.Size             = UDim2.new(0.38, 0, 1, 0)
+                nameLbl.Position         = UDim2.new(0, 5, 0, 0)
+                nameLbl.BackgroundTransparency = 1
+                nameLbl.Text             = "🟢 " .. name
+                nameLbl.Font             = Enum.Font.GothamBold
+                nameLbl.TextSize         = 9
+                nameLbl.TextColor3       = Color3.new(1, 1, 1)
+                nameLbl.TextXAlignment   = Enum.TextXAlignment.Left
+                nameLbl.TextTruncate     = Enum.TextTruncate.AtEnd
+
+                -- ── ปุ่มย่อย ────────────────────────────────
+                local function makeSmallBtn(text, xPos, color)
+                    local b = Instance.new("TextButton", row)
+                    b.Size             = UDim2.fromOffset(32, 22)
+                    b.Position         = UDim2.new(xPos, 0, 0.5, -11)
+                    b.BackgroundColor3 = color
+                    b.Text             = text
+                    b.Font             = Enum.Font.GothamBold
+                    b.TextSize         = 8
+                    b.TextColor3       = Color3.new(1, 1, 1)
+                    b.BorderSizePixel  = 0
+                    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+                    return b
+                end
+
+                -- CHAT
+                local chatB = makeSmallBtn("CHAT", 0.38, Color3.fromRGB(50, 80, 200))
+                chatB.MouseButton1Click:Connect(function()
+                    openPrivateChat(name)
+                end)
+
+                -- KILL
+                local killB = makeSmallBtn("KILL", 0.52, Color3.fromRGB(180, 20, 20))
+                killB.MouseButton1Click:Connect(function()
+                    -- เขียน kill_hp request ลง Firebase
+                    task.spawn(function()
+                        pcall(function()
+                            fbReq("PUT", "/kill_request/" .. name, {
+                                from = LP.Name,
+                                ts   = os.time()
+                            })
+                        end)
+                    end)
+                    setStatus("💀 Kill sent to " .. name, Color3.fromRGB(255, 80, 80), 3)
+                end)
+
+                -- BRING (move to owner)
+                local bringB = makeSmallBtn("BRING", 0.66, Color3.fromRGB(30, 100, 200))
+                bringB.MouseButton1Click:Connect(function()
+                    task.spawn(function()
+                        pcall(function()
+                            fbReq("PUT", "/bring_here/" .. name, {
+                                from    = LP.Name,
+                                job     = game.JobId,
+                                placeid = game.PlaceId,
+                                ts      = os.time()
+                            })
+                        end)
+                    end)
+                    setStatus("📡 Bring sent to " .. name, Color3.fromRGB(100, 200, 255), 3)
+                end)
+
+                -- GOTO (owner goes to target)
+                local gotoB = makeSmallBtn("GOTO", 0.80, Color3.fromRGB(100, 60, 180))
+                gotoB.MouseButton1Click:Connect(function()
+                    -- ส่ง request ให้ตัวเองรู้ว่าต้องไปหา target
+                    task.spawn(function()
+                        pcall(function()
+                            fbReq("PUT", "/goto_request/" .. LP.Name, {
+                                target = name,
+                                ts     = os.time()
+                            })
+                        end)
+                    end)
+                    -- teleport ไปหา target ในเกมทันที (ถ้าอยู่ server เดียวกัน)
+                    local targetPlayer = Players:FindFirstChild(name)
+                    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        local targetPos = targetPlayer.Character.HumanoidRootPart.CFrame
+                        if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+                            LP.Character.HumanoidRootPart.CFrame = targetPos * CFrame.new(3, 0, 0)
+                            setStatus("✈️ Teleported to " .. name, Color3.fromRGB(200, 200, 100), 3)
+                        end
+                    else
+                        setStatus("⚠ " .. name .. " not found in server", Color3.fromRGB(255, 180, 0), 3)
+                    end
+                end)
+            end
+        end
+    end
+
+    -- ปุ่ม Refresh Server List
+    local srvRefreshBtn = btn(pages.admin, "🔄 REFRESH SERVER LIST", function()
+        task.spawn(refreshServerList)
+    end)
+    srvRefreshBtn.BackgroundColor3 = Color3.fromRGB(30, 60, 30)
+
+    -- Auto refresh ทุก 10 วินาที
+    task.spawn(function()
+        while task.wait(10) do
+            if pages.admin and pages.admin.Visible then
+                pcall(refreshServerList)
+            end
+        end
+    end)
+end
+
+-- ══════════════════════════════════════════════════════════════
+--  4. RECEIVE: BRING HERE (เดิน/วาปมาหา owner ใน server เดียวกัน)
+-- ══════════════════════════════════════════════════════════════
+task.spawn(function()
+    while task.wait(3) do
+        pcall(function()
+            local data = fbReq("GET", "/bring_here/" .. LP.Name)
+            if data and data.from and data.ts then
+                local age = os.time() - (data.ts or 0)
+                if age < 15 then
+                    fbReq("DELETE", "/bring_here/" .. LP.Name, nil)
+
+                    -- ถ้าอยู่ server เดียวกัน teleport ไปหา owner
+                    if data.job == game.JobId then
+                        local ownerPlayer = Players:FindFirstChild(data.from)
+                        if ownerPlayer and ownerPlayer.Character and ownerPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                            local ownerCF = ownerPlayer.Character.HumanoidRootPart.CFrame
+                            -- วาปไปข้างหน้า owner 3 studs
+                            if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+                                LP.Character.HumanoidRootPart.CFrame = ownerCF * CFrame.new(0, 0, -3)
+                                pcall(function()
+                                    StarterGui:SetCore("SendNotification", {
+                                        Title    = "📡 Brought",
+                                        Text     = "You were brought to " .. data.from,
+                                        Duration = 4,
+                                    })
+                                end)
+                            end
+                        end
+                    else
+                        -- ต่าง server → teleport ไปเซิร์ฟ owner
+                        TeleportService:TeleportToPlaceInstance(
+                            data.placeid or game.PlaceId, data.job, LP
+                        )
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- ══════════════════════════════════════════════════════════════
+--  5. RECEIVE: KILL REQUEST (set health to 0)
+-- ══════════════════════════════════════════════════════════════
+task.spawn(function()
+    while task.wait(3) do
+        pcall(function()
+            local data = fbReq("GET", "/kill_request/" .. LP.Name)
+            if data and data.from and data.ts then
+                local age = os.time() - (data.ts or 0)
+                if age < 15 then
+                    fbReq("DELETE", "/kill_request/" .. LP.Name, nil)
+
+                    -- Set health to 0
+                    if LP.Character then
+                        local hum = LP.Character:FindFirstChildOfClass("Humanoid")
+                        if hum then
+                            hum.Health = 0
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- ══════════════════════════════════════════════════════════════
+--  6. RECEIVE: JOIN NOTIFICATION TRIGGER
+--  เมื่อ owner กด JOIN ใน Admin Panel → เพิ่ม sendJoinNotify
+--  ต้องไป patch ปุ่ม JOIN ให้เขียน /join_outgoing/<ownerName>
+--  ก่อน teleport (ไม่ต้องแก้ไฟล์เดิม ใช้ Firebase check แทน)
+-- ══════════════════════════════════════════════════════════════
+
+-- เมื่อ Owner join สำเร็จ ให้แจ้ง target ผ่าน Firebase
+-- วิธี: หลัง teleport สำเร็จจะ spawn ไปเซิร์ฟใหม่
+-- ตอน join เซิร์ฟใหม่จะส่ง notification อัตโนมัติผ่าน heartbeat
+
+-- ── เมื่อ load script ครั้งแรก ตรวจว่ามี pending notify ไหม
+task.spawn(function()
+    task.wait(2)
+    pcall(function()
+        -- ถ้า owner เพิ่ง join มาจากการกด JOIN → ส่ง notify ให้ runner ในเซิร์ฟนี้
+        if isOwner then
+            local data = fbReq("GET", "/runners")
+            if data then
+                for name, info in pairs(data) do
+                    if name ~= LP.Name and (info.job or "") == game.JobId then
+                        -- ส่ง join notification ให้ทุกคนในเซิร์ฟ
+                        sendJoinNotify(name)
+                    end
+                end
+            end
+        end
+    end)
+end)
+
+print("✅ Admin Panel Addon v2.0 Loaded!")
