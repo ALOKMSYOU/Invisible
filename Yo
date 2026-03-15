@@ -2255,5 +2255,451 @@ task.spawn(function()
 end)
 
 print("✅ Global Chat v6.0 (Telekinesis Edition) Loaded!")
+-- ══════════════════════════════════════════════════════════════
+--  ADMIN PANEL v1.0 — TELEKINESIS UI EDITION
+--  วิธีใช้: วางต่อท้ายสคริปต์ Telekinesis หลักได้เลย
+--  ระบบ: Firebase Real-time | เฉพาะ Owner เท่านั้น
+-- ══════════════════════════════════════════════════════════════
 
+local HttpService2    = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local StarterGui      = game:GetService("StarterGui")
+
+local FIREBASE   = "https://global-chat-445de-default-rtdb.firebaseio.com"
+local POLL_INT   = 3  -- ดึงข้อมูลทุก 3 วินาที
+
+-- ── Owner List (เหมือนกับที่มีในสคริปต์หลัก) ──────────────
+local AdminOwners = {
+    ["fteywa3"]   = true,
+    ["EmilyC522"] = true,
+    ["Dog_arm5"]  = true,
+    ["zacfr"]     = true,
+}
+
+local isOwner = AdminOwners[LP.Name] == true
+local myName  = LP.Name
+
+-- ══════════════════════════════════════════════════════════════
+--  FIREBASE HELPER
+-- ══════════════════════════════════════════════════════════════
+local function fbReq(method, path, data)
+    local req = (syn and syn.request)
+             or (http and http.request)
+             or request
+             or http_request
+    if not req then return nil end
+    local ok, res = pcall(function()
+        return req({
+            Url     = FIREBASE .. path .. ".json",
+            Method  = method,
+            Headers = {["Content-Type"] = "application/json"},
+            Body    = data and HttpService2:JSONEncode(data) or nil
+        })
+    end)
+    if not ok or not res then return nil end
+    local dok, decoded = pcall(HttpService2.JSONDecode, HttpService2, res.Body)
+    return dok and decoded or nil
+end
+
+local function fbSet(path, data)
+    fbReq("PUT", path, data)
+end
+
+local function fbDelete(path)
+    fbReq("DELETE", path, nil)
+end
+
+-- ══════════════════════════════════════════════════════════════
+--  REGISTER ตัวเองเข้า Firebase เมื่อรันสคริปต์
+-- ══════════════════════════════════════════════════════════════
+local function registerSelf()
+    fbSet("/script_users/" .. myName, {
+        name    = myName,
+        game    = tostring(game.PlaceId),
+        server  = game.JobId,
+        joined  = os.time(),
+        alive   = os.time(),
+    })
+end
+
+-- Heartbeat: อัปเดต alive ทุก 10 วินาที (บอกว่ายังออนไลน์อยู่)
+local function startHeartbeat()
+    task.spawn(function()
+        while task.wait(10) do
+            pcall(function()
+                fbSet("/script_users/" .. myName .. "/alive", os.time())
+            end)
+        end
+    end)
+end
+
+-- ลบตัวเองออกเมื่อออกจากเกม
+game:GetService("Players").LocalPlayer.AncestryChanged:Connect(function()
+    pcall(function() fbDelete("/script_users/" .. myName) end)
+end)
+
+pcall(registerSelf)
+startHeartbeat()
+
+-- ══════════════════════════════════════════════════════════════
+--  BROADCAST NOTIFICATION (รับและแสดง — ทุกคนเห็น)
+-- ══════════════════════════════════════════════════════════════
+local lastBroadcastId = ""
+
+local function showBroadcast(msg, sender)
+    -- แสดงผ่าน StarterGui Notification
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title    = "📢 Admin Broadcast",
+            Text     = "[" .. sender .. "]: " .. msg,
+            Duration = 8,
+        })
+    end)
+end
+
+local function pollBroadcast()
+    task.spawn(function()
+        while task.wait(POLL_INT) do
+            pcall(function()
+                local data = fbReq("GET", "/admin_broadcast")
+                if data and data.id and data.id ~= lastBroadcastId then
+                    lastBroadcastId = data.id
+                    showBroadcast(data.msg or "", data.sender or "Admin")
+                end
+            end)
+        end
+    end)
+end
+pollBroadcast()
+
+-- ══════════════════════════════════════════════════════════════
+--  KICK LISTENER (ทุกคนฟัง — ถ้าโดน kick จะ teleport ออก)
+-- ══════════════════════════════════════════════════════════════
+local function pollKick()
+    task.spawn(function()
+        while task.wait(POLL_INT) do
+            pcall(function()
+                local data = fbReq("GET", "/admin_kick/" .. myName)
+                if data and data.kick == true then
+                    -- ลบ kick command ออกก่อน
+                    fbDelete("/admin_kick/" .. myName)
+                    -- Teleport ออกไปหน้า home (PlaceId 0 = ไม่มีเกม, ใช้ Kick แทน)
+                    game:GetService("Players").LocalPlayer:Kick(
+                        "[ADMIN] คุณถูก Kick โดย Owner"
+                    )
+                end
+            end)
+        end
+    end)
+end
+pollKick()
+
+-- ══════════════════════════════════════════════════════════════
+--  ADMIN PANEL UI — เฉพาะ Owner เท่านั้น
+-- ══════════════════════════════════════════════════════════════
+if not isOwner then
+    print("Admin Panel: ไม่ใช่ Owner — ข้ามการสร้าง UI")
+    return
+end
+
+-- ── สร้างหน้า Admin ใน pages เดิม ──────────────────────────
+pages.admin = createPage()
+local adminPage = pages.admin
+
+-- ── ปุ่มเปิด Admin จากหน้าหลัก ────────────────────────────
+label(pages.main, "--- ADMIN PANEL ---")
+local adminOpenBtn = btn(pages.main, "👑 ADMIN PANEL", function()
+    showPage("admin")
+end)
+adminOpenBtn.BackgroundColor3 = Color3.fromRGB(100, 20, 20)
+adminOpenBtn.Font = Enum.Font.GothamBold
+
+-- ══════════════════════════════════════════════════════════════
+--  ADMIN PAGE LAYOUT
+-- ══════════════════════════════════════════════════════════════
+
+-- หัวข้อ
+local adminTitle = Instance.new("TextLabel", adminPage)
+adminTitle.Size               = UDim2.new(1, 0, 0, 24)
+adminTitle.BackgroundColor3   = Color3.fromRGB(80, 15, 15)
+adminTitle.Text               = "👑  ADMIN PANEL  v1.0"
+adminTitle.Font               = Enum.Font.GothamBold
+adminTitle.TextSize           = 13
+adminTitle.TextColor3         = Color3.fromRGB(255, 200, 100)
+adminTitle.BorderSizePixel    = 0
+Instance.new("UICorner", adminTitle).CornerRadius = UDim.new(0, 6)
+
+-- Status bar
+local adminStatus = Instance.new("TextLabel", adminPage)
+adminStatus.Size               = UDim2.new(1, 0, 0, 14)
+adminStatus.BackgroundTransparency = 1
+adminStatus.Text               = "● Fetching users..."
+adminStatus.Font               = Enum.Font.Gotham
+adminStatus.TextSize           = 9
+adminStatus.TextColor3         = Color3.fromRGB(100, 200, 100)
+adminStatus.TextXAlignment     = Enum.TextXAlignment.Left
+
+-- ── USER LIST ───────────────────────────────────────────────
+local listLabel = Instance.new("TextLabel", adminPage)
+listLabel.Size               = UDim2.new(1, 0, 0, 16)
+listLabel.BackgroundTransparency = 1
+listLabel.Text               = "USERS RUNNING SCRIPT:"
+listLabel.Font               = Enum.Font.GothamBold
+listLabel.TextSize           = 10
+listLabel.TextColor3         = Color3.fromRGB(180, 180, 180)
+listLabel.TextXAlignment     = Enum.TextXAlignment.Left
+
+-- กรอบ list
+local listBg = Instance.new("Frame", adminPage)
+listBg.Size             = UDim2.new(1, 0, 0, 160)
+listBg.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
+listBg.BorderSizePixel  = 0
+Instance.new("UICorner", listBg).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", listBg).Color = Color3.fromRGB(80, 20, 20)
+
+local userScroll = Instance.new("ScrollingFrame", listBg)
+userScroll.Size                  = UDim2.new(1, -4, 1, -4)
+userScroll.Position              = UDim2.new(0, 2, 0, 2)
+userScroll.BackgroundTransparency= 1
+userScroll.BorderSizePixel       = 0
+userScroll.ScrollBarThickness    = 3
+userScroll.ScrollBarImageColor3  = Color3.fromRGB(180, 60, 60)
+userScroll.AutomaticCanvasSize   = Enum.AutomaticSize.Y
+userScroll.CanvasSize            = UDim2.new(0,0,0,0)
+
+local userLayout = Instance.new("UIListLayout", userScroll)
+userLayout.Padding   = UDim.new(0, 3)
+userLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local userPad = Instance.new("UIPadding", userScroll)
+userPad.PaddingLeft   = UDim.new(0, 4)
+userPad.PaddingRight  = UDim.new(0, 4)
+userPad.PaddingTop    = UDim.new(0, 4)
+userPad.PaddingBottom = UDim.new(0, 4)
+
+-- ── ฟังก์ชัน Kick ──────────────────────────────────────────
+local function kickUser(targetName)
+    fbSet("/admin_kick/" .. targetName, {
+        kick   = true,
+        by     = myName,
+        time   = os.time(),
+    })
+    adminStatus.Text      = "⚡ Kick sent → " .. targetName
+    adminStatus.TextColor3= Color3.fromRGB(255, 120, 50)
+    task.delay(3, function()
+        adminStatus.Text      = "● Live"
+        adminStatus.TextColor3= Color3.fromRGB(100, 200, 100)
+    end)
+end
+
+-- ── Refresh user list ───────────────────────────────────────
+local OFFLINE_THRESHOLD = 30  -- วินาที — ถ้า alive เก่ากว่านี้ถือว่าออฟไลน์
+
+local function refreshUserList()
+    -- ลบ row เก่า
+    for _, v in ipairs(userScroll:GetChildren()) do
+        if v:IsA("Frame") then v:Destroy() end
+    end
+
+    local data = fbReq("GET", "/script_users")
+    if not data then
+        adminStatus.Text      = "✕ Firebase error"
+        adminStatus.TextColor3= Color3.fromRGB(220, 60, 60)
+        return
+    end
+
+    local now   = os.time()
+    local count = 0
+
+    for username, info in pairs(data) do
+        local alive     = info.alive or 0
+        local isOnline  = (now - alive) <= OFFLINE_THRESHOLD
+        local isSelf    = (username == myName)
+        local isOwnerU  = AdminOwners[username] == true
+
+        count += 1
+
+        -- Row
+        local row = Instance.new("Frame", userScroll)
+        row.Size             = UDim2.new(1, 0, 0, 38)
+        row.BackgroundColor3 = isOwnerU
+            and Color3.fromRGB(50, 44, 18)
+            or  Color3.fromRGB(22, 22, 34)
+        row.BorderSizePixel  = 0
+        Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+        row.LayoutOrder      = isSelf and -999 or count
+
+        -- แถบสีด้านซ้าย
+        local accent = Instance.new("Frame", row)
+        accent.Size             = UDim2.new(0, 3, 1, -6)
+        accent.Position         = UDim2.new(0, 0, 0, 3)
+        accent.BorderSizePixel  = 0
+        accent.BackgroundColor3 = isOwnerU
+            and Color3.fromRGB(255, 215, 0)
+            or  (isOnline
+                and Color3.fromRGB(60, 200, 80)
+                or  Color3.fromRGB(120, 120, 120))
+        Instance.new("UICorner", accent).CornerRadius = UDim.new(0, 3)
+
+        -- ชื่อผู้ใช้ + status
+        local nameLbl = Instance.new("TextLabel", row)
+        nameLbl.Size               = UDim2.new(1, -60, 0.55, 0)
+        nameLbl.Position           = UDim2.new(0, 10, 0, 2)
+        nameLbl.BackgroundTransparency = 1
+        nameLbl.RichText           = true
+        nameLbl.TextXAlignment     = Enum.TextXAlignment.Left
+        nameLbl.Font               = Enum.Font.GothamBold
+        nameLbl.TextSize           = 12
+        nameLbl.TextColor3         = Color3.new(1,1,1)
+
+        local tag = isOwnerU and "👑 " or ""
+        local selfTag = isSelf and " <font color='#AAAAFF'>(You)</font>" or ""
+        nameLbl.Text = tag .. username .. selfTag
+
+        -- PlaceId + online dot
+        local infoLbl = Instance.new("TextLabel", row)
+        infoLbl.Size               = UDim2.new(1, -10, 0.4, 0)
+        infoLbl.Position           = UDim2.new(0, 10, 0.55, 0)
+        infoLbl.BackgroundTransparency = 1
+        infoLbl.TextXAlignment     = Enum.TextXAlignment.Left
+        infoLbl.Font               = Enum.Font.Gotham
+        infoLbl.TextSize           = 9
+        infoLbl.RichText           = true
+
+        local dot   = isOnline and "<font color='#40CC50'>●</font>" or "<font color='#666666'>●</font>"
+        local label2 = isOnline and "Online" or "Offline"
+        local sameServer = (info.server == game.JobId) and " · <font color='#AACCFF'>Same server</font>" or ""
+        infoLbl.Text = dot .. " " .. label2 .. sameServer
+
+        -- ปุ่ม KICK (ไม่แสดงถ้าเป็นตัวเอง หรือเป็น Owner ด้วยกัน)
+        if not isSelf and not isOwnerU and isOnline then
+            local kickBtn = Instance.new("TextButton", row)
+            kickBtn.Size             = UDim2.fromOffset(44, 22)
+            kickBtn.Position         = UDim2.new(1, -48, 0.5, -11)
+            kickBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+            kickBtn.Text             = "KICK"
+            kickBtn.Font             = Enum.Font.GothamBold
+            kickBtn.TextSize         = 10
+            kickBtn.TextColor3       = Color3.new(1,1,1)
+            kickBtn.BorderSizePixel  = 0
+            Instance.new("UICorner", kickBtn).CornerRadius = UDim.new(0, 5)
+            kickBtn.MouseButton1Click:Connect(function()
+                kickBtn.Text             = "..."
+                kickBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+                kickUser(username)
+                task.delay(2, refreshUserList)
+            end)
+        end
+    end
+
+    local onlineCount = 0
+    if data then
+        local now2 = os.time()
+        for _, info in pairs(data) do
+            if (now2 - (info.alive or 0)) <= OFFLINE_THRESHOLD then
+                onlineCount += 1
+            end
+        end
+    end
+
+    adminStatus.Text      = "● Live · " .. onlineCount .. " online / " .. count .. " total"
+    adminStatus.TextColor3= Color3.fromRGB(100, 200, 100)
+end
+
+-- ── REFRESH BUTTON ──────────────────────────────────────────
+local refreshBtn = btn(adminPage, "🔄 REFRESH LIST", function()
+    adminStatus.Text = "● Fetching..."
+    task.spawn(refreshUserList)
+end)
+refreshBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 80)
+
+-- ══════════════════════════════════════════════════════════════
+--  BROADCAST SECTION
+-- ══════════════════════════════════════════════════════════════
+local bcLabel = Instance.new("TextLabel", adminPage)
+bcLabel.Size               = UDim2.new(1, 0, 0, 14)
+bcLabel.BackgroundTransparency = 1
+bcLabel.Text               = "BROADCAST TO ALL USERS:"
+bcLabel.Font               = Enum.Font.GothamBold
+bcLabel.TextSize           = 10
+bcLabel.TextColor3         = Color3.fromRGB(180, 180, 180)
+bcLabel.TextXAlignment     = Enum.TextXAlignment.Left
+
+-- กรอบพิมพ์ Broadcast
+local bcBg = Instance.new("Frame", adminPage)
+bcBg.Size             = UDim2.new(1, 0, 0, 30)
+bcBg.BackgroundColor3 = Color3.fromRGB(28, 22, 10)
+bcBg.BorderSizePixel  = 0
+Instance.new("UICorner", bcBg).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", bcBg).Color = Color3.fromRGB(120, 80, 0)
+
+local bcInput = Instance.new("TextBox", bcBg)
+bcInput.Size               = UDim2.new(1, -80, 1, -6)
+bcInput.Position           = UDim2.new(0, 8, 0, 3)
+bcInput.BackgroundTransparency = 1
+bcInput.PlaceholderText    = "พิมพ์ประกาศ..."
+bcInput.PlaceholderColor3  = Color3.fromRGB(120, 100, 60)
+bcInput.Text               = ""
+bcInput.Font               = Enum.Font.Gotham
+bcInput.TextSize           = 12
+bcInput.TextColor3         = Color3.fromRGB(255, 220, 120)
+bcInput.ClearTextOnFocus   = false
+
+local bcSendBtn = Instance.new("TextButton", bcBg)
+bcSendBtn.Size             = UDim2.fromOffset(64, 22)
+bcSendBtn.Position         = UDim2.new(1, -68, 0.5, -11)
+bcSendBtn.BackgroundColor3 = Color3.fromRGB(160, 100, 0)
+bcSendBtn.Text             = "SEND 📢"
+bcSendBtn.Font             = Enum.Font.GothamBold
+bcSendBtn.TextSize         = 10
+bcSendBtn.TextColor3       = Color3.new(1,1,1)
+bcSendBtn.BorderSizePixel  = 0
+Instance.new("UICorner", bcSendBtn).CornerRadius = UDim.new(0, 6)
+
+bcSendBtn.MouseButton1Click:Connect(function()
+    local msg = bcInput.Text:match("^%s*(.-)%s*$")
+    if msg == "" then return end
+    bcInput.Text = ""
+
+    task.spawn(function()
+        fbSet("/admin_broadcast", {
+            msg    = msg,
+            sender = myName,
+            id     = tostring(os.time()),  -- unique id ป้องกัน show ซ้ำ
+        })
+        adminStatus.Text      = "📢 Broadcast sent!"
+        adminStatus.TextColor3= Color3.fromRGB(255, 200, 50)
+        task.delay(3, function()
+            adminStatus.Text      = "● Live"
+            adminStatus.TextColor3= Color3.fromRGB(100, 200, 100)
+        end)
+        -- แสดงให้ตัวเองด้วย
+        showBroadcast(msg, myName)
+    end)
+end)
+
+-- ── BACK BUTTON ─────────────────────────────────────────────
+local backAdmin = btn(adminPage, "◀ BACK TO MAIN", function()
+    showPage("main")
+end)
+backAdmin.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+
+-- ══════════════════════════════════════════════════════════════
+--  AUTO REFRESH เมื่อเปิดหน้า Admin
+-- ══════════════════════════════════════════════════════════════
+-- Poll อัตโนมัติเมื่ออยู่ในหน้า admin
+task.spawn(function()
+    while task.wait(POLL_INT) do
+        if pages.admin and pages.admin.Visible then
+            pcall(refreshUserList)
+        end
+    end
+end)
+
+-- โหลดข้อมูลครั้งแรกทันทีเมื่อกดเปิดหน้า
+adminOpenBtn.MouseButton1Click:Connect(function()
+    task.spawn(refreshUserList)
+end)
+
+print("✅ Admin Panel v1.0 Loaded! (Owner: " .. myName .. ")")
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))()
