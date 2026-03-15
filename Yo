@@ -2230,7 +2230,7 @@ input.FocusLost:Connect(function(enter) if enter then trySend() end end)
 
 -- ══════════════════════════════════════════════════════════════
 --  REAL-TIME POLLING
--- ══════════════════════════════════════════════════════════════
+-- ═══════ฝ═══════════════════════════════════════════════════════
 task.spawn(function()
     while task.wait(POLL_INT) do
         if pages.chat and pages.chat.Visible then
@@ -2256,9 +2256,10 @@ end)
 
 print("✅ Global Chat v6.0 (Telekinesis Edition) Loaded!")
 -- ══════════════════════════════════════════════════════════════
---  ADMIN PANEL v2.0 + GLOBAL CHAT PATCH
---  Paste this at the END of the main Telekinesis script.
---  Firebase Real-time | Owner-only panel
+--  ADMIN PANEL v2.0 — TELEKINESIS UI EDITION
+--  Paste at the BOTTOM of the main Telekinesis script.
+--  Features: Online-only list, JOIN, BRING, KICK, Broadcast
+--  Backend : Firebase Real-time
 -- ══════════════════════════════════════════════════════════════
 
 local HttpService2    = game:GetService("HttpService")
@@ -2267,9 +2268,9 @@ local StarterGui      = game:GetService("StarterGui")
 
 local FIREBASE          = "https://global-chat-445de-default-rtdb.firebaseio.com"
 local POLL_INT          = 3
-local OFFLINE_THRESHOLD = 25  -- seconds without heartbeat = offline (hidden)
+local OFFLINE_THRESHOLD = 30  -- seconds without heartbeat = offline (hidden)
 
--- ── Owner list ───────────────────────────────────────────────
+-- ── Owner List ──────────────────────────────────────────────
 local AdminOwners = {
     ["Fteywa3"]   = true,
     ["EmilyC522"] = true,
@@ -2281,7 +2282,7 @@ local isOwner = AdminOwners[LP.Name] == true
 local myName  = LP.Name
 
 -- ══════════════════════════════════════════════════════════════
---  FIREBASE HELPERS
+--  FIREBASE HELPER
 -- ══════════════════════════════════════════════════════════════
 local function fbReq(method, path, data)
     local req = (syn and syn.request)
@@ -2294,7 +2295,7 @@ local function fbReq(method, path, data)
             Url     = FIREBASE .. path .. ".json",
             Method  = method,
             Headers = {["Content-Type"] = "application/json"},
-            Body    = data and HttpService2:JSONEncode(data) or nil,
+            Body    = data and HttpService2:JSONEncode(data) or nil
         })
     end)
     if not ok or not res then return nil end
@@ -2311,29 +2312,32 @@ local function fbDel(path)        fbReq("DELETE", path, nil)  end
 local function registerSelf()
     fbSet("/script_users/" .. myName, {
         name   = myName,
-        place  = tostring(game.PlaceId),
+        game   = tostring(game.PlaceId),
         server = game.JobId,
         joined = os.time(),
         alive  = os.time(),
     })
 end
 
-task.spawn(function()
-    pcall(registerSelf)
-    while task.wait(10) do
-        pcall(function()
-            fbSet("/script_users/" .. myName .. "/alive", os.time())
-        end)
-    end
-end)
+local function startHeartbeat()
+    task.spawn(function()
+        while task.wait(10) do
+            pcall(function()
+                fbSet("/script_users/" .. myName .. "/alive", os.time())
+            end)
+        end
+    end)
+end
 
--- Clean up on leave
-game.Players.LocalPlayer.AncestryChanged:Connect(function()
+game:GetService("Players").LocalPlayer.AncestryChanged:Connect(function()
     pcall(function() fbDel("/script_users/" .. myName) end)
 end)
 
+pcall(registerSelf)
+startHeartbeat()
+
 -- ══════════════════════════════════════════════════════════════
---  BROADCAST LISTENER  (every user receives this)
+--  BROADCAST RECEIVER (all users see it)
 -- ══════════════════════════════════════════════════════════════
 local lastBroadcastId = ""
 
@@ -2350,44 +2354,26 @@ end
 task.spawn(function()
     while task.wait(POLL_INT) do
         pcall(function()
-            local d = fbReq("GET", "/admin_broadcast")
-            if d and d.id and d.id ~= lastBroadcastId then
-                lastBroadcastId = d.id
-                showBroadcast(d.msg or "", d.sender or "Admin")
+            local data = fbReq("GET", "/admin_broadcast")
+            if data and data.id and data.id ~= lastBroadcastId then
+                lastBroadcastId = data.id
+                showBroadcast(data.msg or "", data.sender or "Admin")
             end
         end)
     end
 end)
 
 -- ══════════════════════════════════════════════════════════════
---  KICK LISTENER  (every user listens for their own kick)
+--  KICK LISTENER (all users)
 -- ══════════════════════════════════════════════════════════════
 task.spawn(function()
     while task.wait(POLL_INT) do
         pcall(function()
-            local d = fbReq("GET", "/admin_kick/" .. myName)
-            if d and d.kick == true then
+            local data = fbReq("GET", "/admin_kick/" .. myName)
+            if data and data.kick == true then
                 fbDel("/admin_kick/" .. myName)
-                game.Players.LocalPlayer:Kick("[ADMIN] You were kicked by an Owner.")
-            end
-        end)
-    end
-end)
-
--- ══════════════════════════════════════════════════════════════
---  BRING LISTENER  (every user listens for a bring command)
--- ══════════════════════════════════════════════════════════════
-task.spawn(function()
-    while task.wait(POLL_INT) do
-        pcall(function()
-            local d = fbReq("GET", "/admin_bring/" .. myName)
-            if d and d.bring == true then
-                fbDel("/admin_bring/" .. myName)
-                -- Teleport to the target server
-                TeleportService:TeleportToPlaceInstance(
-                    game.PlaceId,
-                    d.server,
-                    game.Players.LocalPlayer
+                game:GetService("Players").LocalPlayer:Kick(
+                    "[ADMIN] You have been kicked by an Owner."
                 )
             end
         end)
@@ -2395,283 +2381,38 @@ task.spawn(function()
 end)
 
 -- ══════════════════════════════════════════════════════════════
---  GLOBAL CHAT — OWNER CHAT FIX
---  Admin messages are sorted normally (by timestamp, bottom = newest)
---  No LayoutOrder override for owners in chat
+--  BRING LISTENER (all users — teleport to admin's server)
 -- ══════════════════════════════════════════════════════════════
-local GOLD     = "#FFD700"
-local OWNER_BG = Color3.fromRGB(50, 44, 18)
-local CHAT_FIREBASE  = FIREBASE
-local CHAT_POLL_INT  = 2
-local SPAM_COOL      = 2
-
-pages.chat = createPage()
-local chatPage = pages.chat
-
--- Open button from main page
-label(pages.main, "--- GLOBAL CHAT ---")
-local chatOpenBtn = btn(pages.main, "🌐 GLOBAL CHAT v6.0", function()
-    showPage("chat")
-end)
-chatOpenBtn.BackgroundColor3 = Color3.fromRGB(30, 60, 130)
-chatOpenBtn.Font = Enum.Font.GothamBold
-
--- ── Chat Title ───────────────────────────────────────────────
-local chatTitle = Instance.new("TextLabel", chatPage)
-chatTitle.Size               = UDim2.new(1, 0, 0, 22)
-chatTitle.BackgroundColor3   = Color3.fromRGB(20, 30, 60)
-chatTitle.Text               = "🌐  GLOBAL CHAT  v6.0"
-chatTitle.Font               = Enum.Font.GothamBold
-chatTitle.TextSize           = 13
-chatTitle.TextColor3         = Color3.fromRGB(160, 180, 255)
-chatTitle.BorderSizePixel    = 0
-Instance.new("UICorner", chatTitle).CornerRadius = UDim.new(0, 6)
-
--- ── Message scroll area ──────────────────────────────────────
-local scrollBg = Instance.new("Frame", chatPage)
-scrollBg.Size             = UDim2.new(1, 0, 0, 180)
-scrollBg.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
-scrollBg.BorderSizePixel  = 0
-Instance.new("UICorner", scrollBg).CornerRadius = UDim.new(0, 8)
-Instance.new("UIStroke", scrollBg).Color = Color3.fromRGB(50, 50, 90)
-
-local chatScroll = Instance.new("ScrollingFrame", scrollBg)
-chatScroll.Size                  = UDim2.new(1, -4, 1, -4)
-chatScroll.Position              = UDim2.new(0, 2, 0, 2)
-chatScroll.BackgroundTransparency= 1
-chatScroll.BorderSizePixel       = 0
-chatScroll.ScrollBarThickness    = 3
-chatScroll.ScrollBarImageColor3  = Color3.fromRGB(80, 80, 180)
-chatScroll.AutomaticCanvasSize   = Enum.AutomaticSize.Y
-chatScroll.CanvasSize            = UDim2.new(0,0,0,0)
-
-local chatLayout = Instance.new("UIListLayout", chatScroll)
-chatLayout.Padding   = UDim.new(0, 3)
-chatLayout.SortOrder = Enum.SortOrder.LayoutOrder  -- sorted by timestamp order
-
-local chatPad = Instance.new("UIPadding", chatScroll)
-chatPad.PaddingLeft   = UDim.new(0, 3)
-chatPad.PaddingRight  = UDim.new(0, 3)
-chatPad.PaddingTop    = UDim.new(0, 3)
-chatPad.PaddingBottom = UDim.new(0, 3)
-
--- ── Input row ────────────────────────────────────────────────
-local inputBg = Instance.new("Frame", chatPage)
-inputBg.Size             = UDim2.new(1, 0, 0, 30)
-inputBg.BackgroundColor3 = Color3.fromRGB(28, 28, 44)
-inputBg.BorderSizePixel  = 0
-Instance.new("UICorner", inputBg).CornerRadius = UDim.new(0, 8)
-Instance.new("UIStroke", inputBg).Color = Color3.fromRGB(60, 60, 110)
-
-local chatInput = Instance.new("TextBox", inputBg)
-chatInput.Size               = UDim2.new(1, -70, 1, -6)
-chatInput.Position           = UDim2.new(0, 8, 0, 3)
-chatInput.BackgroundTransparency = 1
-chatInput.PlaceholderText    = "Type a message..."
-chatInput.PlaceholderColor3  = Color3.fromRGB(100, 100, 130)
-chatInput.Text               = ""
-chatInput.Font               = Enum.Font.Gotham
-chatInput.TextSize           = 12
-chatInput.TextColor3         = Color3.new(1,1,1)
-chatInput.ClearTextOnFocus   = false
-
-local chatSendBtn = Instance.new("TextButton", inputBg)
-chatSendBtn.Size             = UDim2.fromOffset(56, 22)
-chatSendBtn.Position         = UDim2.new(1, -60, 0.5, -11)
-chatSendBtn.BackgroundColor3 = Color3.fromRGB(50, 80, 200)
-chatSendBtn.Text             = "SEND"
-chatSendBtn.Font             = Enum.Font.GothamBold
-chatSendBtn.TextSize         = 11
-chatSendBtn.TextColor3       = Color3.new(1,1,1)
-chatSendBtn.BorderSizePixel  = 0
-Instance.new("UICorner", chatSendBtn).CornerRadius = UDim.new(0, 6)
-
--- ── Quick Phrases ─────────────────────────────────────────────
-local qFrame = Instance.new("Frame", chatPage)
-qFrame.Size             = UDim2.new(1, 0, 0, 24)
-qFrame.BackgroundTransparency = 1
-local qLayout2 = Instance.new("UIListLayout", qFrame)
-qLayout2.FillDirection = Enum.FillDirection.Horizontal
-qLayout2.Padding       = UDim.new(0, 4)
-
-for _, phrase in ipairs({"Hello! 👋", "Nice!", "Ez 😎", "GG!", "Bruh 💀"}) do
-    local b = Instance.new("TextButton", qFrame)
-    b.Size             = UDim2.new(0, 56, 1, 0)
-    b.BackgroundColor3 = Color3.fromRGB(30, 30, 52)
-    b.Text             = phrase
-    b.Font             = Enum.Font.Gotham
-    b.TextSize         = 9
-    b.TextColor3       = Color3.fromRGB(160, 160, 255)
-    b.BorderSizePixel  = 0
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
-    b.MouseButton1Click:Connect(function() chatInput.Text = phrase end)
-end
-
--- Status
-local chatStatus = Instance.new("TextLabel", chatPage)
-chatStatus.Size               = UDim2.new(1, 0, 0, 14)
-chatStatus.BackgroundTransparency = 1
-chatStatus.Text               = "● Firebase connected"
-chatStatus.Font               = Enum.Font.Gotham
-chatStatus.TextSize           = 9
-chatStatus.TextColor3         = Color3.fromRGB(70, 200, 90)
-chatStatus.TextXAlignment     = Enum.TextXAlignment.Left
-
--- Bottom row
-local chatBottom = Instance.new("Frame", chatPage)
-chatBottom.Size             = UDim2.new(1, 0, 0, 26)
-chatBottom.BackgroundTransparency = 1
-local cbLayout = Instance.new("UIListLayout", chatBottom)
-cbLayout.FillDirection = Enum.FillDirection.Horizontal
-cbLayout.Padding       = UDim.new(0, 5)
-
-local chatClearBtn = btn(chatBottom, "🗑 CLEAR", Color3.fromRGB(130, 35, 35))
-chatClearBtn.Size             = UDim2.new(0.5, -2, 1, 0)
-chatClearBtn.BackgroundColor3 = Color3.fromRGB(130, 35, 35)
-chatClearBtn.MouseButton1Click:Connect(function()
-    for _, v in ipairs(chatScroll:GetChildren()) do
-        if v:IsA("Frame") then v:Destroy() end
-    end
-end)
-
-local chatBackBtn = btn(chatBottom, "◀ BACK", Color3.fromRGB(40, 40, 40))
-chatBackBtn.Size             = UDim2.new(0.5, -2, 1, 0)
-chatBackBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-chatBackBtn.MouseButton1Click:Connect(function() showPage("main") end)
-
--- ── addChatMsg ────────────────────────────────────────────────
--- LayoutOrder = timestamp so ALL users (owners too) sort chronologically
-local chatMsgCache = {}
-
-local function addChatMsg(user, text, jobId, ts)
-    local isOwnerUser = AdminOwners[user] == true
-    local order       = ts or os.time()
-
-    local f = Instance.new("Frame", chatScroll)
-    f.Size             = UDim2.new(1, 0, 0, 36)
-    f.BackgroundColor3 = isOwnerUser and OWNER_BG or Color3.fromRGB(22, 22, 34)
-    f.BorderSizePixel  = 0
-    f.LayoutOrder      = order   -- ← timestamp order, NO special override for owners
-    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
-
-    if isOwnerUser then
-        local accent = Instance.new("Frame", f)
-        accent.Size             = UDim2.new(0, 3, 1, -6)
-        accent.Position         = UDim2.new(0, 0, 0, 3)
-        accent.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
-        accent.BorderSizePixel  = 0
-        Instance.new("UICorner", accent).CornerRadius = UDim.new(0, 3)
-    end
-
-    local t = Instance.new("TextLabel", f)
-    t.Size               = UDim2.new(1, jobId and -54 or -10, 1, 0)
-    t.Position           = UDim2.new(0, isOwnerUser and 8 or 6, 0, 0)
-    t.BackgroundTransparency = 1
-    t.RichText           = true
-    t.TextWrapped        = true
-    t.TextColor3         = Color3.new(1,1,1)
-    t.TextXAlignment     = Enum.TextXAlignment.Left
-    t.TextYAlignment     = Enum.TextYAlignment.Center
-    t.Font               = Enum.Font.GothamMedium
-    t.TextSize           = 11
-
-    local displayName = isOwnerUser
-        and string.format("<b><font color='%s'>👑[OWNER] %s</font></b>", GOLD, user)
-        or  string.format("<b><font color='#9999FF'>%s</font></b>", user)
-
-    t.Text = displayName .. "<font color='#CCCCCC'>: " .. text .. "</font>"
-
-    if jobId and jobId ~= "" and jobId ~= game.JobId then
-        local j = Instance.new("TextButton", f)
-        j.Size             = UDim2.fromOffset(42, 20)
-        j.Position         = UDim2.new(1, -46, 0.5, -10)
-        j.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-        j.Text             = "JOIN"
-        j.Font             = Enum.Font.GothamBold
-        j.TextSize         = 10
-        j.TextColor3       = Color3.new(1,1,1)
-        j.BorderSizePixel  = 0
-        Instance.new("UICorner", j).CornerRadius = UDim.new(0, 5)
-        j.MouseButton1Click:Connect(function()
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, LP)
-        end)
-    end
-
-    task.defer(function()
-        chatScroll.CanvasPosition = Vector2.new(0, chatScroll.AbsoluteCanvasSize.Y + 9999)
-    end)
-end
-
--- ── Firebase chat helpers ─────────────────────────────────────
-local lastChatSent = ""
-local lastChatAt   = 0
-
-local function tryChatSend()
-    local msg = chatInput.Text:match("^%s*(.-)%s*$")
-    if msg == "" then return end
-    if msg == lastChatSent then
-        chatStatus.Text      = "⚠ Duplicate message blocked"
-        chatStatus.TextColor3= Color3.fromRGB(255, 180, 0)
-        task.delay(2, function()
-            chatStatus.Text      = "● Firebase connected"
-            chatStatus.TextColor3= Color3.fromRGB(70, 200, 90)
-        end)
-        return
-    end
-    if (os.clock() - lastChatAt) < SPAM_COOL then
-        chatStatus.Text      = "⚠ Slow down! (" .. SPAM_COOL .. "s cooldown)"
-        chatStatus.TextColor3= Color3.fromRGB(255, 180, 0)
-        task.delay(2, function()
-            chatStatus.Text      = "● Firebase connected"
-            chatStatus.TextColor3= Color3.fromRGB(70, 200, 90)
-        end)
-        return
-    end
-    lastChatSent = msg
-    lastChatAt   = os.clock()
-    chatInput.Text = ""
-    task.spawn(function()
-        fbReq("POST", "/global", {
-            u   = myName,
-            t   = msg,
-            job = game.JobId,
-            ts  = os.time(),
-        })
-    end)
-end
-
-chatSendBtn.MouseButton1Click:Connect(tryChatSend)
-chatInput.FocusLost:Connect(function(enter) if enter then tryChatSend() end end)
-
 task.spawn(function()
-    while task.wait(CHAT_POLL_INT) do
-        if pages.chat and pages.chat.Visible then
-            pcall(function()
-                local data = fbReq("GET", "/global")
-                if not data then return end
-                local sorted = {}
-                for id, msg in pairs(data) do
-                    if not chatMsgCache[id] then
-                        table.insert(sorted, {id = id, msg = msg})
-                    end
-                end
-                table.sort(sorted, function(a, b)
-                    return (a.msg.ts or 0) < (b.msg.ts or 0)
-                end)
-                for _, entry in ipairs(sorted) do
-                    chatMsgCache[entry.id] = true
-                    addChatMsg(entry.msg.u or "?", entry.msg.t or "", entry.msg.job, entry.msg.ts)
-                end
-            end)
-        end
+    while task.wait(POLL_INT) do
+        pcall(function()
+            local data = fbReq("GET", "/admin_bring/" .. myName)
+            if data and data.bring == true then
+                fbDel("/admin_bring/" .. myName)
+                TeleportService:TeleportToPlaceInstance(
+                    game.PlaceId,
+                    data.server,
+                    LP
+                )
+            end
+        end)
     end
 end)
 
 -- ══════════════════════════════════════════════════════════════
---  ADMIN PANEL UI  (Owner-only)
+--  GLOBAL CHAT — FIX: Admin messages sorted by timestamp (no pin)
+--  Paste the GlobalChat_Patch.lua BEFORE this file.
+--  This block patches the LayoutOrder so owner msgs are NOT pinned.
+-- ══════════════════════════════════════════════════════════════
+-- (No extra code needed here — the fix is in GlobalChat_Patch.lua:
+--  remove "f.LayoutOrder = -1" from the isOwner branch so all
+--  messages use the same ascending timestamp order.)
+
+-- ══════════════════════════════════════════════════════════════
+--  ADMIN UI — OWNERS ONLY
 -- ══════════════════════════════════════════════════════════════
 if not isOwner then
-    print("Admin Panel: Not an Owner — UI skipped.")
+    print("Admin Panel: not an owner — UI skipped.")
     return
 end
 
@@ -2684,9 +2425,9 @@ local adminOpenBtn = btn(pages.main, "👑 ADMIN PANEL", function()
     showPage("admin")
 end)
 adminOpenBtn.BackgroundColor3 = Color3.fromRGB(100, 20, 20)
-adminOpenBtn.Font = Enum.Font.GothamBold
+adminOpenBtn.Font             = Enum.Font.GothamBold
 
--- ── Title ─────────────────────────────────────────────────────
+-- ── Page title ──────────────────────────────────────────────
 local adminTitle = Instance.new("TextLabel", adminPage)
 adminTitle.Size               = UDim2.new(1, 0, 0, 24)
 adminTitle.BackgroundColor3   = Color3.fromRGB(80, 15, 15)
@@ -2697,29 +2438,29 @@ adminTitle.TextColor3         = Color3.fromRGB(255, 200, 100)
 adminTitle.BorderSizePixel    = 0
 Instance.new("UICorner", adminTitle).CornerRadius = UDim.new(0, 6)
 
--- ── Status bar ────────────────────────────────────────────────
+-- Status bar
 local adminStatus = Instance.new("TextLabel", adminPage)
 adminStatus.Size               = UDim2.new(1, 0, 0, 14)
 adminStatus.BackgroundTransparency = 1
-adminStatus.Text               = "● Connecting..."
+adminStatus.Text               = "● Fetching users..."
 adminStatus.Font               = Enum.Font.Gotham
 adminStatus.TextSize           = 9
 adminStatus.TextColor3         = Color3.fromRGB(100, 200, 100)
 adminStatus.TextXAlignment     = Enum.TextXAlignment.Left
 
--- ── Section label ─────────────────────────────────────────────
+-- Section label
 local listLabel = Instance.new("TextLabel", adminPage)
 listLabel.Size               = UDim2.new(1, 0, 0, 14)
 listLabel.BackgroundTransparency = 1
-listLabel.Text               = "ACTIVE SCRIPT USERS:"
+listLabel.Text               = "ONLINE USERS:"
 listLabel.Font               = Enum.Font.GothamBold
 listLabel.TextSize           = 10
 listLabel.TextColor3         = Color3.fromRGB(180, 180, 180)
 listLabel.TextXAlignment     = Enum.TextXAlignment.Left
 
--- ── User list scroll ──────────────────────────────────────────
+-- List container
 local listBg = Instance.new("Frame", adminPage)
-listBg.Size             = UDim2.new(1, 0, 0, 170)
+listBg.Size             = UDim2.new(1, 0, 0, 175)
 listBg.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
 listBg.BorderSizePixel  = 0
 Instance.new("UICorner", listBg).CornerRadius = UDim.new(0, 8)
@@ -2745,108 +2486,77 @@ userPad.PaddingRight  = UDim.new(0, 4)
 userPad.PaddingTop    = UDim.new(0, 4)
 userPad.PaddingBottom = UDim.new(0, 4)
 
--- ── Small button helper for action buttons inside rows ────────
-local function rowBtn(parent, txt, col, xOffset)
-    local b = Instance.new("TextButton", parent)
-    b.Size             = UDim2.fromOffset(40, 20)
-    b.Position         = UDim2.new(1, xOffset, 0.5, -10)
-    b.BackgroundColor3 = col
-    b.Text             = txt
-    b.Font             = Enum.Font.GothamBold
-    b.TextSize         = 9
-    b.TextColor3       = Color3.new(1,1,1)
-    b.BorderSizePixel  = 0
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 5)
-    return b
-end
-
--- ── Kick / Bring helpers ──────────────────────────────────────
-local function sendKick(targetName, statusLbl)
-    fbSet("/admin_kick/" .. targetName, {
-        kick = true,
-        by   = myName,
-        time = os.time(),
-    })
-    adminStatus.Text      = "⚡ Kicked → " .. targetName
-    adminStatus.TextColor3= Color3.fromRGB(255, 100, 50)
-    task.delay(3, function()
-        adminStatus.Text      = "● Live"
-        adminStatus.TextColor3= Color3.fromRGB(100, 200, 100)
-    end)
-end
-
-local function sendBring(targetName, targetServer)
-    -- If target is already in this server, no need to bring
-    if targetServer == game.JobId then
-        adminStatus.Text      = targetName .. " is already here."
-        adminStatus.TextColor3= Color3.fromRGB(200, 200, 80)
-        task.delay(3, function()
-            adminStatus.Text      = "● Live"
-            adminStatus.TextColor3= Color3.fromRGB(100, 200, 100)
+-- ── Status helper ────────────────────────────────────────────
+local function setStatus(msg, col, resetAfter)
+    adminStatus.Text       = msg
+    adminStatus.TextColor3 = col
+    if resetAfter then
+        task.delay(resetAfter, function()
+            adminStatus.Text       = "● Live"
+            adminStatus.TextColor3 = Color3.fromRGB(100, 200, 100)
         end)
-        return
     end
+end
+
+-- ── Action senders ───────────────────────────────────────────
+local function sendKick(targetName)
+    fbSet("/admin_kick/" .. targetName, { kick = true, by = myName, time = os.time() })
+    setStatus("⚡ Kick sent → " .. targetName, Color3.fromRGB(255, 120, 50), 3)
+end
+
+local function sendBring(targetName)
     fbSet("/admin_bring/" .. targetName, {
         bring  = true,
         by     = myName,
-        server = game.JobId,  -- Admin's current server
+        server = game.JobId,
         time   = os.time(),
     })
-    adminStatus.Text      = "📍 Bring sent → " .. targetName
-    adminStatus.TextColor3= Color3.fromRGB(80, 180, 255)
-    task.delay(3, function()
-        adminStatus.Text      = "● Live"
-        adminStatus.TextColor3= Color3.fromRGB(100, 200, 100)
-    end)
+    setStatus("📍 Bring sent → " .. targetName, Color3.fromRGB(100, 180, 255), 3)
 end
 
--- ── refreshUserList — preserves scroll position ───────────────
+-- ══════════════════════════════════════════════════════════════
+--  REFRESH — online only, scroll position preserved
+-- ══════════════════════════════════════════════════════════════
 local function refreshUserList()
-    -- Save current scroll position so it doesn't jump to top
-    local savedScroll = userScroll.CanvasPosition
+    -- Save scroll Y before wiping rows
+    local savedY = userScroll.CanvasPosition.Y
 
-    -- Remove old rows
     for _, v in ipairs(userScroll:GetChildren()) do
         if v:IsA("Frame") then v:Destroy() end
     end
 
     local data = fbReq("GET", "/script_users")
     if not data then
-        adminStatus.Text      = "✕ Firebase error"
-        adminStatus.TextColor3= Color3.fromRGB(220, 60, 60)
+        setStatus("✕ Firebase error", Color3.fromRGB(220, 60, 60), nil)
         return
     end
 
     local now        = os.time()
     local onlineList = {}
 
-    -- Collect only ONLINE users
     for username, info in pairs(data) do
-        local alive    = info.alive or 0
-        local isOnline = (now - alive) <= OFFLINE_THRESHOLD
-        if isOnline then
-            table.insert(onlineList, {name = username, info = info})
+        local alive = info.alive or 0
+        -- Only show users active within the threshold
+        if (now - alive) <= OFFLINE_THRESHOLD then
+            table.insert(onlineList, { name = username, info = info })
         end
     end
 
-    -- Sort: self first, then owners, then others — all alphabetically within groups
+    -- Owners first, then alphabetical
     table.sort(onlineList, function(a, b)
-        local aOwn = AdminOwners[a.name] and 1 or 2
-        local bOwn = AdminOwners[b.name] and 1 or 2
-        local aSelf = (a.name == myName) and 0 or aOwn
-        local bSelf = (b.name == myName) and 0 or bOwn
-        if aSelf ~= bSelf then return aSelf < bSelf end
+        local ao = AdminOwners[a.name] and 1 or 0
+        local bo = AdminOwners[b.name] and 1 or 0
+        if ao ~= bo then return ao > bo end
         return a.name < b.name
     end)
 
     for i, entry in ipairs(onlineList) do
-        local username  = entry.name
-        local info      = entry.info
-        local isSelf    = (username == myName)
-        local isOwnerU  = AdminOwners[username] == true
-        local sameServ  = (info.server == game.JobId)
+        local username = entry.name
+        local info     = entry.info
+        local isSelf   = (username == myName)
+        local isOwnerU = AdminOwners[username] == true
+        local sameServ = (info.server == game.JobId)
 
-        -- Row height — owners + non-owners both 40px
         local row = Instance.new("Frame", userScroll)
         row.Size             = UDim2.new(1, 0, 0, 40)
         row.BackgroundColor3 = isOwnerU
@@ -2856,114 +2566,134 @@ local function refreshUserList()
         row.LayoutOrder      = i
         Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
 
-        -- Left accent bar
+        -- Left accent
         local accent = Instance.new("Frame", row)
-        accent.Size             = UDim2.new(0, 3, 1, -6)
-        accent.Position         = UDim2.new(0, 0, 0, 3)
-        accent.BorderSizePixel  = 0
+        accent.Size             = UDim2.new(0, 3, 1, -8)
+        accent.Position         = UDim2.new(0, 0, 0, 4)
         accent.BackgroundColor3 = isOwnerU
             and Color3.fromRGB(255, 215, 0)
             or  Color3.fromRGB(60, 200, 80)
+        accent.BorderSizePixel  = 0
         Instance.new("UICorner", accent).CornerRadius = UDim.new(0, 3)
 
-        -- Name label
+        -- Username label
         local nameLbl = Instance.new("TextLabel", row)
-        nameLbl.Size               = UDim2.new(1, -130, 0.55, 0)
+        nameLbl.Size               = UDim2.new(1, -122, 0.55, 0)
         nameLbl.Position           = UDim2.new(0, 10, 0, 2)
         nameLbl.BackgroundTransparency = 1
         nameLbl.RichText           = true
         nameLbl.TextXAlignment     = Enum.TextXAlignment.Left
         nameLbl.Font               = Enum.Font.GothamBold
         nameLbl.TextSize           = 12
-        nameLbl.TextColor3         = Color3.new(1,1,1)
-        local selfTag = isSelf and " <font color='#AAAAFF'>(You)</font>" or ""
-        nameLbl.Text = (isOwnerU and "👑 " or "") .. username .. selfTag
+        nameLbl.TextColor3         = Color3.new(1, 1, 1)
 
-        -- Sub-info label
-        local infoLbl = Instance.new("TextLabel", row)
-        infoLbl.Size               = UDim2.new(1, -10, 0.4, 0)
-        infoLbl.Position           = UDim2.new(0, 10, 0.55, 0)
-        infoLbl.BackgroundTransparency = 1
-        infoLbl.TextXAlignment     = Enum.TextXAlignment.Left
-        infoLbl.Font               = Enum.Font.Gotham
-        infoLbl.TextSize           = 9
-        infoLbl.RichText           = true
-        local serverTag = sameServ
-            and "<font color='#44CCFF'>● Same server</font>"
+        local ownerTag = isOwnerU and "👑 " or ""
+        local selfTag  = isSelf and " <font color='#AAAAFF'>(You)</font>" or ""
+        nameLbl.Text   = ownerTag .. username .. selfTag
+
+        -- Sub-label: server info
+        local subLbl = Instance.new("TextLabel", row)
+        subLbl.Size               = UDim2.new(1, -10, 0.4, 0)
+        subLbl.Position           = UDim2.new(0, 10, 0.58, 0)
+        subLbl.BackgroundTransparency = 1
+        subLbl.TextXAlignment     = Enum.TextXAlignment.Left
+        subLbl.Font               = Enum.Font.Gotham
+        subLbl.TextSize           = 9
+        subLbl.RichText           = true
+        subLbl.TextColor3         = Color3.new(1, 1, 1)
+        subLbl.Text               = sameServ
+            and "<font color='#55CCFF'>● Same server</font>"
             or  "<font color='#AAAAAA'>● Different server</font>"
-        infoLbl.Text = serverTag
 
-        -- Action buttons (not shown for self or fellow owners)
+        -- ── Action buttons (skip self and fellow owners) ─────
         if not isSelf and not isOwnerU then
-            -- KICK button
-            local kb = rowBtn(row, "KICK", Color3.fromRGB(180, 30, 30), -48)
-            kb.MouseButton1Click:Connect(function()
-                kb.Text             = "..."
-                kb.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-                sendKick(username)
-            end)
+            local btnFrame = Instance.new("Frame", row)
+            btnFrame.Size             = UDim2.fromOffset(114, 24)
+            btnFrame.Position         = UDim2.new(1, -118, 0.5, -12)
+            btnFrame.BackgroundTransparency = 1
 
-            -- JOIN button (teleport Admin to that user's server)
-            local jb = rowBtn(row, "JOIN", Color3.fromRGB(0, 130, 80), -92)
-            if sameServ then
-                jb.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-                jb.Text             = "HERE"
-            else
-                jb.MouseButton1Click:Connect(function()
-                    jb.Text             = "..."
-                    jb.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            local bl = Instance.new("UIListLayout", btnFrame)
+            bl.FillDirection = Enum.FillDirection.Horizontal
+            bl.Padding       = UDim.new(0, 3)
+
+            local function makeBtn(lbl, col)
+                local b = Instance.new("TextButton", btnFrame)
+                b.Size             = UDim2.fromOffset(35, 24)
+                b.BackgroundColor3 = col
+                b.Text             = lbl
+                b.Font             = Enum.Font.GothamBold
+                b.TextSize         = 9
+                b.TextColor3       = Color3.new(1, 1, 1)
+                b.BorderSizePixel  = 0
+                Instance.new("UICorner", b).CornerRadius = UDim.new(0, 5)
+                return b
+            end
+
+            -- JOIN: only shown when user is on a different server
+            if not sameServ and info.server and info.server ~= "" then
+                local jBtn = makeBtn("JOIN", Color3.fromRGB(0, 130, 80))
+                jBtn.MouseButton1Click:Connect(function()
                     TeleportService:TeleportToPlaceInstance(
-                        game.PlaceId,
-                        info.server,
-                        game.Players.LocalPlayer
+                        game.PlaceId, info.server, LP
                     )
                 end)
+            else
+                -- Invisible placeholder so BRING/KICK stay aligned
+                local ph = Instance.new("Frame", btnFrame)
+                ph.Size             = UDim2.fromOffset(35, 24)
+                ph.BackgroundTransparency = 1
             end
 
-            -- BRING button (pull user into Admin's server)
-            local bb = rowBtn(row, "BRING", Color3.fromRGB(0, 80, 180), -136)
-            if sameServ then
-                bb.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-                bb.Text             = "HERE"
-            else
-                bb.MouseButton1Click:Connect(function()
-                    bb.Text             = "..."
-                    bb.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-                    sendBring(username, info.server)
+            -- BRING
+            local bringBtn = makeBtn("BRING", Color3.fromRGB(30, 80, 180))
+            bringBtn.MouseButton1Click:Connect(function()
+                bringBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+                sendBring(username)
+                task.delay(2, function()
+                    bringBtn.BackgroundColor3 = Color3.fromRGB(30, 80, 180)
                 end)
-            end
+            end)
+
+            -- KICK
+            local kBtn = makeBtn("KICK", Color3.fromRGB(180, 30, 30))
+            kBtn.MouseButton1Click:Connect(function()
+                kBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+                sendKick(username)
+                task.delay(2, refreshUserList)
+            end)
         end
     end
 
-    -- Restore scroll position
+    -- Restore scroll — no jump back to top
     task.defer(function()
-        userScroll.CanvasPosition = savedScroll
+        userScroll.CanvasPosition = Vector2.new(0, savedY)
     end)
 
-    local total = 0
-    for _ in pairs(data) do total += 1 end
-
-    adminStatus.Text      = "● Live · " .. #onlineList .. " online  /  " .. total .. " total"
-    adminStatus.TextColor3= Color3.fromRGB(100, 200, 100)
+    setStatus(
+        "● Live · " .. #onlineList .. " online",
+        Color3.fromRGB(100, 200, 100),
+        nil
+    )
 end
 
--- ── Refresh button ────────────────────────────────────────────
+-- Refresh button
 local refreshBtn = btn(adminPage, "🔄 REFRESH", function()
-    adminStatus.Text      = "● Fetching..."
-    adminStatus.TextColor3= Color3.fromRGB(200, 200, 80)
+    setStatus("● Fetching...", Color3.fromRGB(180, 180, 100), nil)
     task.spawn(refreshUserList)
 end)
 refreshBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 80)
 
--- ── Broadcast section ─────────────────────────────────────────
-local bcSep = Instance.new("TextLabel", adminPage)
-bcSep.Size               = UDim2.new(1, 0, 0, 14)
-bcSep.BackgroundTransparency = 1
-bcSep.Text               = "BROADCAST TO ALL USERS:"
-bcSep.Font               = Enum.Font.GothamBold
-bcSep.TextSize           = 10
-bcSep.TextColor3         = Color3.fromRGB(180, 180, 180)
-bcSep.TextXAlignment     = Enum.TextXAlignment.Left
+-- ══════════════════════════════════════════════════════════════
+--  BROADCAST SECTION
+-- ══════════════════════════════════════════════════════════════
+local bcLabel = Instance.new("TextLabel", adminPage)
+bcLabel.Size               = UDim2.new(1, 0, 0, 14)
+bcLabel.BackgroundTransparency = 1
+bcLabel.Text               = "BROADCAST TO ALL USERS:"
+bcLabel.Font               = Enum.Font.GothamBold
+bcLabel.TextSize           = 10
+bcLabel.TextColor3         = Color3.fromRGB(180, 180, 180)
+bcLabel.TextXAlignment     = Enum.TextXAlignment.Left
 
 local bcBg = Instance.new("Frame", adminPage)
 bcBg.Size             = UDim2.new(1, 0, 0, 30)
@@ -2973,7 +2703,7 @@ Instance.new("UICorner", bcBg).CornerRadius = UDim.new(0, 8)
 Instance.new("UIStroke", bcBg).Color = Color3.fromRGB(120, 80, 0)
 
 local bcInput = Instance.new("TextBox", bcBg)
-bcInput.Size               = UDim2.new(1, -80, 1, -6)
+bcInput.Size               = UDim2.new(1, -82, 1, -6)
 bcInput.Position           = UDim2.new(0, 8, 0, 3)
 bcInput.BackgroundTransparency = 1
 bcInput.PlaceholderText    = "Type announcement..."
@@ -2985,13 +2715,13 @@ bcInput.TextColor3         = Color3.fromRGB(255, 220, 120)
 bcInput.ClearTextOnFocus   = false
 
 local bcSendBtn = Instance.new("TextButton", bcBg)
-bcSendBtn.Size             = UDim2.fromOffset(64, 22)
-bcSendBtn.Position         = UDim2.new(1, -68, 0.5, -11)
+bcSendBtn.Size             = UDim2.fromOffset(68, 22)
+bcSendBtn.Position         = UDim2.new(1, -72, 0.5, -11)
 bcSendBtn.BackgroundColor3 = Color3.fromRGB(160, 100, 0)
 bcSendBtn.Text             = "SEND 📢"
 bcSendBtn.Font             = Enum.Font.GothamBold
 bcSendBtn.TextSize         = 10
-bcSendBtn.TextColor3       = Color3.new(1,1,1)
+bcSendBtn.TextColor3       = Color3.new(1, 1, 1)
 bcSendBtn.BorderSizePixel  = 0
 Instance.new("UICorner", bcSendBtn).CornerRadius = UDim.new(0, 6)
 
@@ -3005,23 +2735,20 @@ bcSendBtn.MouseButton1Click:Connect(function()
             sender = myName,
             id     = tostring(os.time()),
         })
-        adminStatus.Text      = "📢 Broadcast sent!"
-        adminStatus.TextColor3= Color3.fromRGB(255, 200, 50)
-        task.delay(3, function()
-            adminStatus.Text      = "● Live"
-            adminStatus.TextColor3= Color3.fromRGB(100, 200, 100)
-        end)
+        setStatus("📢 Broadcast sent!", Color3.fromRGB(255, 200, 50), 3)
         showBroadcast(msg, myName)
     end)
 end)
 
--- ── Back button ───────────────────────────────────────────────
+-- Back button
 local backAdmin = btn(adminPage, "◀ BACK TO MAIN", function()
     showPage("main")
 end)
 backAdmin.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 
--- ── Auto-refresh while admin page is open ─────────────────────
+-- ══════════════════════════════════════════════════════════════
+--  AUTO REFRESH while admin page is open
+-- ══════════════════════════════════════════════════════════════
 task.spawn(function()
     while task.wait(POLL_INT) do
         if pages.admin and pages.admin.Visible then
@@ -3030,11 +2757,9 @@ task.spawn(function()
     end
 end)
 
--- Initial load when admin page opens
 adminOpenBtn.MouseButton1Click:Connect(function()
     task.spawn(refreshUserList)
 end)
 
-print("✅ Admin Panel v2.0 Loaded!  Logged in as: " .. myName)
-
+print("Admin Panel v2.0 loaded! Owner: " .. myName)
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))()
