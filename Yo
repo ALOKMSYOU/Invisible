@@ -2428,10 +2428,7 @@ pollBring()
 -- ══════════════════════════════════════════════════════════════
 --  ADMIN PANEL UI — เฉพาะ Owner เท่านั้น
 -- ══════════════════════════════════════════════════════════════
-if not isOwner then
-    print("Admin Panel: ไม่ใช่ Owner — ข้ามการสร้าง UI")
-    return
-end
+if isOwner then
 
 -- ── สร้างหน้า Admin ใน pages เดิม ──────────────────────────
 pages.admin = createPage()
@@ -2795,5 +2792,7 @@ adminOpenBtn.MouseButton1Click:Connect(function()
 end)
 
 print("✅ Admin Panel v1.0 Loaded! (Owner: " .. myName .. ")")
+
+end -- if isOwner
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))()
