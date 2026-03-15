@@ -2574,13 +2574,11 @@ task.spawn(function()
     while task.wait(5) do
         pcall(function()
             fbReq("PUT", "/runners/" .. LP.Name, {
-                name  = LP.Name,
-                job   = game.JobId,
-                ts    = os.time()
-            })
-        end)
-    end
-end)
+    name    = LP.Name,
+    job     = game.JobId,
+    placeid = game.PlaceId,
+    ts      = os.time()
+})
 
 -- ── สร้างหน้า Admin ───────────────────────────────────────────
 if isOwner then
@@ -2714,7 +2712,8 @@ if isOwner then
                     pcall(function()
                         CoreGui.RobloxPromptGui.promptOverlay.Visible = false
                     end)
-                    TeleportService:TeleportToPlaceInstance(game.PlaceId, runner.job, LP)
+                    local targetPlace = runner.placeid or game.PlaceId
+TeleportService:TeleportToPlaceInstance(targetPlace, runner.job, LP
                     -- ตรวจสอบ error หลัง teleport
                     task.wait(0.5)
                     pcall(function()
