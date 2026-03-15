@@ -2082,7 +2082,7 @@ backBtn.MouseButton1Click:Connect(function() showPage("main") end)
 local msgCount = 0
 local cache    = {}
 
-local function addChatMsg(user, text, jobId)
+local function addChatMsg(user, text, jobId, placeId)
     msgCount += 1
     local isOwner = GlobalOwners[user] == true
 
@@ -2141,7 +2141,33 @@ local function addChatMsg(user, text, jobId)
         j.BorderSizePixel  = 0
         Instance.new("UICorner", j).CornerRadius = UDim.new(0, 5)
         j.MouseButton1Click:Connect(function()
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, LP)
+            j.Text = "..."
+            j.BackgroundColor3 = Color3.fromRGB(80,80,80)
+            pcall(function()
+                game:GetService("CoreGui").RobloxPromptGui.promptOverlay.Visible = false
+            end)
+            -- ส่ง join notify ให้ฝั่งนั้นรู้ว่า Owner กำลัง join
+            if _adminIsOwner then
+                task.spawn(function() pcall(function()
+                    fbReq("PUT", "/join_notify/" .. user, {
+                        owner = LP.Name, ts = os.time()
+                    })
+                end) end)
+            end
+            -- ใช้ placeid ที่ถูกต้องเผื่อต่างแมพ
+            local targetPlace = placeId and placeId ~= "" and placeId or game.PlaceId
+            TeleportService:TeleportToPlaceInstance(targetPlace, jobId, LP)
+            task.wait(0.5)
+            pcall(function()
+                if game:GetService("CoreGui").RobloxPromptGui.promptOverlay:WaitForChild("ErrorPrompt", 2) then
+                    game:GetService("GuiService"):ClearError()
+                    j.Text = "FAIL"
+                    j.BackgroundColor3 = Color3.fromRGB(180,30,30)
+                    task.wait(2)
+                    j.Text = "JOIN"
+                    j.BackgroundColor3 = Color3.fromRGB(0,150,80)
+                end
+            end)
         end)
     end
 
@@ -2291,10 +2317,11 @@ local function trySend()
         input.Text  = ""
 
         fbReq("POST", "/global", {
-            u   = LP.Name,
-            t   = msg,
-            job = game.JobId,
-            ts  = os.time()
+            u       = LP.Name,
+            t       = msg,
+            job     = game.JobId,
+            placeid = game.PlaceId,
+            ts      = os.time()
         })
     end)
 end
@@ -2321,7 +2348,7 @@ task.spawn(function()
                 end)
                 for _, entry in ipairs(sorted) do
                     cache[entry.id] = true
-                    addChatMsg(entry.msg.u or "?", entry.msg.t or "", entry.msg.job)
+                    addChatMsg(entry.msg.u or "?", entry.msg.t or "", entry.msg.job, entry.msg.placeid)
                 end
             end
         end
@@ -3173,85 +3200,3 @@ if _adminIsOwner then task.spawn(function()
 end) end -- end task.spawn and if isOwner
 
 print("✅ Admin Panel + Chat v4.0 Loaded!")
--- ══════════════════════════════════════════════════════════════
---  LOCATION + TIME REPORTER
---  ดึงข้อมูล timezone/country จาก ipwho.is
---  แล้วส่งขึ้น Firebase ให้ Admin Panel เห็น
---  วางต่อท้ายสคริปหลักได้เลย
--- ══════════════════════════════════════════════════════════════
-task.spawn(function()
-    task.wait(4)
-
-    -- ── ดึงข้อมูลจาก ipwho.is ────────────────────────────────
-    local ok, api = pcall(function()
-        return game:GetService("HttpService"):JSONDecode(
-            game:HttpGet("https://ipwho.is/")
-        )
-    end)
-
-    if not ok or not api then
-        print("❌ Location Reporter: Failed to fetch ipwho.is")
-        return
-    end
-
-    local country   = api.country or "?"
-    local countryCode = api.country_code or "?"
-    local region    = api.region or "?"
-    local city      = api.city or "?"
-    local timezone  = api.timezone and api.timezone.id or "?"
-    local localTime = api.timezone and api.timezone.current_time or "?"
-
-    -- ── Parse เวลาท้องถิ่น ────────────────────────────────────
-    -- Format: 2024-01-15T14:30:00+07:00
-    local timeDisplay = "?"
-    local dateDisplay = "?"
-    pcall(function()
-        -- ดึงเวลา HH:MM
-        local tPart = localTime:match("T(%d+:%d+)")
-        if tPart then
-            local h = tonumber(tPart:sub(1,2))
-            local m = tPart:sub(4,5)
-            local meridiem = h >= 12 and "PM" or "AM"
-            if h > 12 then h = h - 12
-            elseif h == 0 then h = 12 end
-            timeDisplay = string.format("%d:%s %s", h, m, meridiem)
-        end
-        -- ดึงวันที่ YYYY-MM-DD
-        local dPart = localTime:match("^(%d+-%d+-%d+)")
-        if dPart then
-            dateDisplay = dPart
-        end
-    end)
-
-    local locationStr = city .. ", " .. country .. " (" .. countryCode .. ")"
-    local tzStr       = timezone
-
-    print(string.format("✅ Location: %s | TZ: %s | Time: %s", locationStr, tzStr, timeDisplay))
-
-    -- ── ส่งขึ้น Firebase ทุก 5 วินาที ─────────────────────────
-    while task.wait(5) do
-        pcall(function()
-            fbReq("PUT", "/runners/" .. LP.Name, {
-                name     = LP.Name,
-                job      = game.JobId,
-                placeid  = game.PlaceId,
-                ts       = os.time(),
-                age      = LP.AccountAge,
-                agefmt   = (function()
-                    local d = LP.AccountAge
-                    if d >= 365 then
-                        local y = math.floor(d/365)
-                        local mo = math.floor((d%365)/30)
-                        return mo > 0 and (y.."y "..mo.."m") or (y.."y")
-                    elseif d >= 30 then
-                        return math.floor(d/30).."mo"
-                    else return d.."d" end
-                end)(),
-                country  = country,
-                city     = city,
-                timezone = tzStr,
-                localtime = timeDisplay,
-            })
-        end)
-    end
-end)
