@@ -2712,7 +2712,9 @@ if isOwner then
                     joinB.Text = "..."
                     joinB.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
                     local ok, err = pcall(function()
-                        TeleportService:TeleportToPlaceInstance(game.PlaceId, runner.job, LP)
+                      local teleportOptions = Instance.new("TeleportOptions")
+teleportOptions.ServerInstanceId = runner.job
+TeleportService:TeleportAsync(game.PlaceId, {LP}, teleportOptions)
                     end)
                     if not ok then
                         joinB.Text = "FAIL"
