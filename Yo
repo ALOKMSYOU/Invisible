@@ -2148,7 +2148,8 @@ local function addChatMsg(user, text, jobId)
         j.BorderSizePixel  = 0
         Instance.new("UICorner", j).CornerRadius = UDim.new(0, 5)
         j.MouseButton1Click:Connect(function()
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, LP)
+            local targetPlace = runner.placeid or game.PlaceId
+TeleportService:TeleportToPlaceInstance(targetPlace, runner.job, LP
         end)
     end
 
