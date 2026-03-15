@@ -3429,3 +3429,126 @@ task.spawn(function()
 
     print("✅ Tutorial System Loaded!")
 end)
+-- ══════════════════════════════════════════════════════════════
+--  TUTORIAL SYSTEM v2.0 — Subtitle under each button
+--  วางต่อท้ายสคริปหลักได้เลย
+-- ══════════════════════════════════════════════════════════════
+task.spawn(function()
+    task.wait(2)
+
+    local SUBTITLES = {
+        -- Main Page
+        ["GRAB (LOOK)"]          = "Hold part in front of you",
+        ["DROP (LOOK)"]          = "Release the part you look at",
+        ["DROP ALL"]             = "Release all held parts",
+        ["FREEZE (LOOK)"]        = "Lock part in place Need To Grab",
+        ["UNFREEZE (LOOK)"]      = "Unlock frozen part",
+        ["UNFREEZE ALL"]         = "Unlock all frozen parts",
+        ["THROW (LOOK)"]         = "Launch part forward",
+        ["HIGHLIGHT : ON"]       = "Toggle part highlight",
+        ["HIGHLIGHT : OFF"]      = "Toggle part highlight",
+        ["▶ MOVE / ROTATE MODE"] = "Precisely move frozen parts",
+        ["DELETE PART(LOOK)"]    = "Launch part at extreme speed",
+        ["DESTROY UI"]           = "Close and remove this UI",
+        ["OPEN PUPPET MASTER"]   = "Control NPCs like puppets",
+        ["BUILDER MODE (3D)"]    = "Draw shape with parts in 3D",
+        ["🌐 GLOBAL CHAT v6.0"]  = "Chat across all servers",
+        ["👑 ADMIN PANEL"]       = "Manage all runners (Owner only)",
+        ["FEEDBACK"]             = "Send feedback via webhook",
+        ["AUTO GRAB NPC : OFF"]  = "Auto-grab nearby NPCs",
+        ["AUTO GRAB NPC : ON"]   = "Auto-grab nearby NPCs",
+        ["AUTO GRAB PART : OFF"] = "Auto-grab nearby parts",
+        ["AUTO GRAB PART : ON"]  = "Auto-grab nearby parts",
+        ["AUTO FREEZE : OFF"]    = "Freeze every grabbed part",
+        ["AUTO FREEZE : ON"]     = "Freeze every grabbed part",
+        ["AUTO THROW : OFF"]     = "Throw every grabbed part",
+        ["AUTO THROW : ON"]      = "Throw every grabbed part",
+        ["AUTO DELETE : OFF"]    = "Launch all nearby parts away",
+        ["AUTO DELETE : ON"]     = "Launch all nearby parts away",
+        ["🛡️ AUTO SHIELD : OFF"] = "Block incoming projectiles",
+        ["🛡️ AUTO SHIELD : ON"]  = "Block incoming projectiles",
+        ["FOLLOW OWNER : OFF"]   = "Parts float behind you",
+        ["FOLLOW OWNER : ON"]    = "Parts float behind you",
+        ["ENABLE CAR MODE: OFF"] = "Tap a part to drive it",
+        ["ENABLE CAR MODE: ON"]  = "Tap a part to drive it",
+
+        -- Move Page
+        ["REFRESH LIST"]         = "Reload frozen parts list",
+        ["SELECT ALL"]           = "Select all frozen parts",
+        ["UNSELECT ALL"]         = "Deselect all parts",
+        ["TELEPORT PART(SELECT FIRST)"] = "Move selected parts to you",
+        ["◀ BACK"]               = "Return to main page",
+        ["◀ BACK TO MAIN"]       = "Return to main page",
+
+        -- Admin Panel
+        ["🔄 REFRESH ALL RUNNERS"] = "Reload all script runners",
+        ["🔄 REFRESH SERVER LIST"] = "Reload runners in this server",
+        ["UNMUTE"]               = "Clear warnings for username above",
+        ["FORCE MUTE"]           = "Mute username above for 30 min",
+
+        -- Chat
+        ["SEND"]                 = "Send message to Global Chat",
+        ["🗑 CLEAR"]             = "Clear your chat view",
+    }
+
+    local patched = {}
+
+    local function addSubtitle(b)
+        local id = tostring(b)
+        if patched[id] then return end
+
+        local sub = SUBTITLES[b.Text]
+        if not sub then
+            -- partial match for toggle buttons
+            for key, val in pairs(SUBTITLES) do
+                local k = key:gsub(" : ON",""):gsub(" : OFF","")
+                local t = b.Text:gsub(" : ON",""):gsub(" : OFF","")
+                if k == t then sub = val break end
+            end
+        end
+        if not sub then return end
+
+        patched[id] = true
+
+        -- ขยาย button ให้สูงขึ้น
+        local origH = b.Size.Y.Offset
+        if origH < 35 then
+            b.Size = UDim2.new(b.Size.X.Scale, b.Size.X.Offset, 0, origH + 14)
+        end
+
+        -- ข้อความหลักขยับขึ้น
+        b.TextYAlignment = Enum.TextYAlignment.Top
+
+        -- subtitle label
+        local sub_lbl = Instance.new("TextLabel", b)
+        sub_lbl.Size = UDim2.new(1, -6, 0, 12)
+        sub_lbl.Position = UDim2.new(0, 3, 1, -13)
+        sub_lbl.BackgroundTransparency = 1
+        sub_lbl.Text = sub
+        sub_lbl.Font = Enum.Font.Gotham
+        sub_lbl.TextSize = 9
+        sub_lbl.TextColor3 = Color3.fromRGB(160, 160, 180)
+        sub_lbl.TextXAlignment = Enum.TextXAlignment.Left
+        sub_lbl.TextTruncate = Enum.TextTruncate.AtEnd
+        sub_lbl.ZIndex = b.ZIndex + 1
+    end
+
+    -- Scan ทุกปุ่มในทุกหน้า
+    task.spawn(function()
+        while true do
+            task.wait(2)
+            pcall(function()
+                if not pages then return end
+                for _, page in pairs(pages) do
+                    for _, child in ipairs(page:GetDescendants()) do
+                        if child:IsA("TextButton") then
+                            addSubtitle(child)
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+
+    print("✅ Tutorial v2.0 Loaded!")
+end)
