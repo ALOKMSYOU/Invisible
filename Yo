@@ -2097,7 +2097,7 @@ local function addChatMsg(user, text, jobId)
     f.Size             = UDim2.new(1, 0, 0, 36)
     f.BackgroundColor3 = isOwner and OWNER_BG or Color3.fromRGB(22, 22, 34)
     f.BorderSizePixel  = 0
-    f.LayoutOrder      = isOwner and -msgCount or msgCount
+    f.LayoutOrder = msgCount
     Instance.new("UICorner", f).CornerRadius = UDim.new(0, 6)
 
     -- แถบทองด้านซ้ายสำหรับ Owner
