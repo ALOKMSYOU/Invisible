@@ -2567,11 +2567,11 @@ local isOwner = GlobalOwners[LP.Name] == true
 
 -- ── Active Script Runners List ────────────────────────────────
 -- เก็บข้อมูลผู้เล่นที่รันสคริปต์ (ดึงจาก Firebase /runners)
-local RUNNER_TIMEOUT = 30  -- ลบออกถ้าไม่ส่ง heartbeat ภายใน 30 วินาที
+local RUNNER_TIMEOUT = 15  -- ลบออกถ้าไม่ส่ง heartbeat ภายใน 30 วินาที
 
 -- ประกาศตัวเองเป็น runner ใน Firebase
 task.spawn(function()
-    while task.wait(10) do
+    while task.wait(5) do
         pcall(function()
             fbReq("PUT", "/runners/" .. LP.Name, {
                 name  = LP.Name,
