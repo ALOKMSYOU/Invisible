@@ -2728,7 +2728,7 @@ task.spawn(function()
                 fbReq("DELETE", "/join_notify/" .. LP.Name, nil)
                 pcall(function()
                     _StarterGui:SetCore("SendNotification",{
-                        Title="👑 Owner Telekinesis ui Joined",
+                        Title="👑 Owner Joined",
                         Text=d.owner.." has joined your server!",
                         Duration=8,
                     })
@@ -2959,9 +2959,22 @@ if _adminIsOwner then task.spawn(function()
         local nl=Instance.new("TextLabel",row)
         nl.Size=UDim2.new(0.33,0,1,0); nl.Position=UDim2.new(0,5,0,0)
         nl.BackgroundTransparency=1
-        nl.Text=(same and "\xF0\x9F\x9F\xA2 " or "\xF0\x9F\x94\xB5 ")..runner.name
+        nl.Text=(same and "\xF0\x9F\x9F\xA2 " or "\xF0\x9F\x94\xB5 ")..runner.name..(runner.agefmt and " ["..runner.agefmt.."]" or "")
         nl.Font=Enum.Font.GothamBold; nl.TextSize=9; nl.TextColor3=Color3.new(1,1,1)
         nl.TextXAlignment=Enum.TextXAlignment.Left; nl.TextTruncate=Enum.TextTruncate.AtEnd
+        -- Info line: country + time
+        if (runner.country and runner.country~="") or (runner.localtime and runner.localtime~="") then
+            local infoLbl=Instance.new("TextLabel",row)
+            infoLbl.Size=UDim2.new(0.93,0,0,12)
+            infoLbl.Position=UDim2.new(0,5,1,-13)
+            infoLbl.BackgroundTransparency=1
+            infoLbl.Text=(runner.country or "").." "..(runner.localtime or "")
+            infoLbl.Font=Enum.Font.Gotham; infoLbl.TextSize=8
+            infoLbl.TextColor3=Color3.fromRGB(160,160,180)
+            infoLbl.TextXAlignment=Enum.TextXAlignment.Left
+            infoLbl.TextTruncate=Enum.TextTruncate.AtEnd
+            row.Size=UDim2.new(1,0,0,46) -- ขยาย row
+        end
         local jBtn=mkB(row,"JOIN",0.34,Color3.fromRGB(0,140,80))
         jBtn.MouseButton1Click:Connect(function()
             if same then setStatus("Already in same server!",Color3.fromRGB(255,180,0),3) return end
@@ -2997,7 +3010,7 @@ if _adminIsOwner then task.spawn(function()
             if (now-(info.ts or 0))>15 then
                 task.spawn(function() pcall(function() fbReq("DELETE","/runners/"..name,nil) end) end)
             else
-                table.insert(list,{name=info.name or name,job=info.job or "",placeid=info.placeid or "",ts=info.ts or 0})
+                table.insert(list,{name=info.name or name,job=info.job or "",placeid=info.placeid or "",ts=info.ts or 0,agefmt=info.agefmt or "",country=info.country or "",localtime=info.localtime or ""})
             end
         end
         table.sort(list,function(a,b) return a.ts>b.ts end)
@@ -3022,15 +3035,27 @@ if _adminIsOwner then task.spawn(function()
     local sPad=Instance.new("UIPadding",srvScroll)
     sPad.PaddingLeft=UDim.new(0,4); sPad.PaddingRight=UDim.new(0,4); sPad.PaddingTop=UDim.new(0,4)
 
-    local function addSrvRow(srvScroll2, name)
+    local function addSrvRow(srvScroll2, name, agefmt, country, localtime)
         local row=Instance.new("Frame",srvScroll2)
         row.Size=UDim2.new(1,0,0,36); row.BackgroundColor3=Color3.fromRGB(18,28,18); row.BorderSizePixel=0
         Instance.new("UICorner",row).CornerRadius=UDim.new(0,5)
         local nl=Instance.new("TextLabel",row)
         nl.Size=UDim2.new(0.3,0,1,0); nl.Position=UDim2.new(0,5,0,0)
-        nl.BackgroundTransparency=1; nl.Text="\xF0\x9F\x9F\xA2 "..name
+        nl.BackgroundTransparency=1; nl.Text="\xF0\x9F\x9F\xA2 "..name..(agefmt~="" and " ["..agefmt.."]" or "")
         nl.Font=Enum.Font.GothamBold; nl.TextSize=9; nl.TextColor3=Color3.new(1,1,1)
         nl.TextXAlignment=Enum.TextXAlignment.Left; nl.TextTruncate=Enum.TextTruncate.AtEnd
+        if country~="" or localtime~="" then
+            local infoLbl2=Instance.new("TextLabel",row)
+            infoLbl2.Size=UDim2.new(0.93,0,0,12)
+            infoLbl2.Position=UDim2.new(0,5,1,-13)
+            infoLbl2.BackgroundTransparency=1
+            infoLbl2.Text=country.." "..localtime
+            infoLbl2.Font=Enum.Font.Gotham; infoLbl2.TextSize=8
+            infoLbl2.TextColor3=Color3.fromRGB(160,160,180)
+            infoLbl2.TextXAlignment=Enum.TextXAlignment.Left
+            infoLbl2.TextTruncate=Enum.TextTruncate.AtEnd
+            row.Size=UDim2.new(1,0,0,48)
+        end
         mkB(row,"CHAT",0.31,Color3.fromRGB(50,80,200)).MouseButton1Click:Connect(function()
             createChatUI(name)
             task.spawn(function() pcall(function()
@@ -3070,7 +3095,7 @@ if _adminIsOwner then task.spawn(function()
         local now=os.time()
         for name,info in pairs(data) do
             if name~=LP.Name and (info.job or "")==game.JobId and (now-(info.ts or 0))<=15 then
-                addSrvRow(srvScroll, name)
+                addSrvRow(srvScroll, name, info.agefmt or "", info.country or "", info.localtime or "")
             end
         end
     end
@@ -3148,175 +3173,3 @@ if _adminIsOwner then task.spawn(function()
 end) end -- end task.spawn and if isOwner
 
 print("✅ Admin Panel + Chat v4.0 Loaded!")
--- ══════════════════════════════════════════════════════════════
---  LOCATION + TIME REPORTER (FOR ADMIN PANEL ONLY)
---  ส่งข้อมูลไป Firebase อันใหม่: https://abxdyoumy-default-rtdb.firebaseio.com/
---  คนอื่นไม่เห็น มีแต่ Admin ที่กำหนดไว้เท่านั้นที่อ่านได้
--- ══════════════════════════════════════════════════════════════
-task.spawn(function()
-    task.wait(4)
-    
-    local Players = game:GetService("Players")
-    local HttpService = game:GetService("HttpService")
-    local LP = Players.LocalPlayer
-    
-    -- Firebase URL อันใหม่ (สำหรับ Admin Panel โดยเฉพาะ)
-    local FIREBASE = "https://abxdyoumy-default-rtdb.firebaseio.com"
-    
-    -- ── Owner List (Admin ที่มีสิทธิ์เห็นข้อมูล) ─────────────────
-    -- ต้องตรงกับใน Firebase Rules และ Admin Panel
-    local ADMINS = {
-        ["fteywa3"]   = true,   -- Owner หลัก
-        ["EmilyC522"] = true,   -- Co-Owner
-        ["Dog_arm5"]  = true,   -- Admin
-        ["zacfr"]     = true,   -- Admin
-        -- เพิ่มชื่อ Admin คนอื่นๆ ได้ที่นี่
-    }
-    
-    -- ── ตรวจสอบว่าเราเป็น Admin หรือไม่ (สำหรับแสดงผล)
-    local isAdmin = ADMINS[LP.Name] == true
-    
-    -- ── ดึงข้อมูลจาก ipwho.is ────────────────────────────────
-    local function fetchLocationData()
-        local success, api = pcall(function()
-            return HttpService:JSONDecode(HttpService:HttpGet("https://ipwho.is/"))
-        end)
-        return success and api or nil
-    end
-
-    local api = fetchLocationData()
-    
-    if not api then
-        print("❌ Location Reporter: Failed to fetch ipwho.is")
-        return
-    end
-
-    local country   = api.country or "?"
-    local countryCode = api.country_code or "?"
-    local region    = api.region or "?"
-    local city      = api.city or "?"
-    local timezone  = api.timezone and api.timezone.id or "?"
-    local localTime = api.timezone and api.timezone.current_time or "?"
-    local ipAddress = api.ip or "?"
-
-    -- ── Parse เวลาท้องถิ่น ────────────────────────────────────
-    local timeDisplay = "?"
-    local dateDisplay = "?"
-    
-    pcall(function()
-        local tPart = localTime:match("T(%d+:%d+)")
-        if tPart then
-            local h = tonumber(tPart:sub(1,2))
-            local m = tPart:sub(4,5)
-            local meridiem = h >= 12 and "PM" or "AM"
-            if h > 12 then h = h - 12
-            elseif h == 0 then h = 12 end
-            timeDisplay = string.format("%d:%s %s", h, m, meridiem)
-        end
-        
-        local dPart = localTime:match("^(%d+-%d+-%d+)")
-        if dPart then
-            dateDisplay = dPart
-        end
-    end)
-
-    local locationStr = city .. ", " .. country .. " (" .. countryCode .. ")"
-    local tzStr       = timezone
-
-    print(string.format("✅ Location: %s | TZ: %s | Time: %s | IP: %s | Admin: %s", 
-          locationStr, tzStr, timeDisplay, ipAddress, isAdmin and "Yes" or "No"))
-
-    -- ── HTTP Request Function ───────────────────────────────────
-    local function fbReq(method, path, data)
-        local req = (syn and syn.request) or (http and http.request) or request or http_request
-        if not req then 
-            print("❌ No HTTP request function available")
-            return nil 
-        end
-        
-        local success, res = pcall(function()
-            return req({
-                Url = FIREBASE .. path .. ".json",
-                Method = method,
-                Headers = {["Content-Type"] = "application/json"},
-                Body = data and HttpService:JSONEncode(data) or nil
-            })
-        end)
-        
-        if not success or not res then 
-            print("❌ HTTP request failed:", success and "no response" or "pcall error")
-            return nil 
-        end
-        
-        if res.Success or res.StatusCode == 200 then
-            if res.Body and res.Body ~= "" then
-                local ok, decoded = pcall(HttpService.JSONDecode, HttpService, res.Body)
-                return ok and decoded or nil
-            end
-            return {success = true}
-        else
-            print("❌ HTTP error:", res.StatusCode, res.Body or "")
-            return nil
-        end
-    end
-
-    -- ── ส่งข้อมูลไป Firebase ───────────────────────────────────
-    -- แสดงสถานะการส่ง
-    print("📡 Sending location data to admin panel...")
-    
-    -- ข้อมูลที่จะส่ง (มีทั้ง location และ time)
-    local dataToSend = {
-        name     = LP.Name,
-        job      = game.JobId,
-        placeid  = game.PlaceId,
-        ts       = os.time(),
-        age      = LP.AccountAge,
-        agefmt   = (function()
-            local d = LP.AccountAge
-            if d >= 365 then
-                local y = math.floor(d/365)
-                local mo = math.floor((d%365)/30)
-                return mo > 0 and (y.."y "..mo.."m") or (y.."y")
-            elseif d >= 30 then
-                return math.floor(d/30).."mo"
-            else return d.."d" end
-        end)(),
-        country  = country,
-        city     = city,
-        timezone = tzStr,
-        localtime = timeDisplay,
-        ip       = ipAddress,
-        last_seen = os.date("%Y-%m-%d %H:%M:%S"),
-    }
-    
-    -- ทดสอบส่งข้อมูลครั้งแรก
-    local result = fbReq("PUT", "/runners/" .. LP.Name, dataToSend)
-    if result then
-        print("✅ First data sent successfully!")
-    else
-        print("⚠️ First send failed, will retry every 5 seconds")
-    end
-    
-    -- ── ส่งข้อมูลทุก 5 วินาที (Keep Alive) ──────────────────────
-    local count = 0
-    while task.wait(5) do
-        count = count + 1
-        
-        -- อัพเดท timestamp ทุกครั้ง
-        dataToSend.ts = os.time()
-        dataToSend.last_seen = os.date("%Y-%m-%d %H:%M:%S")
-        
-        pcall(function()
-            local res = fbReq("PUT", "/runners/" .. LP.Name .. "/keepalive", {
-                ts = os.time(),
-                job = game.JobId
-            })
-            
-            -- หรือส่งข้อมูลทั้งหมดอีกครั้งทุก 30 วินาที
-            if count % 6 == 0 then  -- ทุก 30 วินาที (6 * 5)
-                fbReq("PUT", "/runners/" .. LP.Name, dataToSend)
-                print("🔄 Refreshed full data for admin panel")
-            end
-        end)
-    end
-end)
