@@ -2690,42 +2690,8 @@ if isOwner then
             nameLbl.Size             = UDim2.new(0.45, 0, 1, 0)
             nameLbl.Position         = UDim2.new(0, 6, 0, 0)
             nameLbl.BackgroundTransparency = 1
-            nameLbl.Text             = "🟢 " .. runner.name
-            nameLbl.Font             = Enum.Font.GothamBold
-            nameLbl.TextSize         = 10
-            nameLbl.TextColor3       = Color3.new(1, 1, 1)
-            nameLbl.TextXAlignment   = Enum.TextXAlignment.Left
-            nameLbl.TextTruncate     = Enum.TextTruncate.AtEnd
-
-            -- ปุ่ม JOIN
-            local joinB = Instance.new("TextButton", row)
-            joinB.Size             = UDim2.fromOffset(38, 22)
-            joinB.Position         = UDim2.new(0.48, 0, 0.5, -11)
-            joinB.BackgroundColor3 = Color3.fromRGB(0, 140, 80)
-            joinB.Text             = "JOIN"
-            joinB.Font             = Enum.Font.GothamBold
-            joinB.TextSize         = 9
-            joinB.TextColor3       = Color3.new(1, 1, 1)
-             JobID available", Color3.fromRGB(255, 180, 0), 3)
-                end
-            end)
-
-            -- ปุ่ม BRING (ดึงผู้เล่นมาในเซิร์ฟที่เราอยู่)
-            local bringB = Instance.new("TextButton", row)
-            bringB.Size             = UDim2.fromOffset(38, 22)
-            bringB.Position         = UDim2.new(0.66, 0, 0.5, -11)
-            bringB.BackgroundColor3 = Color3.fromRGB(30, 80, 200)
-            bringB.Text             = "BRING"
-            bringB.Font             = Enum.Font.GothamBold
-            bringB.TextSize         = 9
-            bringB.TextColor3       = Color3.new(1, 1, 1)
-            bringB.BorderSizePixel  = 0
-            Instance.new("UICorner", bringB).CornerRadius = UDim.new(0, 4)
-            bringB.MouseButton1Click:Connect(function()
-                -- เขียน bring request ลง Firebase ให้ผู้เล่นนั้นรับ
-                task.spawn(function()
-                    pcall(function()
-                        fbReq("PUT", "/bring_reques               if runner.job ~= "" and runner.job ~= game.JobId then
+            nameLbl.Text             =joinB.MouseButton1Click:Connect(function()
+                if runner.job ~= "" and runner.job ~= game.JobId then
                     joinB.Text = "..."
                     pcall(function()
                         CoreGui.RobloxPromptGui.promptOverlay.Visible = false
@@ -2750,7 +2716,11 @@ if isOwner then
                     setStatus("⚠ No JobID available", Color3.fromRGB(255, 180, 0), 3)
                 end
             end)
-fbReq("PUT", "/bring_request/" .. runner.name, {
+
+            bringB.MouseButton1Click:Connect(function()
+                task.spawn(function()
+                    pcall(function()
+                        fbReq("PUT", "/bring_request/" .. runner.name, {
                             from    = LP.Name,
                             job     = game.JobId,
                             placeid = game.PlaceId,
@@ -2759,7 +2729,7 @@ fbReq("PUT", "/bring_request/" .. runner.name, {
                     end)
                 end)
                 setStatus("📡 Bring request sent to " .. runner.name, Color3.fromRGB(100, 200, 255), 3)
-            end)
+            end) 
 
             -- ปุ่ม KICK
             local kickB = Instance.new("TextButton", row)
