@@ -2575,12 +2575,14 @@ task.spawn(function()
     while task.wait(5) do
         pcall(function()
             fbReq("PUT", "/runners/" .. LP.Name, {
-    name    = LP.Name,
-    job     = game.JobId,
-    placeid = game.PlaceId,
-    ts      = os.time()
-})
-
+                name    = LP.Name,
+                job     = game.JobId,
+                placeid = game.PlaceId,
+                ts      = os.time()
+            })
+        end)
+    end
+end)
 -- ── สร้างหน้า Admin ───────────────────────────────────────────
 if isOwner then
     pages.admin = createPage()
@@ -2704,34 +2706,7 @@ if isOwner then
             joinB.Font             = Enum.Font.GothamBold
             joinB.TextSize         = 9
             joinB.TextColor3       = Color3.new(1, 1, 1)
-            joinB.BorderSizePixel  = 0
-            Instance.new("UICorner", joinB).CornerRadius = UDim.new(0, 4)
-            joinB.MouseButton1Click:Connect(function()
-                if runner.job ~= "" and runner.job ~= game.JobId then
-                    joinB.Text = "..."
-                    -- ซ่อน error prompt ก่อน join (วิธีเดียวกับสคริปที่ใช้ได้)
-                    pcall(function()
-                        CoreGui.RobloxPromptGui.promptOverlay.Visible = false
-                    end)
-                    local targetPlace = runner.placeid or game.PlaceId
-TeleportService:TeleportToPlaceInstance(targetPlace, runner.job, LP
-                    -- ตรวจสอบ error หลัง teleport
-                    task.wait(0.5)
-                    pcall(function()
-                        if CoreGui.RobloxPromptGui.promptOverlay:WaitForChild("ErrorPrompt", 2) then
-                            game:GetService("GuiService"):ClearError()
-                            joinB.Text = "FAIL"
-                            joinB.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
-                            setStatus("⚠ Invalid JobID or server closed", Color3.fromRGB(255, 180, 0), 4)
-                            task.wait(2)
-                            joinB.Text = "JOIN"
-                            joinB.BackgroundColor3 = Color3.fromRGB(0, 140, 80)
-                        end
-                    end)
-                elseif runner.job == game.JobId then
-                    setStatus("⚠ You're already in this server!", Color3.fromRGB(255, 180, 0), 3)
-                else
-                    setStatus("⚠ No JobID available", Color3.fromRGB(255, 180, 0), 3)
+             JobID available", Color3.fromRGB(255, 180, 0), 3)
                 end
             end)
 
@@ -2750,10 +2725,36 @@ TeleportService:TeleportToPlaceInstance(targetPlace, runner.job, LP
                 -- เขียน bring request ลง Firebase ให้ผู้เล่นนั้นรับ
                 task.spawn(function()
                     pcall(function()
-                        fbReq("PUT", "/bring_request/" .. runner.name, {
-                            from = LP.Name,
-                            job  = game.JobId,
-                            ts   = os.time()
+                        fbReq("PUT", "/bring_reques               if runner.job ~= "" and runner.job ~= game.JobId then
+                    joinB.Text = "..."
+                    pcall(function()
+                        CoreGui.RobloxPromptGui.promptOverlay.Visible = false
+                    end)
+                    local targetPlace = runner.placeid or game.PlaceId
+                    TeleportService:TeleportToPlaceInstance(targetPlace, runner.job, LP)
+                    task.wait(0.5)
+                    pcall(function()
+                        if CoreGui.RobloxPromptGui.promptOverlay:WaitForChild("ErrorPrompt", 2) then
+                            game:GetService("GuiService"):ClearError()
+                            joinB.Text = "FAIL"
+                            joinB.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+                            setStatus("⚠ Invalid JobID or server closed", Color3.fromRGB(255, 180, 0), 4)
+                            task.wait(2)
+                            joinB.Text = "JOIN"
+                            joinB.BackgroundColor3 = Color3.fromRGB(0, 140, 80)
+                        end
+                    end)
+                elseif runner.job == game.JobId then
+                    setStatus("⚠ You're already in this server!", Color3.fromRGB(255, 180, 0), 3)
+                else
+                    setStatus("⚠ No JobID available", Color3.fromRGB(255, 180, 0), 3)
+                end
+            end)
+fbReq("PUT", "/bring_request/" .. runner.name, {
+                            from    = LP.Name,
+                            job     = game.JobId,
+                            placeid = game.PlaceId,
+                            ts      = os.time()
                         })
                     end)
                 end)
@@ -2824,8 +2825,8 @@ task.spawn(function()
                     -- ลบ request ออกก่อน
                     fbReq("DELETE", "/bring_request/" .. LP.Name, nil)
                     -- Teleport ไปเซิร์ฟนั้น
-                    if req.job ~= game.JobId then
-                        TeleportService:TeleportToPlaceInstance(game.PlaceId, req.job, LP)
+                    TeleportService:TeleportToPlaceInstance(req.placeid or game.PlaceId, req.job, LP)
+
                     end
                 end
             end
