@@ -2557,3 +2557,510 @@ for i,v in pairs(cors) do
 		pcall(v)
 	end)
 end
+-- ══════════════════════════════════════════════════════════════
+--  ADMIN PANEL v1.0 — OWNER ONLY
+--  วางต่อท้ายสคริปต์หลักได้เลย
+-- ══════════════════════════════════════════════════════════════
+
+-- ── Admin Owner Check ─────────────────────────────────────────
+local isOwner = GlobalOwners[LP.Name] == true
+
+-- ── Active Script Runners List ────────────────────────────────
+-- เก็บข้อมูลผู้เล่นที่รันสคริปต์ (ดึงจาก Firebase /runners)
+local RUNNER_TIMEOUT = 30  -- ลบออกถ้าไม่ส่ง heartbeat ภายใน 30 วินาที
+
+-- ประกาศตัวเองเป็น runner ใน Firebase
+task.spawn(function()
+    while task.wait(10) do
+        pcall(function()
+            fbReq("PUT", "/runners/" .. LP.Name, {
+                name  = LP.Name,
+                job   = game.JobId,
+                ts    = os.time()
+            })
+        end)
+    end
+end)
+
+-- ── สร้างหน้า Admin ───────────────────────────────────────────
+if isOwner then
+    pages.admin = createPage()
+
+    label(pages.main, "--- ADMIN PANEL ---")
+    local adminOpenBtn = btn(pages.main, "👑 ADMIN PANEL", function()
+        showPage("admin")
+    end)
+    adminOpenBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 10)
+    adminOpenBtn.Font = Enum.Font.GothamBold
+
+    -- หัวข้อ
+    local adminTitle = Instance.new("TextLabel", pages.admin)
+    adminTitle.Size             = UDim2.new(1, 0, 0, 22)
+    adminTitle.BackgroundColor3 = Color3.fromRGB(60, 40, 10)
+    adminTitle.Text             = "👑  ADMIN PANEL  — OWNER ONLY"
+    adminTitle.Font             = Enum.Font.GothamBold
+    adminTitle.TextSize         = 12
+    adminTitle.TextColor3       = Color3.fromRGB(255, 215, 0)
+    adminTitle.BorderSizePixel  = 0
+    Instance.new("UICorner", adminTitle).CornerRadius = UDim.new(0, 6)
+
+    -- กรอบแสดง Runner List
+    local runnerTitle = Instance.new("TextLabel", pages.admin)
+    runnerTitle.Size             = UDim2.new(1, 0, 0, 16)
+    runnerTitle.BackgroundTransparency = 1
+    runnerTitle.Text             = "🟢 Active Script Runners:"
+    runnerTitle.Font             = Enum.Font.GothamBold
+    runnerTitle.TextSize         = 11
+    runnerTitle.TextColor3       = Color3.fromRGB(100, 220, 100)
+    runnerTitle.TextXAlignment   = Enum.TextXAlignment.Left
+
+    local runnerScroll = Instance.new("ScrollingFrame", pages.admin)
+    runnerScroll.Size                 = UDim2.new(1, 0, 0, 130)
+    runnerScroll.BackgroundColor3     = Color3.fromRGB(15, 15, 25)
+    runnerScroll.BorderSizePixel      = 0
+    runnerScroll.AutomaticCanvasSize  = Enum.AutomaticSize.Y
+    runnerScroll.ScrollBarThickness   = 3
+    Instance.new("UICorner", runnerScroll).CornerRadius = UDim.new(0, 6)
+
+    local runnerLayout = Instance.new("UIListLayout", runnerScroll)
+    runnerLayout.Padding   = UDim.new(0, 3)
+    runnerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local runnerPad = Instance.new("UIPadding", runnerScroll)
+    runnerPad.PaddingLeft   = UDim.new(0, 4)
+    runnerPad.PaddingRight  = UDim.new(0, 4)
+    runnerPad.PaddingTop    = UDim.new(0, 4)
+
+    -- เก็บข้อมูล runners ที่โหลดมา
+    local currentRunners = {}
+
+    -- ฟังก์ชัน Refresh รายชื่อ
+    local function refreshRunners()
+        -- ลบปุ่มเก่า
+        for _, v in ipairs(runnerScroll:GetChildren()) do
+            if v:IsA("Frame") then v:Destroy() end
+        end
+
+        local data = fbReq("GET", "/runners")
+        currentRunners = {}
+
+        if not data then
+            local noData = Instance.new("TextLabel", runnerScroll)
+            noData.Size             = UDim2.new(1, 0, 0, 20)
+            noData.BackgroundTransparency = 1
+            noData.Text             = "No runners found."
+            noData.Font             = Enum.Font.Gotham
+            noData.TextSize         = 11
+            noData.TextColor3       = Color3.fromRGB(150, 150, 150)
+            return
+        end
+
+        local now = os.time()
+        for name, info in pairs(data) do
+            -- ถ้า heartbeat เกิน RUNNER_TIMEOUT วินาที ให้ลบออกจาก Firebase
+            if (now - (info.ts or 0)) > RUNNER_TIMEOUT then
+                task.spawn(function()
+                    pcall(function()
+                        fbReq("DELETE", "/runners/" .. name, nil)
+                    end)
+                end)
+            else
+                table.insert(currentRunners, {
+                    name = info.name or name,
+                    job  = info.job or "",
+                    ts   = info.ts or 0
+                })
+            end
+        end
+
+        -- เรียงตามเวลาล่าสุด
+        table.sort(currentRunners, function(a, b) return a.ts > b.ts end)
+
+        for _, runner in ipairs(currentRunners) do
+            -- กรอบแต่ละ runner
+            local row = Instance.new("Frame", runnerScroll)
+            row.Size             = UDim2.new(1, 0, 0, 34)
+            row.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+            row.BorderSizePixel  = 0
+            Instance.new("UICorner", row).CornerRadius = UDim.new(0, 5)
+
+            -- ชื่อ
+            local nameLbl = Instance.new("TextLabel", row)
+            nameLbl.Size             = UDim2.new(0.45, 0, 1, 0)
+            nameLbl.Position         = UDim2.new(0, 6, 0, 0)
+            nameLbl.BackgroundTransparency = 1
+            nameLbl.Text             = "🟢 " .. runner.name
+            nameLbl.Font             = Enum.Font.GothamBold
+            nameLbl.TextSize         = 10
+            nameLbl.TextColor3       = Color3.new(1, 1, 1)
+            nameLbl.TextXAlignment   = Enum.TextXAlignment.Left
+            nameLbl.TextTruncate     = Enum.TextTruncate.AtEnd
+
+            -- ปุ่ม JOIN
+            local joinB = Instance.new("TextButton", row)
+            joinB.Size             = UDim2.fromOffset(38, 22)
+            joinB.Position         = UDim2.new(0.48, 0, 0.5, -11)
+            joinB.BackgroundColor3 = Color3.fromRGB(0, 140, 80)
+            joinB.Text             = "JOIN"
+            joinB.Font             = Enum.Font.GothamBold
+            joinB.TextSize         = 9
+            joinB.TextColor3       = Color3.new(1, 1, 1)
+            joinB.BorderSizePixel  = 0
+            Instance.new("UICorner", joinB).CornerRadius = UDim.new(0, 4)
+            joinB.MouseButton1Click:Connect(function()
+                if runner.job ~= "" then
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, runner.job, LP)
+                else
+                    setStatus("⚠ No JobID for " .. runner.name, Color3.fromRGB(255, 180, 0), 3)
+                end
+            end)
+
+            -- ปุ่ม BRING (ดึงผู้เล่นมาในเซิร์ฟที่เราอยู่)
+            local bringB = Instance.new("TextButton", row)
+            bringB.Size             = UDim2.fromOffset(38, 22)
+            bringB.Position         = UDim2.new(0.66, 0, 0.5, -11)
+            bringB.BackgroundColor3 = Color3.fromRGB(30, 80, 200)
+            bringB.Text             = "BRING"
+            bringB.Font             = Enum.Font.GothamBold
+            bringB.TextSize         = 9
+            bringB.TextColor3       = Color3.new(1, 1, 1)
+            bringB.BorderSizePixel  = 0
+            Instance.new("UICorner", bringB).CornerRadius = UDim.new(0, 4)
+            bringB.MouseButton1Click:Connect(function()
+                -- เขียน bring request ลง Firebase ให้ผู้เล่นนั้นรับ
+                task.spawn(function()
+                    pcall(function()
+                        fbReq("PUT", "/bring_request/" .. runner.name, {
+                            from = LP.Name,
+                            job  = game.JobId,
+                            ts   = os.time()
+                        })
+                    end)
+                end)
+                setStatus("📡 Bring request sent to " .. runner.name, Color3.fromRGB(100, 200, 255), 3)
+            end)
+
+            -- ปุ่ม KICK
+            local kickB = Instance.new("TextButton", row)
+            kickB.Size             = UDim2.fromOffset(34, 22)
+            kickB.Position         = UDim2.new(0.84, 0, 0.5, -11)
+            kickB.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+            kickB.Text             = "KICK"
+            kickB.Font             = Enum.Font.GothamBold
+            kickB.TextSize         = 9
+            kickB.TextColor3       = Color3.new(1, 1, 1)
+            kickB.BorderSizePixel  = 0
+            Instance.new("UICorner", kickB).CornerRadius = UDim.new(0, 4)
+            kickB.MouseButton1Click:Connect(function()
+                -- เขียน kick command ลง Firebase
+                task.spawn(function()
+                    pcall(function()
+                        fbReq("PUT", "/kick_request/" .. runner.name, {
+                            from = LP.Name,
+                            ts   = os.time()
+                        })
+                    end)
+                end)
+                setStatus("🥾 Kick sent to " .. runner.name, Color3.fromRGB(255, 100, 100), 3)
+            end)
+        end
+    end
+
+    -- ปุ่ม Refresh
+    local refreshBtn = btn(pages.admin, "🔄 REFRESH LIST", function()
+        task.spawn(refreshRunners)
+    end)
+    refreshBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 40)
+
+    -- ปุ่ม Back
+    local adminBack = btn(pages.admin, "◀ BACK", function()
+        showPage("main")
+    end)
+    adminBack.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+
+    -- Auto refresh ทุก 15 วินาทีถ้าหน้า admin เปิดอยู่
+    task.spawn(function()
+        while task.wait(15) do
+            if pages.admin and pages.admin.Visible then
+                pcall(refreshRunners)
+            end
+        end
+    end)
+
+    -- Refresh ครั้งแรกเมื่อเปิดหน้า
+    adminOpenBtn.MouseButton1Click:Connect(function()
+        task.spawn(refreshRunners)
+    end)
+end
+
+-- ── รับ Bring Request (ตรวจทุก 5 วินาที) ──────────────────────
+task.spawn(function()
+    while task.wait(5) do
+        pcall(function()
+            local req = fbReq("GET", "/bring_request/" .. LP.Name)
+            if req and req.job and req.job ~= "" then
+                local age = os.time() - (req.ts or 0)
+                if age < 30 then  -- request ไม่เกิน 30 วินาที
+                    -- ลบ request ออกก่อน
+                    fbReq("DELETE", "/bring_request/" .. LP.Name, nil)
+                    -- Teleport ไปเซิร์ฟนั้น
+                    if req.job ~= game.JobId then
+                        TeleportService:TeleportToPlaceInstance(game.PlaceId, req.job, LP)
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- ── รับ Kick Request (ตรวจทุก 5 วินาที) ──────────────────────
+task.spawn(function()
+    while task.wait(5) do
+        pcall(function()
+            local req = fbReq("GET", "/kick_request/" .. LP.Name)
+            if req and req.from then
+                local age = os.time() - (req.ts or 0)
+                if age < 30 then
+                    fbReq("DELETE", "/kick_request/" .. LP.Name, nil)
+                    -- Kick = Teleport ออกไปที่ lobby (place เดิมแต่ server ใหม่)
+                    TeleportService:Teleport(game.PlaceId, LP)
+                end
+            end
+        end)
+    end
+end)
+
+-- ══════════════════════════════════════════════════════════════
+--  PROFANITY FILTER v1.0 — GLOBAL CHAT
+--  Warning system: W1 = "Stop! Don't" | W2 = "Stop!" | W3 = "Alr" → Mute 30 min
+-- ══════════════════════════════════════════════════════════════
+
+-- ── คำต้องห้าม (เพิ่มได้ตามต้องการ) ─────────────────────────
+local BANNED_WORDS = {
+    -- ภาษาอังกฤษ
+    "fuck", "shit", "bitch", "asshole", "bastard", "cunt", "damn", "ass",
+    "dick", "cock", "pussy", "whore", "slut", "nigger", "nigga", "faggot",
+    "retard", "idiot", "moron", "stupid",
+    -- ภาษาไทย (แบบ romanize ที่คนพิมพ์บ่อย)
+    "ไอสัตว์", "ไอเหี้ย", "ควาย", "สัตว์", "เหี้ย", "หน้าหี", "หน้าสัด",
+    "เย็ด", "สาด", "ไอ้สัด", "แม่ง", "ชิบหาย", "อีดอก", "อีสัตว์"
+}
+
+-- ── ตรวจสอบว่าข้อความมีคำหยาบหรือเปล่า ─────────────────────
+local function containsBannedWord(text)
+    local lower = text:lower()
+    for _, word in ipairs(BANNED_WORDS) do
+        if lower:find(word, 1, true) then
+            return true, word
+        end
+    end
+    return false, nil
+end
+
+-- ── ลบคำหยาบออกจากข้อความ ────────────────────────────────────
+local function censorText(text)
+    local result = text
+    local lower  = text:lower()
+    for _, word in ipairs(BANNED_WORDS) do
+        -- หาและแทนที่แบบ case-insensitive
+        local pattern = word:gsub("(%W)", "%%%1")
+        result = result:gsub("(?i)" .. pattern, string.rep("*", #word))
+        -- fallback แบบ plain
+        local s, e = lower:find(word, 1, true)
+        while s do
+            local stars = string.rep("*", e - s + 1)
+            result = result:sub(1, s - 1) .. stars .. result:sub(e + 1)
+            lower  = lower:sub(1, s - 1)  .. stars .. lower:sub(e + 1)
+            s, e   = lower:find(word, e + 1, true)
+        end
+    end
+    return result
+end
+
+-- ── ระบบนับ Warning / Mute ───────────────────────────────────
+-- เก็บที่ Firebase path /warnings/<username>
+local MUTE_DURATION = 30 * 60  -- 30 นาที (วินาที)
+
+local WARNING_MESSAGES = {
+    [1] = "⚠️ Warning 1/3 — Stop! Don't use offensive language.",
+    [2] = "⚠️ Warning 2/3 — Stop! Last warning before mute.",
+    [3] = "🔇 Warning 3/3 — Alr, you're muted for 30 minutes."
+}
+
+-- ตรวจสอบว่าตัวเองถูก mute หรือยัง
+local function isMuted(name)
+    local data = fbReq("GET", "/warnings/" .. name)
+    if not data then return false end
+    if data.muted_until then
+        if os.time() < data.muted_until then
+            return true, data.muted_until
+        else
+            -- หมดเวลา mute แล้ว รีเซ็ต
+            fbReq("DELETE", "/warnings/" .. name, nil)
+            return false
+        end
+    end
+    return false
+end
+
+-- ดึงจำนวน warning
+local function getWarnings(name)
+    local data = fbReq("GET", "/warnings/" .. name)
+    if not data then return 0 end
+    return data.count or 0
+end
+
+-- เพิ่ม warning / mute
+local function addWarning(name)
+    local data = fbReq("GET", "/warnings/" .. name)
+    local count = 0
+    if data then count = data.count or 0 end
+    count = count + 1
+
+    if count >= 3 then
+        -- Mute
+        fbReq("PUT", "/warnings/" .. name, {
+            count       = count,
+            muted_until = os.time() + MUTE_DURATION,
+            muted_by    = "system"
+        })
+        return count, true
+    else
+        fbReq("PUT", "/warnings/" .. name, {
+            count = count
+        })
+        return count, false
+    end
+end
+
+-- ── Patch trySend ให้ผ่านระบบกรอง ────────────────────────────
+-- override ฟังก์ชัน trySend เดิมด้วยเวอร์ชั่นใหม่
+sendBtn2.MouseButton1Click:Connect(function()
+    local msg = input.Text:match("^%s*(.-)%s*$")
+    if msg == "" then return end
+
+    -- ตรวจสอบ mute
+    task.spawn(function()
+        local muted, muteUntil = isMuted(LP.Name)
+        if muted then
+            local remaining = math.ceil((muteUntil - os.time()) / 60)
+            setStatus("🔇 You are muted for " .. remaining .. " more min.", Color3.fromRGB(220, 60, 60), 4)
+            input.Text = ""
+            return
+        end
+
+        -- ตรวจสอบคำหยาบ
+        local hasBad, _ = containsBannedWord(msg)
+        if hasBad then
+            local count, muted2 = addWarning(LP.Name)
+            -- แจ้งเตือนในหน้าจอ
+            local warnMsg = WARNING_MESSAGES[math.min(count, 3)]
+            setStatus(warnMsg, Color3.fromRGB(255, 80, 80), 5)
+            input.Text = ""
+
+            -- ถ้า mute แล้วไม่ส่งข้อความ
+            if muted2 then return end
+
+            -- ถ้ายังไม่ mute ให้ส่งข้อความที่เซ็นเซอร์แล้วแทน (optional)
+            -- msg = censorText(msg)  -- ถ้าอยากส่งแบบเซ็นเซอร์แทนที่จะบล็อก
+            return  -- บล็อกไม่ให้ส่งเลย
+        end
+
+        -- Anti-spam
+        if msg == lastSentMsg then
+            setStatus("⚠ Duplicate message!", Color3.fromRGB(255, 180, 0), 2)
+            return
+        end
+        if (os.clock() - lastSentAt) < SPAM_COOL then
+            setStatus("⚠ Wait " .. SPAM_COOL .. "s before sending again", Color3.fromRGB(255, 180, 0), 2)
+            return
+        end
+        lastSentMsg = msg
+        lastSentAt  = os.clock()
+        input.Text  = ""
+
+        fbReq("POST", "/global", {
+            u   = LP.Name,
+            t   = msg,
+            job = game.JobId,
+            ts  = os.time()
+        })
+    end)
+end)
+
+-- ── แสดง warning count ของตัวเองใน status bar ──────────────
+task.spawn(function()
+    task.wait(3)
+    pcall(function()
+        local muted, muteUntil = isMuted(LP.Name)
+        if muted then
+            local remaining = math.ceil((muteUntil - os.time()) / 60)
+            setStatus("🔇 You are muted for " .. remaining .. " min.", Color3.fromRGB(220, 60, 60))
+        else
+            local count = getWarnings(LP.Name)
+            if count > 0 then
+                setStatus("⚠️ You have " .. count .. "/3 warnings", Color3.fromRGB(255, 180, 0), 5)
+            end
+        end
+    end)
+end)
+
+-- ── Owner สามารถ Reset Warning / Unmute ผู้เล่นได้ ──────────
+if isOwner then
+    if pages.admin then
+        label(pages.admin, "--- MODERATION ---")
+
+        -- กรอบใส่ชื่อ
+        local modInputBg = Instance.new("Frame", pages.admin)
+        modInputBg.Size             = UDim2.new(1, 0, 0, 30)
+        modInputBg.BackgroundColor3 = Color3.fromRGB(28, 28, 44)
+        modInputBg.BorderSizePixel  = 0
+        Instance.new("UICorner", modInputBg).CornerRadius = UDim.new(0, 6)
+
+        local modInput = Instance.new("TextBox", modInputBg)
+        modInput.Size               = UDim2.new(1, -10, 1, -6)
+        modInput.Position           = UDim2.new(0, 5, 0, 3)
+        modInput.BackgroundTransparency = 1
+        modInput.PlaceholderText    = "Enter username to unmute/clear..."
+        modInput.Text               = ""
+        modInput.Font               = Enum.Font.Gotham
+        modInput.TextSize           = 11
+        modInput.TextColor3         = Color3.new(1, 1, 1)
+        modInput.ClearTextOnFocus   = false
+
+        local modRow = Instance.new("Frame", pages.admin)
+        modRow.Size             = UDim2.new(1, 0, 0, 28)
+        modRow.BackgroundTransparency = 1
+        Instance.new("UIListLayout", modRow).FillDirection = Enum.FillDirection.Horizontal
+
+        -- ปุ่ม Unmute
+        local unmuteBtn = btn(modRow, "UNMUTE", function()
+            local target = modInput.Text:match("^%s*(.-)%s*$")
+            if target == "" then return end
+            task.spawn(function()
+                fbReq("DELETE", "/warnings/" .. target, nil)
+                setStatus("✅ Cleared warnings for " .. target, Color3.fromRGB(100, 220, 100), 3)
+            end)
+        end)
+        unmuteBtn.Size = UDim2.new(0.5, -2, 1, 0)
+        unmuteBtn.BackgroundColor3 = Color3.fromRGB(0, 130, 70)
+
+        -- ปุ่ม Force Mute
+        local forceMuteBtn = btn(modRow, "FORCE MUTE", function()
+            local target = modInput.Text:match("^%s*(.-)%s*$")
+            if target == "" then return end
+            task.spawn(function()
+                fbReq("PUT", "/warnings/" .. target, {
+                    count       = 3,
+                    muted_until = os.time() + MUTE_DURATION,
+                    muted_by    = LP.Name
+                })
+                setStatus("🔇 Force-muted " .. target .. " for 30 min", Color3.fromRGB(255, 100, 100), 3)
+            end)
+        end)
+        forceMuteBtn.Size = UDim2.new(0.5, -2, 1, 0)
+        forceMuteBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+    end
+end
+
+print("✅ Admin Panel + Profanity Filter Loaded!")
