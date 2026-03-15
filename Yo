@@ -2728,7 +2728,7 @@ task.spawn(function()
                 fbReq("DELETE", "/join_notify/" .. LP.Name, nil)
                 pcall(function()
                     _StarterGui:SetCore("SendNotification",{
-                        Title="👑 Owner Joined",
+                        Title="👑 Owner Telekinesis ui Joined",
                         Text=d.owner.." has joined your server!",
                         Duration=8,
                     })
