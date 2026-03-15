@@ -3302,3 +3302,168 @@ end
 
 print("✅ Admin Panel + Addon v3.0 Loaded!")
 end) -- end task.spawn wrapper
+-- ══════════════════════════════════════════════════════════════
+--  CHAT REQUEST SYSTEM
+--  วางต่อท้ายสคริปหลักได้เลย (ต้องรันหลังสคริปหลักเสมอ)
+-- ══════════════════════════════════════════════════════════════
+task.spawn(function()
+    task.wait(3) -- รอให้ fbReq และ openPrivateChat พร้อมก่อน
+
+    -- ── ส่ง chat request ไปหาเป้าหมาย ─────────────────────────
+    -- เรียกฟังก์ชันนี้เมื่อกดปุ่ม CHAT
+    local function sendChatRequest(targetName)
+        task.spawn(function()
+            pcall(function()
+                fbReq("PUT", "/chat_request/" .. targetName, {
+                    from = LP.Name,
+                    ts   = os.time()
+                })
+            end)
+        end)
+    end
+
+    -- ── รับ chat request ─────────────────────────────────────────
+    task.spawn(function()
+        while task.wait(3) do
+            pcall(function()
+                local req = fbReq("GET", "/chat_request/" .. LP.Name)
+                if req and req.from and req.ts then
+                    local age = os.time() - (req.ts or 0)
+                    if age < 20 then
+                        fbReq("DELETE", "/chat_request/" .. LP.Name, nil)
+
+                        local fromName = req.from
+
+                        -- แจ้ง notification
+                        pcall(function()
+                            game:GetService("StarterGui"):SetCore("SendNotification", {
+                                Title    = "💬 Chat Request",
+                                Text     = fromName .. " wants to chat with you!",
+                                Duration = 8,
+                            })
+                        end)
+
+                        -- สร้าง popup ถาม Accept/Decline
+                        local ng = Instance.new("ScreenGui")
+                        pcall(function() ng.Parent = game:GetService("CoreGui") end)
+                        if ng.Parent ~= game:GetService("CoreGui") then ng.Parent = LP.PlayerGui end
+                        ng.ResetOnSpawn = false
+
+                        local nf = Instance.new("Frame", ng)
+                        nf.Size             = UDim2.fromOffset(280, 90)
+                        nf.Position         = UDim2.new(0.5, -140, 0, 20)
+                        nf.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+                        nf.Active           = true
+                        nf.Draggable        = true
+                        nf.BorderSizePixel  = 0
+                        Instance.new("UICorner", nf).CornerRadius = UDim.new(0, 10)
+                        Instance.new("UIStroke", nf).Color        = Color3.fromRGB(60, 60, 120)
+
+                        local nl = Instance.new("TextLabel", nf)
+                        nl.Size               = UDim2.new(1, -10, 0, 36)
+                        nl.Position           = UDim2.new(0, 5, 0, 5)
+                        nl.BackgroundTransparency = 1
+                        nl.RichText           = true
+                        nl.TextWrapped        = true
+                        nl.TextXAlignment     = Enum.TextXAlignment.Center
+                        nl.Font               = Enum.Font.GothamBold
+                        nl.TextSize           = 13
+                        nl.TextColor3         = Color3.new(1, 1, 1)
+                        nl.Text = string.format(
+                            "<font color='#FFD700'>👑 %s</font> wants to chat!",
+                            fromName
+                        )
+
+                        -- ปุ่ม ACCEPT
+                        local acceptBtn = Instance.new("TextButton", nf)
+                        acceptBtn.Size             = UDim2.fromOffset(110, 32)
+                        acceptBtn.Position         = UDim2.new(0, 10, 0, 48)
+                        acceptBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+                        acceptBtn.Text             = "✓ ACCEPT"
+                        acceptBtn.Font             = Enum.Font.GothamBold
+                        acceptBtn.TextSize         = 12
+                        acceptBtn.TextColor3       = Color3.new(1, 1, 1)
+                        acceptBtn.BorderSizePixel  = 0
+                        Instance.new("UICorner", acceptBtn).CornerRadius = UDim.new(0, 6)
+
+                        -- ปุ่ม DECLINE
+                        local declineBtn = Instance.new("TextButton", nf)
+                        declineBtn.Size             = UDim2.fromOffset(110, 32)
+                        declineBtn.Position         = UDim2.new(0, 158, 0, 48)
+                        declineBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+                        declineBtn.Text             = "✕ DECLINE"
+                        declineBtn.Font             = Enum.Font.GothamBold
+                        declineBtn.TextSize         = 12
+                        declineBtn.TextColor3       = Color3.new(1, 1, 1)
+                        declineBtn.BorderSizePixel  = 0
+                        Instance.new("UICorner", declineBtn).CornerRadius = UDim.new(0, 6)
+
+                        acceptBtn.MouseButton1Click:Connect(function()
+                            ng:Destroy()
+                            -- เปิด Private Chat UI
+                            openPrivateChat(fromName)
+                        end)
+
+                        declineBtn.MouseButton1Click:Connect(function()
+                            ng:Destroy()
+                        end)
+
+                        -- ลบ popup หลัง 20 วินาที ถ้าไม่กด
+                        task.delay(20, function()
+                            if ng and ng.Parent then ng:Destroy() end
+                        end)
+                    end
+                end
+            end)
+        end
+    end)
+
+    -- ── Patch ปุ่ม CHAT ใน In-Server List ───────────────────────
+    -- หา chatB buttons ทั้งหมดใน srvScroll แล้ว patch
+    -- แต่เนื่องจาก buttons ถูกสร้างแบบ dynamic
+    -- เราจะ patch ผ่าน Firebase แทน
+    -- เมื่อกด CHAT → sendChatRequest(name) + openPrivateChat(name)
+
+    -- Override refreshServerList ไม่ได้ตรงๆ
+    -- แต่ใช้วิธี listen event แทน
+    -- เพิ่ม chat_request listener เข้าไปใน pcGui ที่มีอยู่แล้ว
+
+    -- ── Patch chatB ผ่าน UserInputService ────────────────────────
+    -- วิธีที่ทำงานได้: เพิ่ม sendChatRequest ใน chatB.MouseButton1Click
+    -- โดย scan หา buttons ที่ text = "CHAT" ใน srvScroll
+
+    task.spawn(function()
+        while task.wait(1) do
+            pcall(function()
+                -- หา srvScroll ผ่าน gui
+                local adminPage = pages and pages.admin
+                if not adminPage then return end
+
+                for _, child in ipairs(adminPage:GetDescendants()) do
+                    if child:IsA("TextButton") and child.Text == "CHAT" then
+                        -- ตรวจว่า patch แล้วยัง
+                        if not child:GetAttribute("ChatPatched") then
+                            child:SetAttribute("ChatPatched", true)
+                            child.MouseButton1Click:Connect(function()
+                                -- หาชื่อจาก row parent
+                                local row = child.Parent
+                                if row then
+                                    for _, lbl in ipairs(row:GetChildren()) do
+                                        if lbl:IsA("TextLabel") then
+                                            local name = lbl.Text:gsub("🟢 ", "")
+                                            if name ~= "" then
+                                                sendChatRequest(name)
+                                            end
+                                            break
+                                        end
+                                    end
+                                end
+                            end)
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+
+end)
