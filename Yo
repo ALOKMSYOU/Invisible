@@ -3303,31 +3303,228 @@ end
 print("✅ Admin Panel + Addon v3.0 Loaded!")
 end) -- end task.spawn wrapper
 -- ══════════════════════════════════════════════════════════════
---  AUTO CHAT OPEN v1.0
+--  AUTO CHAT OPEN v2.0 — SELF CONTAINED
 --  วางต่อท้ายสคริปหลักได้เลย
---  เมื่อ Owner กด CHAT → UI chat เปิดทั้งสองฝั่งอัตโนมัติ
 -- ══════════════════════════════════════════════════════════════
 task.spawn(function()
     task.wait(3)
 
-    -- ── รับ chat_open request ─────────────────────────────────
+    local _fbReq = fbReq -- cache fbReq ตอนนี้ขณะยังอยู่ใน scope เดียวกัน
+
+    -- ── ฟังก์ชันสร้าง Chat UI ────────────────────────────────
+    local activeChatGuis = {} -- เก็บ gui ที่เปิดอยู่
+
+    local function createChatUI(withName)
+        -- ถ้ามีอยู่แล้วให้ focus แทน
+        if activeChatGuis[withName] and activeChatGuis[withName].Parent then
+            activeChatGuis[withName].Enabled = true
+            return
+        end
+
+        local cache2  = {}
+        local msgCount2 = 0
+
+        local cg = Instance.new("ScreenGui")
+        cg.ResetOnSpawn = false
+        cg.Name = "ChatUI_" .. withName
+        pcall(function() cg.Parent = game:GetService("CoreGui") end)
+        if cg.Parent ~= game:GetService("CoreGui") then cg.Parent = LP.PlayerGui end
+        activeChatGuis[withName] = cg
+
+        local cf = Instance.new("Frame", cg)
+        cf.Size             = UDim2.fromOffset(260, 300)
+        cf.Position         = UDim2.new(0.75, 0, 0.28, 0)
+        cf.BackgroundColor3 = Color3.fromRGB(14, 14, 22)
+        cf.Active           = true
+        cf.Draggable        = true
+        cf.BorderSizePixel  = 0
+        Instance.new("UICorner", cf).CornerRadius = UDim.new(0, 10)
+        Instance.new("UIStroke", cf).Color        = Color3.fromRGB(60, 60, 120)
+
+        -- Header
+        local header = Instance.new("Frame", cf)
+        header.Size             = UDim2.new(1, 0, 0, 30)
+        header.BackgroundColor3 = Color3.fromRGB(20, 20, 40)
+        header.BorderSizePixel  = 0
+        Instance.new("UICorner", header).CornerRadius = UDim.new(0, 10)
+
+        local titleLbl = Instance.new("TextLabel", header)
+        titleLbl.Size               = UDim2.new(1, -34, 1, 0)
+        titleLbl.Position           = UDim2.new(0, 8, 0, 0)
+        titleLbl.BackgroundTransparency = 1
+        titleLbl.Text               = "💬 Chat with " .. withName
+        titleLbl.Font               = Enum.Font.GothamBold
+        titleLbl.TextSize           = 11
+        titleLbl.TextColor3         = Color3.fromRGB(160, 180, 255)
+        titleLbl.TextXAlignment     = Enum.TextXAlignment.Left
+
+        local closeBtn = Instance.new("TextButton", header)
+        closeBtn.Size             = UDim2.fromOffset(24, 24)
+        closeBtn.Position         = UDim2.new(1, -28, 0.5, -12)
+        closeBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+        closeBtn.Text             = "X"
+        closeBtn.Font             = Enum.Font.GothamBold
+        closeBtn.TextSize         = 11
+        closeBtn.TextColor3       = Color3.new(1, 1, 1)
+        closeBtn.BorderSizePixel  = 0
+        Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 5)
+        closeBtn.MouseButton1Click:Connect(function()
+            cg:Destroy()
+            activeChatGuis[withName] = nil
+        end)
+
+        -- Scroll
+        local scrollBg2 = Instance.new("Frame", cf)
+        scrollBg2.Size             = UDim2.new(1, -10, 0, 200)
+        scrollBg2.Position         = UDim2.new(0, 5, 0, 35)
+        scrollBg2.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
+        scrollBg2.BorderSizePixel  = 0
+        Instance.new("UICorner", scrollBg2).CornerRadius = UDim.new(0, 6)
+
+        local scr = Instance.new("ScrollingFrame", scrollBg2)
+        scr.Size                 = UDim2.new(1, -4, 1, -4)
+        scr.Position             = UDim2.new(0, 2, 0, 2)
+        scr.BackgroundTransparency = 1
+        scr.BorderSizePixel      = 0
+        scr.ScrollBarThickness   = 3
+        scr.AutomaticCanvasSize  = Enum.AutomaticSize.Y
+        scr.CanvasSize           = UDim2.new(0, 0, 0, 0)
+        local layout2 = Instance.new("UIListLayout", scr)
+        layout2.Padding   = UDim.new(0, 3)
+        layout2.SortOrder = Enum.SortOrder.LayoutOrder
+
+        -- Input
+        local inputBg2 = Instance.new("Frame", cf)
+        inputBg2.Size             = UDim2.new(1, -10, 0, 28)
+        inputBg2.Position         = UDim2.new(0, 5, 0, 242)
+        inputBg2.BackgroundColor3 = Color3.fromRGB(25, 25, 45)
+        inputBg2.BorderSizePixel  = 0
+        Instance.new("UICorner", inputBg2).CornerRadius = UDim.new(0, 6)
+
+        local inputBox2 = Instance.new("TextBox", inputBg2)
+        inputBox2.Size               = UDim2.new(1, -60, 1, -6)
+        inputBox2.Position           = UDim2.new(0, 6, 0, 3)
+        inputBox2.BackgroundTransparency = 1
+        inputBox2.PlaceholderText    = "Type here..."
+        inputBox2.PlaceholderColor3  = Color3.fromRGB(80, 80, 100)
+        inputBox2.Text               = ""
+        inputBox2.Font               = Enum.Font.Gotham
+        inputBox2.TextSize           = 11
+        inputBox2.TextColor3         = Color3.new(1, 1, 1)
+        inputBox2.ClearTextOnFocus   = false
+
+        local sendBtn3 = Instance.new("TextButton", inputBg2)
+        sendBtn3.Size             = UDim2.fromOffset(50, 22)
+        sendBtn3.Position         = UDim2.new(1, -54, 0.5, -11)
+        sendBtn3.BackgroundColor3 = Color3.fromRGB(50, 80, 200)
+        sendBtn3.Text             = "SEND"
+        sendBtn3.Font             = Enum.Font.GothamBold
+        sendBtn3.TextSize         = 10
+        sendBtn3.TextColor3       = Color3.new(1, 1, 1)
+        sendBtn3.BorderSizePixel  = 0
+        Instance.new("UICorner", sendBtn3).CornerRadius = UDim.new(0, 5)
+
+        -- ── ฟังก์ชันแสดงข้อความ ──────────────────────────────
+        local function addMsg(sender, text)
+            msgCount2 = msgCount2 + 1
+            local isSelf = (sender == LP.Name)
+            local row2 = Instance.new("Frame", scr)
+            row2.Size             = UDim2.new(1, 0, 0, 0)
+            row2.AutomaticSize    = Enum.AutomaticSize.Y
+            row2.BackgroundColor3 = isSelf and Color3.fromRGB(30, 40, 80) or Color3.fromRGB(22, 22, 34)
+            row2.BorderSizePixel  = 0
+            row2.LayoutOrder      = msgCount2
+            Instance.new("UICorner", row2).CornerRadius = UDim.new(0, 5)
+            local lbl2 = Instance.new("TextLabel", row2)
+            lbl2.Size               = UDim2.new(1, -8, 0, 0)
+            lbl2.Position           = UDim2.new(0, 4, 0, 3)
+            lbl2.AutomaticSize      = Enum.AutomaticSize.Y
+            lbl2.BackgroundTransparency = 1
+            lbl2.RichText           = true
+            lbl2.TextWrapped        = true
+            lbl2.TextXAlignment     = Enum.TextXAlignment.Left
+            lbl2.Font               = Enum.Font.GothamMedium
+            lbl2.TextSize           = 11
+            lbl2.TextColor3         = Color3.new(1, 1, 1)
+            lbl2.Text = string.format(
+                "<b><font color='%s'>%s</font></b>: %s",
+                isSelf and "#88AAFF" or "#FFD700", sender, text
+            )
+            task.defer(function()
+                scr.CanvasPosition = Vector2.new(0, scr.AbsoluteCanvasSize.Y + 9999)
+            end)
+        end
+
+        -- ── ส่งข้อความ ───────────────────────────────────────
+        local roomId2
+        do
+            local names = {LP.Name, withName}
+            table.sort(names)
+            roomId2 = names[1] .. "_" .. names[2]
+        end
+
+        local function doSend()
+            local msg = inputBox2.Text:match("^%s*(.-)%s*$")
+            if msg == "" then return end
+            inputBox2.Text = ""
+            addMsg(LP.Name, msg)
+            task.spawn(function()
+                pcall(function()
+                    _fbReq("POST", "/private_chat/" .. roomId2, {
+                        sender = LP.Name, text = msg, ts = os.time()
+                    })
+                end)
+            end)
+        end
+
+        sendBtn3.MouseButton1Click:Connect(doSend)
+        inputBox2.FocusLost:Connect(function(enter) if enter then doSend() end end)
+
+        -- ── Polling ───────────────────────────────────────────
+        task.spawn(function()
+            while cg and cg.Parent do
+                task.wait(2)
+                pcall(function()
+                    local data2 = _fbReq("GET", "/private_chat/" .. roomId2)
+                    if data2 then
+                        local sorted2 = {}
+                        for id2, m2 in pairs(data2) do
+                            if not cache2[id2] then
+                                table.insert(sorted2, {id = id2, msg = m2})
+                            end
+                        end
+                        table.sort(sorted2, function(a, b)
+                            return (a.msg.ts or 0) < (b.msg.ts or 0)
+                        end)
+                        for _, entry2 in ipairs(sorted2) do
+                            cache2[entry2.id] = true
+                            if entry2.msg.sender ~= LP.Name then
+                                addMsg(entry2.msg.sender or "?", entry2.msg.text or "")
+                            end
+                        end
+                    end
+                end)
+            end
+        end)
+    end
+
+    -- ── รับ chat_open request (ฝั่งคนรับ) ───────────────────
     task.spawn(function()
         while task.wait(2) do
             pcall(function()
-                local req = fbReq("GET", "/chat_open/" .. LP.Name)
+                local req = _fbReq("GET", "/chat_open/" .. LP.Name)
                 if req and req.from and req.ts then
                     local age = os.time() - (req.ts or 0)
                     if age < 20 then
-                        fbReq("DELETE", "/chat_open/" .. LP.Name, nil)
-                        -- เปิด Private Chat UI ฝั่งคนรับทันที
-                        openPrivateChat(req.from)
+                        _fbReq("DELETE", "/chat_open/" .. LP.Name, nil)
+                        createChatUI(req.from)
                     end
                 end
             end)
         end
     end)
 
-    -- ── Patch ปุ่ม CHAT ให้ส่ง chat_open ─────────────────────
+    -- ── Patch ปุ่ม CHAT ในหน้า Admin (ฝั่ง Owner) ───────────
     task.spawn(function()
         while task.wait(1) do
             pcall(function()
@@ -3335,20 +3532,22 @@ task.spawn(function()
                 if not adminPage then return end
                 for _, child in ipairs(adminPage:GetDescendants()) do
                     if child:IsA("TextButton") and child.Text == "CHAT"
-                        and not child:GetAttribute("AutoChatPatched")
+                        and not child:GetAttribute("V2ChatPatched")
                     then
-                        child:SetAttribute("AutoChatPatched", true)
+                        child:SetAttribute("V2ChatPatched", true)
                         child.MouseButton1Click:Connect(function()
                             local row = child.Parent
                             if not row then return end
                             for _, lbl in ipairs(row:GetChildren()) do
                                 if lbl:IsA("TextLabel") then
-                                    local name = lbl.Text:gsub("🟢 ", ""):gsub("🔵 ", "")
+                                    local name = lbl.Text:gsub("[🟢🔵] ", ""):gsub("🟢 ", ""):gsub("🔵 ", "")
                                     if name ~= "" then
-                                        -- ส่ง request ให้อีกฝั่งเปิด chat
+                                        -- เปิด UI ฝั่ง Owner
+                                        createChatUI(name)
+                                        -- ส่ง request ให้ฝั่งรับเปิดด้วย
                                         task.spawn(function()
                                             pcall(function()
-                                                fbReq("PUT", "/chat_open/" .. name, {
+                                                _fbReq("PUT", "/chat_open/" .. name, {
                                                     from = LP.Name,
                                                     ts   = os.time()
                                                 })
