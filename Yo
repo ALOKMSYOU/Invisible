@@ -2796,5 +2796,4 @@ end)
 
 print("✅ Admin Panel v1.0 Loaded! (Owner: " .. myName .. ")")
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))() --garvity
 loadstring(game:HttpGet("https://raw.githubusercontent.com/randomstring0/Qwerty/main/qwerty1.lua"))()
