@@ -320,7 +320,15 @@ _xb.TextColor3 = Color3.new(1,1,1)
 _xb.BorderSizePixel = 0
 _xb.ZIndex = 102
 Instance.new("UICorner",_xb).CornerRadius = UDim.new(0,4)
-_xb.MouseButton1Click:Connect(function() _pf.Visible = false end)
+_xb.MouseButton1Click:Connect(function()
+    _pf.Visible = false
+end)
+-- Also close on background tap
+_pf.InputBegan:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.Touch or inp.UserInputType == Enum.UserInputType.MouseButton2 then
+        _pf.Visible = false
+    end
+end)
 
 local function _showTut(tdata, srcBtn)
     _pt.Text = tdata.t
@@ -348,7 +356,7 @@ end
 local function btn(page, text, cb)
     local _td = _getTdata(text)
     local b = Instance.new("TextButton", page)
-    b.Size = UDim2.new(1, _td and -22 or 0, 0, 28)
+    b.Size = UDim2.new(1, 0, 0, 28)
     b.Text = text
     b.Font = Enum.Font.Gotham
     b.TextSize = 12
@@ -357,17 +365,18 @@ local function btn(page, text, cb)
     Instance.new("UICorner",b)
     b.MouseButton1Click:Connect(function() cb(b) end)
     if _td then
-        local qb = Instance.new("TextButton", page)
-        qb.Size = UDim2.fromOffset(20, 28)
-        qb.AnchorPoint = Vector2.new(1,0)
-        qb.Position = UDim2.new(1, 0, b.Position.Y.Scale, b.Position.Y.Offset)
+        -- ใส่ ? ไว้ใน button เดิมเลย ทางขวาสุด
+        local qb = Instance.new("TextButton", b)
+        qb.Size = UDim2.fromOffset(20, 20)
+        qb.AnchorPoint = Vector2.new(1, 0.5)
+        qb.Position = UDim2.new(1, -2, 0.5, 0)
         qb.BackgroundColor3 = Color3.fromRGB(40,40,110)
         qb.Text = "?"
         qb.Font = Enum.Font.GothamBold
-        qb.TextSize = 10
+        qb.TextSize = 9
         qb.TextColor3 = Color3.fromRGB(160,180,255)
         qb.BorderSizePixel = 0
-        qb.ZIndex = 2
+        qb.ZIndex = b.ZIndex + 2
         Instance.new("UICorner",qb).CornerRadius = UDim.new(0,4)
         qb.MouseButton1Click:Connect(function()
             local td2 = _getTdata(b.Text) or _td
