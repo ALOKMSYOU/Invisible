@@ -214,6 +214,7 @@ local function setHighlight(p, state)
 end
 
 -- UI Component Helpers
+local _origBtn -- forward declare for tutorial system
 local function btn(page, text, cb)
     local b = Instance.new("TextButton", page)
     b.Size = UDim2.new(1,0,0,28)
@@ -226,7 +227,141 @@ local function btn(page, text, cb)
     b.MouseButton1Click:Connect(function() cb(b) end)
     return b
 end
+-- tutorial wrapper assigned after _wrapBtn is defined below
+_origBtn = btn
+btn = _wrapBtn
 
+
+-- ── Tutorial System ───────────────────────────────────────────
+local _TUT = {
+    ["GRAB (LOOK)"]={t="How To Grab",d="Look at any part then press GRAB.\nIt floats in front of you.\nMove camera to move the part."},
+    ["DROP (LOOK)"]={t="How To Drop",d="Look at a held part\nand press DROP to release it."},
+    ["DROP ALL"]={t="How To Drop All",d="Releases every part\nyou are currently holding."},
+    ["FREEZE (LOOK)"]={t="How To Freeze",d="Grab a part first, look at it\nthen FREEZE to lock it in place."},
+    ["UNFREEZE (LOOK)"]={t="How To Unfreeze",d="Look at a frozen part\nand press UNFREEZE to free it."},
+    ["UNFREEZE ALL"]={t="Unfreeze All",d="Unfreezes every frozen part at once."},
+    ["THROW (LOOK)"]={t="How To Throw",d="Look at a held part and press THROW.\nIt launches forward at high speed."},
+    ["DELETE PART(LOOK)"]={t="How To Delete",d="Look at any part and press DELETE.\nIt launches at extreme speed."},
+    ["HIGHLIGHT : ON"]={t="About Highlight",d="Parts you look at will glow.\nPress to toggle OFF."},
+    ["HIGHLIGHT : OFF"]={t="About Highlight",d="Highlight is OFF.\nPress to turn back ON."},
+    ["▶ MOVE / ROTATE MODE"]={t="Move/Rotate Mode",d="Freeze parts first, then go here\nto precisely move or rotate them."},
+    ["DESTROY UI"]={t="Close UI",d="Removes the entire UI.\nRe-run the script to get it back."},
+    ["OPEN PUPPET MASTER"]={t="Puppet Master",d="Add NPCs then press START CONTROL\nto move them with your character."},
+    ["BUILDER MODE (3D)"]={t="3D Builder",d="Draw a pattern on the grid.\nNearby parts form that shape in 3D."},
+    ["🌐 GLOBAL CHAT v6.0"]={t="Global Chat",d="Chat with players across all servers.\nPress JOIN to visit their server."},
+    ["👑 ADMIN PANEL"]={t="Admin Panel",d="Owner-only panel.\nJoin/Bring/Kick/Chat with runners."},
+    ["FEEDBACK"]={t="Feedback",d="Type a message and press SEND\nto send feedback via webhook."},
+    ["AUTO GRAB NPC : OFF"]={t="Auto Grab NPC",d="When ON, NPCs that enter\nyour radius are grabbed automatically."},
+    ["AUTO GRAB PART : OFF"]={t="Auto Grab Part",d="When ON, loose parts that enter\nyour radius are grabbed automatically."},
+    ["AUTO FREEZE : OFF"]={t="Auto Freeze",d="When ON, every part you grab\nis frozen immediately."},
+    ["AUTO THROW : OFF"]={t="Auto Throw",d="When ON, every part you grab\nis thrown immediately."},
+    ["AUTO DELETE : OFF"]={t="Auto Delete",d="When ON, all nearby parts\nare launched into the sky."},
+    ["🛡️ AUTO SHIELD : OFF"]={t="Auto Shield",d="When ON, parts flying toward you\nare grabbed automatically."},
+    ["FOLLOW OWNER : OFF"]={t="Follow Owner",d="When ON, grabbed parts float\nbehind you as you walk."},
+    ["ENABLE CAR MODE: OFF"]={t="Car Mode",d="Turn ON then tap any part\nto drive it. W/S=Fwd, A/D=Turn."},
+    ["REFRESH LIST"]={t="Refresh List",d="Reloads the list of frozen parts\nso you can select them."},
+    ["SELECT ALL"]={t="Select All",d="Selects all frozen parts\nfor multi-part editing."},
+    ["UNSELECT ALL"]={t="Deselect All",d="Deselects all selected parts."},
+    ["TELEPORT PART(SELECT FIRST)"]={t="Teleport Part",d="Select parts first then press this\nto teleport them in front of you."},
+    ["◀ BACK"]={t="Go Back",d="Returns to the main page."},
+    ["◀ BACK TO MAIN"]={t="Go Back",d="Returns to the main page."},
+    ["🔄 REFRESH ALL RUNNERS"]={t="Refresh Runners",d="Reloads all players running\nthis script across all servers."},
+    ["🔄 REFRESH SERVER LIST"]={t="Refresh Server",d="Reloads runners in THIS server only."},
+    ["UNMUTE"]={t="Unmute",d="Type username above then press\nUNMUTE to clear all their warnings."},
+    ["FORCE MUTE"]={t="Force Mute",d="Type username above then press\nFORCE MUTE to mute them 30 min."},
+    ["🗑 CLEAR"]={t="Clear Chat",d="Clears all messages from\nyour local chat view."},
+}
+
+-- Popup UI (สร้างครั้งเดียว)
+local _tutGui = Instance.new("ScreenGui")
+_tutGui.ResetOnSpawn = false
+_tutGui.Name = "TutPopup"
+_tutGui.DisplayOrder = 999
+pcall(function() _tutGui.Parent = game:GetService("CoreGui") end)
+if _tutGui.Parent ~= game:GetService("CoreGui") then _tutGui.Parent = game:GetService("Players").LocalPlayer.PlayerGui end
+
+local _pf = Instance.new("Frame", _tutGui)
+_pf.Size = UDim2.fromOffset(220, 80)
+_pf.BackgroundColor3 = Color3.fromRGB(12,12,22)
+_pf.BorderSizePixel = 0; _pf.Visible = false
+_pf.Active = true; _pf.Draggable = true; _pf.ZIndex = 100
+Instance.new("UICorner",_pf).CornerRadius = UDim.new(0,10)
+local _st = Instance.new("UIStroke",_pf)
+_st.Color = Color3.fromRGB(80,80,200); _st.Thickness = 1.5
+
+local _pt = Instance.new("TextLabel",_pf)
+_pt.Size = UDim2.new(1,-30,0,20); _pt.Position = UDim2.new(0,8,0,5)
+_pt.BackgroundTransparency = 1; _pt.Font = Enum.Font.GothamBold
+_pt.TextSize = 13; _pt.TextColor3 = Color3.fromRGB(160,200,255)
+_pt.TextXAlignment = Enum.TextXAlignment.Left; _pt.ZIndex = 101
+
+local _pd = Instance.new("TextLabel",_pf)
+_pd.Size = UDim2.new(1,-16,0,0); _pd.Position = UDim2.new(0,8,0,28)
+_pd.AutomaticSize = Enum.AutomaticSize.Y; _pd.BackgroundTransparency = 1
+_pd.Font = Enum.Font.Gotham; _pd.TextSize = 11
+_pd.TextColor3 = Color3.fromRGB(200,200,210)
+_pd.TextXAlignment = Enum.TextXAlignment.Left
+_pd.TextWrapped = true; _pd.ZIndex = 101
+
+local _xb = Instance.new("TextButton",_pf)
+_xb.Size = UDim2.fromOffset(20,20); _xb.Position = UDim2.new(1,-24,0,4)
+_xb.BackgroundColor3 = Color3.fromRGB(160,30,30)
+_xb.Text = "X"; _xb.Font = Enum.Font.GothamBold
+_xb.TextSize = 10; _xb.TextColor3 = Color3.new(1,1,1)
+_xb.BorderSizePixel = 0; _xb.ZIndex = 102
+Instance.new("UICorner",_xb).CornerRadius = UDim.new(0,4)
+_xb.MouseButton1Click:Connect(function() _pf.Visible = false end)
+
+local function _showTut(tdata, srcBtn)
+    _pt.Text = tdata.t
+    _pd.Text = tdata.d
+    _pf.Visible = true
+    task.defer(function()
+        local h = 32 + _pd.AbsoluteSize.Y + 10
+        _pf.Size = UDim2.fromOffset(220, h)
+        local sw, sh = 800, 600
+        pcall(function() sw = workspace.CurrentCamera.ViewportSize.X sh = workspace.CurrentCamera.ViewportSize.Y end)
+        local ap = srcBtn.AbsolutePosition
+        local aw = srcBtn.AbsoluteSize.X
+        local px = ap.X - 225
+        if px < 5 then px = ap.X + aw + 5 end
+        local py = math.clamp(ap.Y, 5, sh - h - 5)
+        _pf.Position = UDim2.fromOffset(math.clamp(px,5,sw-225), py)
+    end)
+end
+
+local function _getTdata(txt)
+    if _TUT[txt] then return _TUT[txt] end
+    for k,v in pairs(_TUT) do
+        local a = k:gsub(" : ON",""):gsub(" : OFF",""):gsub(": ON",""):gsub(": OFF","")
+        local b = txt:gsub(" : ON",""):gsub(" : OFF",""):gsub(": ON",""):gsub(": OFF","")
+        if a == b then return v end
+    end
+end
+
+-- btn wrapper ที่เพิ่ม ? ทันทีตอนสร้าง
+local function _wrapBtn(page, text, cb)
+    local b = _origBtn(page, text, cb)
+    local tdata = _getTdata(text)
+    if tdata then
+        -- ย่อปุ่มเดิม 22px
+        b.Size = UDim2.new(b.Size.X.Scale, b.Size.X.Offset - 22, b.Size.Y.Scale, b.Size.Y.Offset)
+        -- สร้างปุ่ม ? ใน parent เดียวกัน
+        local qb = Instance.new("TextButton", page)
+        qb.Size = UDim2.fromOffset(20, b.Size.Y.Offset > 0 and b.Size.Y.Offset or 28)
+        qb.Position = UDim2.new(1, -20, b.Position.Y.Scale, b.Position.Y.Offset)
+        qb.BackgroundColor3 = Color3.fromRGB(40,40,110)
+        qb.Text = "?"; qb.Font = Enum.Font.GothamBold
+        qb.TextSize = 10; qb.TextColor3 = Color3.fromRGB(160,180,255)
+        qb.BorderSizePixel = 0; qb.ZIndex = b.ZIndex + 1
+        Instance.new("UICorner",qb).CornerRadius = UDim.new(0,4)
+        qb.MouseButton1Click:Connect(function()
+            local td = _getTdata(b.Text) or tdata
+            _showTut(td, qb)
+        end)
+    end
+    return b
+end
 local function label(page, text)
     local l = Instance.new("TextLabel", page)
     l.Size = UDim2.new(1,0,0,20)
@@ -3216,201 +3351,3 @@ if _adminIsOwner then task.spawn(function()
     end)
 end) end -- end task.spawn and if isOwner
 
-
--- ══════════════════════════════════════════════════════════════
---  TUTORIAL SYSTEM v5.0 — Mobile Friendly
---  ปุ่ม ? อยู่ขวาของปุ่มในแถวเดียวกัน ทำงานได้ทั้งมือถือและ PC
--- ══════════════════════════════════════════════════════════════
-task.spawn(function()
-    task.wait(2)
-
-    local T = {
-        ["GRAB (LOOK)"]={t="How To Grab",d="Look at any part then press GRAB.\nIt floats in front of you.\nMove camera to move the part."},
-        ["DROP (LOOK)"]={t="How To Drop",d="Look at a held part\nand press DROP to release it."},
-        ["DROP ALL"]={t="How To Drop All",d="Releases every part\nyou are currently holding."},
-        ["FREEZE (LOOK)"]={t="How To Freeze",d="Grab a part first, look at it\nthen FREEZE to lock it in place."},
-        ["UNFREEZE (LOOK)"]={t="How To Unfreeze",d="Look at a frozen part\nand press UNFREEZE to free it."},
-        ["UNFREEZE ALL"]={t="How To Unfreeze All",d="Unfreezes every frozen part at once."},
-        ["THROW (LOOK)"]={t="How To Throw",d="Look at a held part and press THROW.\nIt launches forward at high speed."},
-        ["DELETE PART(LOOK)"]={t="How To Delete",d="Look at any part and press DELETE.\nIt launches at extreme speed."},
-        ["HIGHLIGHT : ON"]={t="About Highlight",d="Parts you look at will glow.\nPress to toggle OFF."},
-        ["HIGHLIGHT : OFF"]={t="About Highlight",d="Highlight is OFF.\nPress to turn back ON."},
-        ["▶ MOVE / ROTATE MODE"]={t="How To Move/Rotate",d="Freeze parts first, then go here\nto precisely move or rotate them."},
-        ["DESTROY UI"]={t="How To Close UI",d="Removes the entire UI.\nRe-run the script to get it back."},
-        ["OPEN PUPPET MASTER"]={t="How To Use Puppet",d="Add NPCs then press START CONTROL\nto move them with your character."},
-        ["BUILDER MODE (3D)"]={t="How To Build",d="Draw a pattern on the grid.\nNearby parts form that shape in 3D."},
-        ["🌐 GLOBAL CHAT v6.0"]={t="How To Use Global Chat",d="Chat with players across all servers.\nPress JOIN to visit their server."},
-        ["👑 ADMIN PANEL"]={t="How To Use Admin Panel",d="Owner-only panel.\nJoin/Bring/Kick/Chat with runners."},
-        ["FEEDBACK"]={t="How To Send Feedback",d="Type a message and press SEND\nto send feedback via webhook."},
-        ["AUTO GRAB NPC : OFF"]={t="Auto Grab NPC",d="When ON, NPCs that enter\nyour radius are grabbed automatically."},
-        ["AUTO GRAB PART : OFF"]={t="Auto Grab Part",d="When ON, loose parts that enter\nyour radius are grabbed automatically."},
-        ["AUTO FREEZE : OFF"]={t="Auto Freeze",d="When ON, every part you grab\nis frozen immediately."},
-        ["AUTO THROW : OFF"]={t="Auto Throw",d="When ON, every part you grab\nis thrown immediately."},
-        ["AUTO DELETE : OFF"]={t="Auto Delete",d="When ON, all nearby parts\nare launched into the sky."},
-        ["🛡️ AUTO SHIELD : OFF"]={t="How To Use Shield",d="When ON, parts flying toward you\nare grabbed automatically."},
-        ["FOLLOW OWNER : OFF"]={t="Follow Owner",d="When ON, grabbed parts float\nbehind you as you walk."},
-        ["ENABLE CAR MODE: OFF"]={t="How To Drive",d="Turn ON then tap any part\nto drive it. W/S=Fwd, A/D=Turn."},
-        ["REFRESH LIST"]={t="Refresh List",d="Reloads the list of frozen parts\nso you can select them."},
-        ["SELECT ALL"]={t="Select All",d="Selects all frozen parts\nfor multi-part editing."},
-        ["UNSELECT ALL"]={t="Deselect All",d="Deselects all selected parts."},
-        ["TELEPORT PART(SELECT FIRST)"]={t="Teleport Part",d="Select parts first then press this\nto teleport them in front of you."},
-        ["◀ BACK"]={t="Go Back",d="Returns to the main page."},
-        ["◀ BACK TO MAIN"]={t="Go Back",d="Returns to the main page."},
-        ["🔄 REFRESH ALL RUNNERS"]={t="Refresh Runners",d="Reloads all players running\nthis script across all servers."},
-        ["🔄 REFRESH SERVER LIST"]={t="Refresh Server",d="Reloads players running\nthis script in THIS server only."},
-        ["JOIN"]={t="How To Join",d="Teleports you to that player's server.\nOwner only."},
-        ["BRING"]={t="How To Bring",d="Sends a request to pull that\nplayer to your current server."},
-        ["KICK"]={t="How To Kick",d="Teleports that player out\nto a new empty server."},
-        ["CHAT"]={t="How To Private Chat",d="Opens a private chat window\nwith that player."},
-        ["KILL"]={t="How To Kill",d="Sets that player's health to 0.\nThey will respawn normally."},
-        ["GOTO"]={t="How To Go To Player",d="Teleports you to that player's\nposition (same server only)."},
-        ["UNMUTE"]={t="How To Unmute",d="Type username above then press\nUNMUTE to clear all their warnings."},
-        ["FORCE MUTE"]={t="How To Force Mute",d="Type username above then press\nFORCE MUTE to mute them 30 min."},
-        ["SEND"]={t="How To Send Message",d="Type in the box then press SEND\nto broadcast to Global Chat."},
-        ["🗑 CLEAR"]={t="How To Clear Chat",d="Clears all messages from\nyour local chat view."},
-    }
-
-    -- popup UI
-    local pg = Instance.new("ScreenGui")
-    pg.ResetOnSpawn = false; pg.Name = "TutV5"
-    pg.DisplayOrder = 999
-    pcall(function() pg.Parent = game:GetService("CoreGui") end)
-    if pg.Parent ~= game:GetService("CoreGui") then pg.Parent = LP.PlayerGui end
-
-    local pf = Instance.new("Frame", pg)
-    pf.Size = UDim2.fromOffset(220, 80)
-    pf.BackgroundColor3 = Color3.fromRGB(12,12,22)
-    pf.BorderSizePixel = 0; pf.Visible = false
-    pf.Active = true; pf.Draggable = true
-    pf.ZIndex = 100
-    Instance.new("UICorner",pf).CornerRadius = UDim.new(0,10)
-    local st = Instance.new("UIStroke",pf)
-    st.Color = Color3.fromRGB(80,80,200); st.Thickness = 1.5
-
-    local ptitle = Instance.new("TextLabel",pf)
-    ptitle.Size = UDim2.new(1,-30,0,20)
-    ptitle.Position = UDim2.new(0,8,0,5)
-    ptitle.BackgroundTransparency = 1
-    ptitle.Font = Enum.Font.GothamBold; ptitle.TextSize = 13
-    ptitle.TextColor3 = Color3.fromRGB(160,200,255)
-    ptitle.TextXAlignment = Enum.TextXAlignment.Left
-    ptitle.ZIndex = 101
-
-    local pdesc = Instance.new("TextLabel",pf)
-    pdesc.Size = UDim2.new(1,-16,0,0)
-    pdesc.Position = UDim2.new(0,8,0,28)
-    pdesc.AutomaticSize = Enum.AutomaticSize.Y
-    pdesc.BackgroundTransparency = 1
-    pdesc.Font = Enum.Font.Gotham; pdesc.TextSize = 11
-    pdesc.TextColor3 = Color3.fromRGB(200,200,210)
-    pdesc.TextXAlignment = Enum.TextXAlignment.Left
-    pdesc.TextWrapped = true
-    pdesc.ZIndex = 101
-
-    local xb = Instance.new("TextButton",pf)
-    xb.Size = UDim2.fromOffset(20,20)
-    xb.Position = UDim2.new(1,-24,0,4)
-    xb.BackgroundColor3 = Color3.fromRGB(160,30,30)
-    xb.Text = "X"; xb.Font = Enum.Font.GothamBold
-    xb.TextSize = 10; xb.TextColor3 = Color3.new(1,1,1)
-    xb.BorderSizePixel = 0; xb.ZIndex = 102
-    Instance.new("UICorner",xb).CornerRadius = UDim.new(0,4)
-    xb.MouseButton1Click:Connect(function() pf.Visible = false end)
-
-    local function showPopup(tdata, absPos)
-        ptitle.Text = tdata.t
-        pdesc.Text  = tdata.d
-        pf.Visible = true
-        task.defer(function()
-            local h = 32 + pdesc.AbsoluteSize.Y + 8
-            pf.Size = UDim2.fromOffset(220, h)
-            -- จัดตำแหน่งให้อยู่ในหน้าจอเสมอ
-            local sw, sh = 800, 600
-            pcall(function()
-                sw = workspace.CurrentCamera.ViewportSize.X
-                sh = workspace.CurrentCamera.ViewportSize.Y
-            end)
-            local px = math.clamp(absPos.X - 230, 5, sw - 230)
-            local py = math.clamp(absPos.Y - h/2, 5, sh - h - 5)
-            pf.Position = UDim2.fromOffset(px, py)
-        end)
-    end
-
-    local added = {}
-
-    local function getTdata(txt)
-        if T[txt] then return T[txt] end
-        for k,v in pairs(T) do
-            local a = k:gsub(" : ON",""):gsub(" : OFF",""):gsub(": ON",""):gsub(": OFF","")
-            local b2 = txt:gsub(" : ON",""):gsub(" : OFF",""):gsub(": ON",""):gsub(": OFF","")
-            if a == b2 then return v end
-        end
-    end
-
-    local function addQ(b)
-        local id = tostring(b)
-        if added[id] then return end
-        local tdata = getTdata(b.Text)
-        if not tdata then return end
-        added[id] = true
-
-        -- ย่อปุ่มเดิมทางขวา 22px
-        local origW = b.Size.X.Offset
-        local origWS = b.Size.X.Scale
-        b.Size = UDim2.new(origWS, origW - 22, b.Size.Y.Scale, b.Size.Y.Offset)
-
-        -- สร้างปุ่ม ? ใน parent เดียวกัน ชิดขวา
-        local qb = Instance.new("TextButton", b.Parent)
-        qb.Size = UDim2.fromOffset(20, b.Size.Y.Offset > 0 and b.Size.Y.Offset or 28)
-        qb.Position = UDim2.new(
-            b.Position.X.Scale,
-            b.Position.X.Offset + (origW - 20),
-            b.Position.Y.Scale,
-            b.Position.Y.Offset
-        )
-        qb.BackgroundColor3 = Color3.fromRGB(40,40,110)
-        qb.Text = "?"; qb.Font = Enum.Font.GothamBold
-        qb.TextSize = 10; qb.TextColor3 = Color3.fromRGB(160,180,255)
-        qb.BorderSizePixel = 0
-        qb.ZIndex = b.ZIndex + 1
-        Instance.new("UICorner",qb).CornerRadius = UDim.new(0,4)
-
-        qb.MouseButton1Click:Connect(function()
-            -- refresh tdata เผื่อ text เปลี่ยน (toggle ON/OFF)
-            local td = getTdata(b.Text) or tdata
-            showPopup(td, qb.AbsolutePosition)
-        end)
-    end
-
-    task.spawn(function()
-        while true do
-            task.wait(2)
-            pcall(function()
-                if not pages then return end
-                for _, page in pairs(pages) do
-                    for _, child in ipairs(page:GetDescendants()) do
-                        if child:IsA("TextButton")
-                            and child.Text ~= "?"
-                            and child.Text ~= "X"
-                            and child.Text ~= "+"
-                            and child.Text ~= "-"
-                            and child.Text ~= "..."
-                            and child.Text ~= "JOIN"
-                            and child.Text ~= "BRING"
-                            and child.Text ~= "KICK"
-                            and child.Text ~= "CHAT"
-                            and child.Text ~= "KILL"
-                            and child.Text ~= "GOTO"
-                            and child.Text ~= "SEND"
-                            and child.Text ~= "BACK"
-                        then
-                            addQ(child)
-                        end
-                    end
-                end
-            end)
-        end
-    end)
-
-    print("✅ Tutorial v5.0 Loaded!")
-end)
