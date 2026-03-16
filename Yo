@@ -71,48 +71,135 @@ Instance.new("UICorner",cross).CornerRadius = UDim.new(1,0)
 
 local targetHL = Instance.new("Highlight", gui)
 targetHL.FillTransparency = 0.6
-targetHL.OutlineColor = Color3.fromRGB(255,255,255)
+targetHL.OutlineColor = Color3.fromRGB(0,255,200)
 
+-- ══ TELEKINESIS UI 2.0 — MAIN FRAME ══════════════════════
 local main = Instance.new("Frame", gui)
-main.Size = UDim2.fromScale(0.32*UI_SCALE, 0.75*UI_SCALE)
+main.Size = UDim2.fromScale(0.32*UI_SCALE, 0.76*UI_SCALE)
 main.Position = UDim2.fromScale(0.03, 0.18)
-main.BackgroundColor3 = Color3.fromRGB(20,20,20)
+main.BackgroundColor3 = Color3.fromRGB(5, 6, 9)
 main.Active = true
 main.Draggable = true
-Instance.new("UICorner",main).CornerRadius = UDim.new(0,14)
+main.BorderSizePixel = 0
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 18)
+local mainStroke = Instance.new("UIStroke", main)
+mainStroke.Color = Color3.fromRGB(0, 230, 170)
+mainStroke.Thickness = 1.5
+mainStroke.Transparency = 0.2
 
-local title = Instance.new("TextLabel", main)
-title.Size = UDim2.new(1,0,0,32)
-title.Text = "TELEKINESIS UI 1.7"
-title.Font = Enum.Font.GothamBold
-title.TextSize = 16
-title.TextColor3 = Color3.new(1,1,1)
+-- ── HEADER ──────────────────────────────────────────────────
+local hdr = Instance.new("Frame", main)
+hdr.Size = UDim2.new(1, 0, 0, 52)
+hdr.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+hdr.BackgroundTransparency = 0.3
+hdr.BorderSizePixel = 0
+Instance.new("UICorner", hdr).CornerRadius = UDim.new(0, 18)
+local hdrFix = Instance.new("Frame", hdr)
+hdrFix.Size = UDim2.new(1, 0, 0.5, 0)
+hdrFix.Position = UDim2.new(0, 0, 0.5, 0)
+hdrFix.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+hdrFix.BackgroundTransparency = 0.3
+hdrFix.BorderSizePixel = 0
+
+-- Gradient overlay on header
+local hdrGrad = Instance.new("Frame", hdr)
+hdrGrad.Size = UDim2.fromScale(1,1)
+hdrGrad.BackgroundColor3 = Color3.fromRGB(0, 180, 130)
+hdrGrad.BackgroundTransparency = 0.88
+hdrGrad.BorderSizePixel = 0
+Instance.new("UICorner", hdrGrad).CornerRadius = UDim.new(0, 18)
+
+-- Icon square
+local badge = Instance.new("Frame", hdr)
+badge.Size = UDim2.fromOffset(38, 38)
+badge.Position = UDim2.new(0, 8, 0.5, -19)
+badge.BackgroundColor3 = Color3.fromRGB(0, 200, 145)
+badge.BorderSizePixel = 0
+Instance.new("UICorner", badge).CornerRadius = UDim.new(0, 10)
+local badgeGrad = Instance.new("UIGradient", badge)
+badgeGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 185)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 120, 90)),
+})
+badgeGrad.Rotation = 135
+local badgeIcon = Instance.new("TextLabel", badge)
+badgeIcon.Size = UDim2.fromScale(1,1)
+badgeIcon.BackgroundTransparency = 1
+badgeIcon.Text = "TK"
+badgeIcon.Font = Enum.Font.GothamBlack
+badgeIcon.TextSize = 14
+badgeIcon.TextColor3 = Color3.new(1,1,1)
+
+-- Title
+local title = Instance.new("TextLabel", hdr)
+title.Size = UDim2.new(1, -58, 0, 20)
+title.Position = UDim2.new(0, 54, 0, 8)
 title.BackgroundTransparency = 1
+title.Text = "TELEKINESIS UI"
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 14
+title.TextColor3 = Color3.fromRGB(245, 255, 252)
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+local titleSub = Instance.new("TextLabel", hdr)
+titleSub.Size = UDim2.new(1, -58, 0, 13)
+titleSub.Position = UDim2.new(0, 54, 0, 30)
+titleSub.BackgroundTransparency = 1
+titleSub.Text = "2.0  •  EXECUTOR SCRIPT"
+titleSub.Font = Enum.Font.GothamMedium
+titleSub.TextSize = 9
+titleSub.TextColor3 = Color3.fromRGB(0, 215, 160)
+titleSub.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Bottom border glow
+local divLine = Instance.new("Frame", hdr)
+divLine.Size = UDim2.new(0.85, 0, 0, 1)
+divLine.Position = UDim2.new(0.075, 0, 1, -1)
+divLine.BackgroundColor3 = Color3.fromRGB(0, 215, 160)
+divLine.BackgroundTransparency = 0.4
+divLine.BorderSizePixel = 0
+Instance.new("UICorner", divLine).CornerRadius = UDim.new(1,0)
+local divGrad = Instance.new("UIGradient", divLine)
+divGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.new(0,0,0)),
+    ColorSequenceKeypoint.new(0.15, Color3.new(1,1,1)),
+    ColorSequenceKeypoint.new(0.85, Color3.new(1,1,1)),
+    ColorSequenceKeypoint.new(1, Color3.new(0,0,0)),
+})
 
 local pages = {}
 local function createPage()
     local f = Instance.new("ScrollingFrame", main)
-    f.Position = UDim2.new(0.03,0,0,36)
-    f.Size = UDim2.new(0.94,0,1,-45)
-    f.ScrollBarThickness = 4
+    f.Position = UDim2.new(0, 6, 0, 56)
+    f.Size = UDim2.new(1, -12, 1, -62)
+    f.ScrollBarThickness = 3
+    f.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 160)
     f.Visible = false
-    f.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    f.BackgroundTransparency = 1
     f.BorderSizePixel = 0
     local layout = Instance.new("UIListLayout", f)
-    layout.Padding = UDim.new(0,5)
+    layout.Padding = UDim.new(0, 4)
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         f.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y+10)
     end)
+    local pad = Instance.new("UIPadding", f)
+    pad.PaddingTop = UDim.new(0, 4)
+    pad.PaddingBottom = UDim.new(0, 4)
     return f
 end
 
+local _tutPages = {} -- pages ที่ต้องการปุ่ม ?
 pages.main = createPage()
 pages.move = createPage()
+_tutPages[pages.main] = true
+_tutPages[pages.move] = true
 
 local function showPage(name)
     for k,v in pairs(pages) do v.Visible = (k == name) end
 end
 showPage("main")
+
+
 
 -- Logic Functions
 local function getTarget()
@@ -232,9 +319,6 @@ local _TUT = {
     ["DESTROY UI"]={t="Close UI",d="Removes the entire UI.\nRe-run the script to get it back."},
     ["OPEN PUPPET MASTER"]={t="Puppet Master",d="Add NPCs then press START CONTROL\nto move them with your character."},
     ["BUILDER MODE (3D)"]={t="3D Builder",d="Draw a pattern on the grid.\nNearby parts form that shape in 3D."},
-    ["🌐 GLOBAL CHAT v6.0"]={t="Global Chat",d="Chat with players across all servers.\nPress JOIN to visit their server."},
-    ["👑 ADMIN PANEL"]={t="Admin Panel",d="Owner-only panel.\nJoin/Bring/Kick/Chat with runners."},
-    ["FEEDBACK"]={t="Feedback",d="Type a message and press SEND\nto send feedback via webhook."},
     ["AUTO GRAB NPC : OFF"]={t="Auto Grab NPC",d="When ON, NPCs that enter\nyour radius are grabbed automatically."},
     ["AUTO GRAB PART : OFF"]={t="Auto Grab Part",d="When ON, loose parts that enter\nyour radius are grabbed automatically."},
     ["AUTO FREEZE : OFF"]={t="Auto Freeze",d="When ON, every part you grab\nis frozen immediately."},
@@ -247,13 +331,6 @@ local _TUT = {
     ["SELECT ALL"]={t="Select All",d="Selects all frozen parts\nfor multi-part editing."},
     ["UNSELECT ALL"]={t="Deselect All",d="Deselects all selected parts."},
     ["TELEPORT PART(SELECT FIRST)"]={t="Teleport Part",d="Select parts first then press this\nto teleport them in front of you."},
-    ["◀ BACK"]={t="Go Back",d="Returns to the main page."},
-    ["◀ BACK TO MAIN"]={t="Go Back",d="Returns to the main page."},
-    ["🔄 REFRESH ALL RUNNERS"]={t="Refresh Runners",d="Reloads all players running\nthis script across all servers."},
-    ["🔄 REFRESH SERVER LIST"]={t="Refresh Server",d="Reloads runners in THIS server only."},
-    ["UNMUTE"]={t="Unmute",d="Type username above then press\nUNMUTE to clear all their warnings."},
-    ["FORCE MUTE"]={t="Force Mute",d="Type username above then press\nFORCE MUTE to mute them 30 min."},
-    ["🗑 CLEAR"]={t="Clear Chat",d="Clears all messages from\nyour local chat view."},
 }
 
 local function _getTdata(txt)
@@ -265,72 +342,66 @@ local function _getTdata(txt)
     end
 end
 
--- Popup UI
-local _tutGui = Instance.new("ScreenGui")
-_tutGui.ResetOnSpawn = false
-_tutGui.Name = "TutPopup"
-_tutGui.DisplayOrder = 999
-pcall(function() _tutGui.Parent = game:GetService("CoreGui") end)
-if _tutGui.Parent ~= game:GetService("CoreGui") then
-    _tutGui.Parent = game:GetService("Players").LocalPlayer.PlayerGui
+-- Popup UI (lazy init)
+local _pf, _pt, _pd = nil, nil, nil
+
+local function _initPopup()
+    if _pf then return end
+    local _tutGui = Instance.new("ScreenGui")
+    _tutGui.ResetOnSpawn = false
+    _tutGui.Name = "TutPopup"
+    _tutGui.DisplayOrder = 999
+    pcall(function() _tutGui.Parent = game:GetService("CoreGui") end)
+    if _tutGui.Parent ~= game:GetService("CoreGui") then
+        _tutGui.Parent = LP.PlayerGui
+    end
+    _pf = Instance.new("Frame", _tutGui)
+    _pf.Size = UDim2.fromOffset(220, 80)
+    _pf.BackgroundColor3 = Color3.fromRGB(12,12,22)
+    _pf.BorderSizePixel = 0
+    _pf.Visible = false
+    _pf.Active = true
+    _pf.Draggable = true
+    _pf.ZIndex = 100
+    Instance.new("UICorner",_pf).CornerRadius = UDim.new(0,10)
+    local _st = Instance.new("UIStroke",_pf)
+    _st.Color = Color3.fromRGB(80,80,200); _st.Thickness = 1.5
+    _pt = Instance.new("TextLabel",_pf)
+    _pt.Size = UDim2.new(1,-30,0,22)
+    _pt.Position = UDim2.new(0,8,0,5)
+    _pt.BackgroundTransparency = 1
+    _pt.Font = Enum.Font.GothamBold
+    _pt.TextSize = 13
+    _pt.TextColor3 = Color3.fromRGB(160,200,255)
+    _pt.TextXAlignment = Enum.TextXAlignment.Left
+    _pt.ZIndex = 101
+    _pd = Instance.new("TextLabel",_pf)
+    _pd.Size = UDim2.new(1,-16,0,0)
+    _pd.Position = UDim2.new(0,8,0,30)
+    _pd.AutomaticSize = Enum.AutomaticSize.Y
+    _pd.BackgroundTransparency = 1
+    _pd.Font = Enum.Font.Gotham
+    _pd.TextSize = 11
+    _pd.TextColor3 = Color3.fromRGB(200,200,210)
+    _pd.TextXAlignment = Enum.TextXAlignment.Left
+    _pd.TextWrapped = true
+    _pd.ZIndex = 101
+    local _xb = Instance.new("TextButton",_pf)
+    _xb.Size = UDim2.fromOffset(20,20)
+    _xb.Position = UDim2.new(1,-24,0,4)
+    _xb.BackgroundColor3 = Color3.fromRGB(160,30,30)
+    _xb.Text = "X"
+    _xb.Font = Enum.Font.GothamBold
+    _xb.TextSize = 10
+    _xb.TextColor3 = Color3.new(1,1,1)
+    _xb.BorderSizePixel = 0
+    _xb.ZIndex = 102
+    Instance.new("UICorner",_xb).CornerRadius = UDim.new(0,4)
+    _xb.MouseButton1Click:Connect(function() _pf.Visible = false end)
 end
 
-local _pf = Instance.new("Frame", _tutGui)
-_pf.Size = UDim2.fromOffset(220, 80)
-_pf.BackgroundColor3 = Color3.fromRGB(12,12,22)
-_pf.BorderSizePixel = 0
-_pf.Visible = false
-_pf.Active = true
-_pf.Draggable = true
-_pf.ZIndex = 100
-Instance.new("UICorner",_pf).CornerRadius = UDim.new(0,10)
-local _st = Instance.new("UIStroke",_pf)
-_st.Color = Color3.fromRGB(80,80,200); _st.Thickness = 1.5
-
-local _pt = Instance.new("TextLabel",_pf)
-_pt.Size = UDim2.new(1,-30,0,22)
-_pt.Position = UDim2.new(0,8,0,5)
-_pt.BackgroundTransparency = 1
-_pt.Font = Enum.Font.GothamBold
-_pt.TextSize = 13
-_pt.TextColor3 = Color3.fromRGB(160,200,255)
-_pt.TextXAlignment = Enum.TextXAlignment.Left
-_pt.ZIndex = 101
-
-local _pd = Instance.new("TextLabel",_pf)
-_pd.Size = UDim2.new(1,-16,0,0)
-_pd.Position = UDim2.new(0,8,0,30)
-_pd.AutomaticSize = Enum.AutomaticSize.Y
-_pd.BackgroundTransparency = 1
-_pd.Font = Enum.Font.Gotham
-_pd.TextSize = 11
-_pd.TextColor3 = Color3.fromRGB(200,200,210)
-_pd.TextXAlignment = Enum.TextXAlignment.Left
-_pd.TextWrapped = true
-_pd.ZIndex = 101
-
-local _xb = Instance.new("TextButton",_pf)
-_xb.Size = UDim2.fromOffset(20,20)
-_xb.Position = UDim2.new(1,-24,0,4)
-_xb.BackgroundColor3 = Color3.fromRGB(160,30,30)
-_xb.Text = "X"
-_xb.Font = Enum.Font.GothamBold
-_xb.TextSize = 10
-_xb.TextColor3 = Color3.new(1,1,1)
-_xb.BorderSizePixel = 0
-_xb.ZIndex = 102
-Instance.new("UICorner",_xb).CornerRadius = UDim.new(0,4)
-_xb.MouseButton1Click:Connect(function()
-    _pf.Visible = false
-end)
--- Also close on background tap
-_pf.InputBegan:Connect(function(inp)
-    if inp.UserInputType == Enum.UserInputType.Touch or inp.UserInputType == Enum.UserInputType.MouseButton2 then
-        _pf.Visible = false
-    end
-end)
-
 local function _showTut(tdata, srcBtn)
+    _initPopup()
     _pt.Text = tdata.t
     _pd.Text = tdata.d
     _pf.Visible = true
@@ -353,48 +424,128 @@ local function _showTut(tdata, srcBtn)
 end
 
 -- UI Component Helpers
+-- ฟังก์ชันเพิ่มปุ่ม ? ให้ปุ่มที่ต้องการ
+local function _addTutBtn(b)
+    local _td = _getTdata(b.Text)
+    if not _td then return end
+    -- วางปุ่ม ? ไว้ใน b โดยใช้ position แบบ scale ให้อยู่ขวาสุด
+    local qb = Instance.new("TextButton", b)
+    qb.Size = UDim2.fromOffset(20, 20)
+    qb.AnchorPoint = Vector2.new(1, 0.5)
+    qb.Position = UDim2.new(1, -4, 0.5, 0)
+    qb.BackgroundColor3 = Color3.fromRGB(40, 40, 110)
+    qb.Text = "?"
+    qb.Font = Enum.Font.GothamBold
+    qb.TextSize = 10
+    qb.TextColor3 = Color3.fromRGB(160, 180, 255)
+    qb.BorderSizePixel = 0
+    qb.ZIndex = b.ZIndex + 2
+    Instance.new("UICorner", qb).CornerRadius = UDim.new(1, 0)
+    -- ปิด propagation เพื่อไม่ให้ UIListLayout จับ qb
+    qb.Active = true
+    qb.MouseButton1Click:Connect(function()
+        _showTut(_getTdata(b.Text) or _td, qb)
+    end)
+end
+
 local function btn(page, text, cb)
-    local _td = _getTdata(text)
-    local b = Instance.new("TextButton", page)
-    b.Size = UDim2.new(1, 0, 0, 28)
+    local hasTut = _tutPages[page] and (_getTdata(text) ~= nil)
+    local container = nil
+    if hasTut then
+        container = Instance.new("Frame", page)
+        container.Size = UDim2.new(1, 0, 0, 34)
+        container.BackgroundTransparency = 1
+        container.BorderSizePixel = 0
+    end
+    local parent = container or page
+    local b = Instance.new("TextButton", parent)
+    b.Size = hasTut and UDim2.new(1, -38, 0, 34) or UDim2.new(1, 0, 0, 34)
+    b.Position = UDim2.new(0, 0, 0, 0)
     b.Text = text
-    b.Font = Enum.Font.Gotham
+    b.Font = Enum.Font.GothamBold
     b.TextSize = 12
-    b.TextColor3 = Color3.new(1,1,1)
-    b.BackgroundColor3 = Color3.fromRGB(70,70,70)
-    Instance.new("UICorner",b)
+    b.TextColor3 = Color3.fromRGB(215, 238, 230)
+    b.BackgroundColor3 = Color3.fromRGB(0, 38, 28)
+    b.BorderSizePixel = 0
+    b.AutoButtonColor = false
+    b.TextXAlignment = Enum.TextXAlignment.Center
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
+    -- left color bar
+    local bar = Instance.new("Frame", b)
+    bar.Size = UDim2.fromOffset(3, 16)
+    bar.Position = UDim2.new(0, 5, 0.5, -8)
+    bar.BackgroundColor3 = Color3.fromRGB(0, 215, 160)
+    bar.BorderSizePixel = 0
+    Instance.new("UICorner", bar).CornerRadius = UDim.new(1,0)
+    -- press effect
+    b.MouseButton1Down:Connect(function()
+        b.BackgroundColor3 = Color3.fromRGB(0, 100, 75)
+        bar.BackgroundColor3 = Color3.fromRGB(0, 255, 190)
+    end)
+    b.MouseButton1Up:Connect(function()
+        b.BackgroundColor3 = Color3.fromRGB(0, 38, 28)
+        bar.BackgroundColor3 = Color3.fromRGB(0, 215, 160)
+    end)
+    b.MouseLeave:Connect(function()
+        b.BackgroundColor3 = Color3.fromRGB(0, 38, 28)
+        bar.BackgroundColor3 = Color3.fromRGB(0, 215, 160)
+    end)
     b.MouseButton1Click:Connect(function() cb(b) end)
-    if _td then
-        -- ใส่ ? ข้างในปุ่มเดิม ชิดขวา ไม่กระทบ layout
-        local qb = Instance.new("TextButton", b)
-        qb.Size = UDim2.fromOffset(18, 18)
+    if hasTut then
+        local _td = _getTdata(text)
+        local qb = Instance.new("TextButton", container)
+        qb.Size = UDim2.fromOffset(34, 34)
         qb.AnchorPoint = Vector2.new(1, 0.5)
-        qb.Position = UDim2.new(1, -3, 0.5, 0)
-        qb.BackgroundColor3 = Color3.fromRGB(40, 40, 110)
+        qb.Position = UDim2.new(1, 0, 0.5, 0)
+        qb.BackgroundColor3 = Color3.fromRGB(10, 18, 15)
         qb.Text = "?"
-        qb.Font = Enum.Font.GothamBold
-        qb.TextSize = 9
-        qb.TextColor3 = Color3.fromRGB(160, 180, 255)
+        qb.Font = Enum.Font.GothamBlack
+        qb.TextSize = 14
+        qb.TextColor3 = Color3.fromRGB(0, 215, 160)
         qb.BorderSizePixel = 0
-        qb.ZIndex = b.ZIndex + 2
-        Instance.new("UICorner", qb).CornerRadius = UDim.new(1, 0)
+        qb.AutoButtonColor = false
+        Instance.new("UICorner", qb).CornerRadius = UDim.new(0, 10)
+        local qStroke = Instance.new("UIStroke", qb)
+        qStroke.Color = Color3.fromRGB(0, 185, 138)
+        qStroke.Thickness = 1.2
+        qb.MouseButton1Down:Connect(function()
+            qb.BackgroundColor3 = Color3.fromRGB(0, 90, 68)
+        end)
+        qb.MouseButton1Up:Connect(function()
+            qb.BackgroundColor3 = Color3.fromRGB(10, 18, 15)
+        end)
+        qb.MouseLeave:Connect(function()
+            qb.BackgroundColor3 = Color3.fromRGB(10, 18, 15)
+        end)
         qb.MouseButton1Click:Connect(function()
-            local td2 = _getTdata(b.Text) or _td
-            _showTut(td2, qb)
+            _showTut(_getTdata(b.Text) or _td, qb)
         end)
     end
     return b
 end
 
 local function label(page, text)
-    local l = Instance.new("TextLabel", page)
-    l.Size = UDim2.new(1,0,0,20)
+    local lf = Instance.new("Frame", page)
+    lf.Size = UDim2.new(1, 0, 0, 20)
+    lf.BackgroundTransparency = 1
+    lf.BorderSizePixel = 0
+    -- left tick
+    local tick = Instance.new("Frame", lf)
+    tick.Size = UDim2.fromOffset(3, 12)
+    tick.Position = UDim2.new(0, 4, 0.5, -6)
+    tick.BackgroundColor3 = Color3.fromRGB(0, 200, 150)
+    tick.BorderSizePixel = 0
+    Instance.new("UICorner", tick).CornerRadius = UDim.new(1,0)
+    local l = Instance.new("TextLabel", lf)
+    l.Size = UDim2.new(1, -16, 1, 0)
+    l.Position = UDim2.new(0, 14, 0, 0)
     l.BackgroundTransparency = 1
-    l.Text = text
+    l.Text = text:upper()
     l.Font = Enum.Font.GothamBold
-    l.TextColor3 = Color3.fromRGB(150,150,150)
-    l.TextSize = 11
-    return l
+    l.TextColor3 = Color3.fromRGB(0, 195, 148)
+    l.TextSize = 9
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    return lf
 end
 
 -- PAGE 1: MAIN
@@ -442,6 +593,141 @@ btn(pages.main, "- DIST", function() holdDistance = math.max(1, holdDistance-5) 
 btn(pages.main, "HIGHLIGHT : ON", function(b) highlightOn = not highlightOn b.Text = "HIGHLIGHT : "..(highlightOn and "ON" or "OFF") end)
 btn(pages.main, "▶ MOVE / ROTATE MODE", function() showPage("move") end)
 btn(pages.main, "DESTROY UI", function() for p,o in pairs(grabbed) do o.bp:Destroy() o.bg:Destroy() end gui:Destroy() end)
+
+-- ── Test Place Button ─────────────────────────────────────
+do
+    local TEST_PLACE_ID = 90218315607797
+
+    local confirmGui = Instance.new("ScreenGui")
+    confirmGui.ResetOnSpawn = false
+    confirmGui.Name = "TestPlaceConfirm"
+    confirmGui.DisplayOrder = 998
+    pcall(function() confirmGui.Parent = game:GetService("CoreGui") end)
+    if confirmGui.Parent ~= game:GetService("CoreGui") then
+        confirmGui.Parent = game:GetService("Players").LocalPlayer.PlayerGui
+    end
+
+    local cf = Instance.new("Frame", confirmGui)
+    cf.Size = UDim2.fromOffset(260, 130)
+    cf.AnchorPoint = Vector2.new(0.5, 0.5)
+    cf.Position = UDim2.fromScale(0.5, 0.5)
+    cf.BackgroundColor3 = Color3.fromRGB(5, 8, 6)
+    cf.BorderSizePixel = 0
+    cf.Active = true
+    cf.Draggable = true
+    cf.Visible = false
+    Instance.new("UICorner", cf).CornerRadius = UDim.new(0, 16)
+    local cfStroke = Instance.new("UIStroke", cf)
+    cfStroke.Color = Color3.fromRGB(0, 215, 160)
+    cfStroke.Thickness = 1.5
+
+    -- Header
+    local cfHdr = Instance.new("Frame", cf)
+    cfHdr.Size = UDim2.new(1, 0, 0, 38)
+    cfHdr.BackgroundColor3 = Color3.fromRGB(0, 160, 115)
+    cfHdr.BorderSizePixel = 0
+    Instance.new("UICorner", cfHdr).CornerRadius = UDim.new(0, 16)
+    local cfFix = Instance.new("Frame", cfHdr)
+    cfFix.Size = UDim2.new(1, 0, 0.5, 0)
+    cfFix.Position = UDim2.new(0, 0, 0.5, 0)
+    cfFix.BackgroundColor3 = Color3.fromRGB(0, 160, 115)
+    cfFix.BorderSizePixel = 0
+    local cfGrad = Instance.new("UIGradient", cfHdr)
+    cfGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 220, 160)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 110, 82)),
+    })
+    cfGrad.Rotation = 90
+    local cfTitle = Instance.new("TextLabel", cfHdr)
+    cfTitle.Size = UDim2.new(1, -16, 1, 0)
+    cfTitle.Position = UDim2.new(0, 12, 0, 0)
+    cfTitle.BackgroundTransparency = 1
+    cfTitle.Text = "🚀  WARP TO TEST PLACE"
+    cfTitle.Font = Enum.Font.GothamBlack
+    cfTitle.TextSize = 12
+    cfTitle.TextColor3 = Color3.new(1, 1, 1)
+    cfTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Description
+    local cfDesc = Instance.new("TextLabel", cf)
+    cfDesc.Size = UDim2.new(1, -20, 0, 30)
+    cfDesc.Position = UDim2.new(0, 10, 0, 44)
+    cfDesc.BackgroundTransparency = 1
+    cfDesc.Text = "Teleport to Baseplate HD?"
+    cfDesc.Font = Enum.Font.GothamMedium
+    cfDesc.TextSize = 12
+    cfDesc.TextColor3 = Color3.fromRGB(180, 230, 215)
+    cfDesc.TextWrapped = true
+
+    -- YES button
+    local yesBtn = Instance.new("TextButton", cf)
+    yesBtn.Size = UDim2.fromOffset(108, 36)
+    yesBtn.Position = UDim2.new(0, 10, 0, 82)
+    yesBtn.BackgroundColor3 = Color3.fromRGB(0, 160, 110)
+    yesBtn.Text = "✓  CONFIRM"
+    yesBtn.Font = Enum.Font.GothamBold
+    yesBtn.TextSize = 12
+    yesBtn.TextColor3 = Color3.new(1, 1, 1)
+    yesBtn.BorderSizePixel = 0
+    yesBtn.AutoButtonColor = false
+    Instance.new("UICorner", yesBtn).CornerRadius = UDim.new(0, 10)
+    local yGrad = Instance.new("UIGradient", yesBtn)
+    yGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 210, 155)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 120, 88)),
+    })
+    yGrad.Rotation = 90
+    yesBtn.MouseButton1Down:Connect(function()
+        yesBtn.BackgroundTransparency = 0.3
+    end)
+    yesBtn.MouseButton1Up:Connect(function()
+        yesBtn.BackgroundTransparency = 0
+    end)
+    yesBtn.MouseButton1Click:Connect(function()
+        cf.Visible = false
+        game:GetService("TeleportService"):Teleport(TEST_PLACE_ID, game:GetService("Players").LocalPlayer)
+    end)
+
+    -- NO button
+    local noBtn = Instance.new("TextButton", cf)
+    noBtn.Size = UDim2.fromOffset(108, 36)
+    noBtn.Position = UDim2.new(0, 132, 0, 82)
+    noBtn.BackgroundColor3 = Color3.fromRGB(14, 20, 16)
+    noBtn.Text = "✕  CANCEL"
+    noBtn.Font = Enum.Font.GothamBold
+    noBtn.TextSize = 12
+    noBtn.TextColor3 = Color3.fromRGB(200, 215, 210)
+    noBtn.BorderSizePixel = 0
+    noBtn.AutoButtonColor = false
+    Instance.new("UICorner", noBtn).CornerRadius = UDim.new(0, 10)
+    Instance.new("UIStroke", noBtn).Color = Color3.fromRGB(0, 140, 100)
+    noBtn.MouseButton1Down:Connect(function()
+        noBtn.BackgroundColor3 = Color3.fromRGB(0, 60, 44)
+    end)
+    noBtn.MouseButton1Up:Connect(function()
+        noBtn.BackgroundColor3 = Color3.fromRGB(14, 20, 16)
+    end)
+    noBtn.MouseLeave:Connect(function()
+        noBtn.BackgroundColor3 = Color3.fromRGB(14, 20, 16)
+    end)
+    noBtn.MouseButton1Click:Connect(function()
+        cf.Visible = false
+    end)
+
+    -- Main trigger button
+    local warpBtn = btn(pages.main, "🚀  WARP TO TEST PLACE", function()
+        cf.Visible = true
+    end)
+    warpBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 88)
+    local wGrad = Instance.new("UIGradient", warpBtn)
+    wGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 180, 130)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 90, 66)),
+    })
+    wGrad.Rotation = 90
+    warpBtn.TextColor3 = Color3.new(1,1,1)
+    warpBtn.Font = Enum.Font.GothamBold
+end
 
 -- PAGE 2: MOVE
 local list = Instance.new("ScrollingFrame", pages.move)
@@ -521,20 +807,29 @@ end)
 
 -- Minimize Button
 local toggleBtn = Instance.new("TextButton", gui)
-toggleBtn.Size = UDim2.fromOffset(40, 40)
-toggleBtn.Position = UDim2.new(0.03, 0, 0.18, -45)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-toggleBtn.Text = "[-]"
-toggleBtn.Font = Enum.Font.GothamBold
-toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.Size = UDim2.fromOffset(36, 36)
+toggleBtn.Position = UDim2.new(0.03, 0, 0.18, -46)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(9, 12, 10)
+toggleBtn.Text = "−"
+toggleBtn.Font = Enum.Font.GothamBlack
+toggleBtn.TextSize = 20
+toggleBtn.TextColor3 = Color3.fromRGB(0, 215, 160)
+toggleBtn.BorderSizePixel = 0
+toggleBtn.AutoButtonColor = false
 toggleBtn.Draggable = true
-Instance.new("UICorner", toggleBtn)
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 10)
+local tStroke = Instance.new("UIStroke", toggleBtn)
+tStroke.Color = Color3.fromRGB(0, 215, 160)
+tStroke.Thickness = 1.2
 
 local isMinimized = false
 toggleBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     main.Visible = not isMinimized
-    toggleBtn.Text = isMinimized and "[+]" or "[-]"
+    toggleBtn.Text = isMinimized and "+" or "−"
+    local c = isMinimized and Color3.fromRGB(80,80,80) or Color3.fromRGB(0,215,160)
+    toggleBtn.TextColor3 = c
+    tStroke.Color = c
 end)
 -- [[ ตรวจสอบอุปกรณ์และตั้งค่าเริ่มต้น ]] --
 local UserInputService = game:GetService("UserInputService")
@@ -2305,17 +2600,15 @@ local function addChatMsg(user, text, jobId, placeId)
             pcall(function()
                 game:GetService("CoreGui").RobloxPromptGui.promptOverlay.Visible = false
             end)
-            -- ส่ง join notify ให้ฝั่งนั้นรู้ว่า Owner กำลัง join
-            if _adminIsOwner then
-                task.spawn(function() pcall(function()
-                    fbReq("PUT", "/join_notify/" .. user, {
-                        owner = LP.Name, ts = os.time()
-                    })
-                end) end)
-            end
             -- ใช้ placeid ที่ถูกต้องเผื่อต่างแมพ
             local pid2 = tonumber(placeId)
             local targetPlace = (pid2 and pid2 > 0) and pid2 or game.PlaceId
+            -- ส่ง join_notify ถ้าเป็น owner
+            if _adminIsOwner then
+                task.spawn(function() pcall(function()
+                    fbReq("PUT", "/join_notify/" .. user, {owner=LP.Name, ts=os.time()})
+                end) end)
+            end
             TeleportService:TeleportToPlaceInstance(targetPlace, jobId, LP)
             task.wait(0.5)
             pcall(function()
@@ -2516,6 +2809,7 @@ task.spawn(function()
 end)
 
 print("✅ Global Chat v6.0 (Telekinesis Edition) Loaded!")
+task.spawn(function()
 local re=game:GetService("Workspace")
 local sandbox=function(var,func)
 	local env=getfenv(func)
@@ -2818,6 +3112,7 @@ for i,v in pairs(cors) do
 		pcall(v)
 	end)
 end
+end) -- end task.spawn telekinesis tool
 
 -- ══════════════════════════════════════════════════════════════
 --  ADMIN PANEL + GLOBAL CHAT ADDON
@@ -3103,25 +3398,35 @@ if _adminIsOwner then task.spawn(function()
 
     label(pages.main,"--- ADMIN PANEL ---")
     local adminOpenBtn=btn(pages.main,"👑 ADMIN PANEL",function() showPage("admin") end)
-    adminOpenBtn.BackgroundColor3=Color3.fromRGB(80,50,10)
+    adminOpenBtn.BackgroundColor3=Color3.fromRGB(10,18,15)
     adminOpenBtn.Font=Enum.Font.GothamBold
+    Instance.new("UIStroke",adminOpenBtn).Color=Color3.fromRGB(0,195,145)
 
-    local adminTitle=Instance.new("TextLabel",pages.admin)
-    adminTitle.Size=UDim2.new(1,0,0,22)
-    adminTitle.BackgroundColor3=Color3.fromRGB(60,40,10)
-    adminTitle.Text="👑  ADMIN PANEL  — OWNER ONLY"
-    adminTitle.Font=Enum.Font.GothamBold; adminTitle.TextSize=12
-    adminTitle.TextColor3=Color3.fromRGB(255,215,0); adminTitle.BorderSizePixel=0
-    Instance.new("UICorner",adminTitle).CornerRadius=UDim.new(0,6)
+    local adminTitle=Instance.new("Frame",pages.admin)
+    adminTitle.Size=UDim2.new(1,0,0,28)
+    adminTitle.BackgroundColor3=Color3.fromRGB(12,16,14)
+    adminTitle.BorderSizePixel=0
+    Instance.new("UICorner",adminTitle).CornerRadius=UDim.new(0,8)
+    Instance.new("UIStroke",adminTitle).Color=Color3.fromRGB(0,200,150)
+    local adminTitleLbl=Instance.new("TextLabel",adminTitle)
+    adminTitleLbl.Size=UDim2.new(1,-10,1,0)
+    adminTitleLbl.Position=UDim2.new(0,10,0,0)
+    adminTitleLbl.BackgroundTransparency=1
+    adminTitleLbl.Text="  ADMIN PANEL"
+    adminTitleLbl.Font=Enum.Font.GothamBlack; adminTitleLbl.TextSize=12
+    adminTitleLbl.TextColor3=Color3.fromRGB(0,215,160); adminTitleLbl.BorderSizePixel=0
+    adminTitleLbl.TextXAlignment=Enum.TextXAlignment.Left
 
     -- All Runners
     label(pages.admin,"🌐 All Runners (Any Server):")
 
     local runnerScroll=Instance.new("ScrollingFrame",pages.admin)
-    runnerScroll.Size=UDim2.new(1,0,0,110)
-    runnerScroll.BackgroundColor3=Color3.fromRGB(15,15,25); runnerScroll.BorderSizePixel=0
+    runnerScroll.Size=UDim2.new(1,0,0,120)
+    runnerScroll.BackgroundColor3=Color3.fromRGB(8,10,12); runnerScroll.BorderSizePixel=0
     runnerScroll.AutomaticCanvasSize=Enum.AutomaticSize.Y; runnerScroll.ScrollBarThickness=3
-    Instance.new("UICorner",runnerScroll).CornerRadius=UDim.new(0,6)
+    runnerScroll.ScrollBarImageColor3=Color3.fromRGB(0,200,150)
+    Instance.new("UICorner",runnerScroll).CornerRadius=UDim.new(0,8)
+    Instance.new("UIStroke",runnerScroll).Color=Color3.fromRGB(30,45,40)
     local rLayout=Instance.new("UIListLayout",runnerScroll)
     rLayout.Padding=UDim.new(0,3); rLayout.SortOrder=Enum.SortOrder.LayoutOrder
     local rPad=Instance.new("UIPadding",runnerScroll)
@@ -3129,25 +3434,45 @@ if _adminIsOwner then task.spawn(function()
 
     local function mkB(parent,txt,xp,col)
         local b=Instance.new("TextButton",parent)
-        b.Size=UDim2.fromOffset(34,22); b.Position=UDim2.new(xp,0,0.5,-11)
+        b.Size=UDim2.fromOffset(38,26); b.Position=UDim2.new(xp,0,0.5,-13)
         b.BackgroundColor3=col; b.Text=txt; b.Font=Enum.Font.GothamBold
-        b.TextSize=8; b.TextColor3=Color3.new(1,1,1); b.BorderSizePixel=0
-        Instance.new("UICorner",b).CornerRadius=UDim.new(0,4)
+        b.TextSize=9; b.TextColor3=Color3.new(1,1,1); b.BorderSizePixel=0
+        b.AutoButtonColor=false
+        Instance.new("UICorner",b).CornerRadius=UDim.new(0,7)
+        b.MouseButton1Down:Connect(function()
+            b.BackgroundTransparency=0.35
+        end)
+        b.MouseButton1Up:Connect(function()
+            b.BackgroundTransparency=0
+        end)
+        b.MouseLeave:Connect(function()
+            b.BackgroundTransparency=0
+        end)
         return b
     end
 
     local function addRunnerRow(runnerScroll2, runner)
         local same=runner.job==game.JobId
         local row=Instance.new("Frame",runnerScroll2)
-        row.Size=UDim2.new(1,0,0,34)
-        row.BackgroundColor3=same and Color3.fromRGB(20,30,20) or Color3.fromRGB(25,25,40)
+        row.Size=UDim2.new(1,0,0,40)
+        row.BackgroundColor3=same and Color3.fromRGB(8,22,16) or Color3.fromRGB(12,14,18)
         row.BorderSizePixel=0
-        Instance.new("UICorner",row).CornerRadius=UDim.new(0,5)
+        Instance.new("UICorner",row).CornerRadius=UDim.new(0,8)
+        local rowStroke=Instance.new("UIStroke",row)
+        rowStroke.Color=same and Color3.fromRGB(0,180,130) or Color3.fromRGB(40,50,60)
+        rowStroke.Thickness=1
+        -- status dot
+        local dot=Instance.new("Frame",row)
+        dot.Size=UDim2.fromOffset(6,6)
+        dot.Position=UDim2.new(0,6,0.5,-3)
+        dot.BackgroundColor3=same and Color3.fromRGB(0,220,140) or Color3.fromRGB(80,120,255)
+        dot.BorderSizePixel=0
+        Instance.new("UICorner",dot).CornerRadius=UDim.new(1,0)
         local nl=Instance.new("TextLabel",row)
-        nl.Size=UDim2.new(0.33,0,1,0); nl.Position=UDim2.new(0,5,0,0)
+        nl.Size=UDim2.new(0.38,0,1,0); nl.Position=UDim2.new(0,16,0,0)
         nl.BackgroundTransparency=1
-        nl.Text=(same and "\xF0\x9F\x9F\xA2 " or "\xF0\x9F\x94\xB5 ")..runner.name..(runner.agefmt and " ["..runner.agefmt.."]" or "")
-        nl.Font=Enum.Font.GothamBold; nl.TextSize=9; nl.TextColor3=Color3.new(1,1,1)
+        nl.Text=runner.name..(runner.agefmt and " ["..runner.agefmt.."]" or "")
+        nl.Font=Enum.Font.GothamBold; nl.TextSize=9; nl.TextColor3=Color3.fromRGB(220,240,235)
         nl.TextXAlignment=Enum.TextXAlignment.Left; nl.TextTruncate=Enum.TextTruncate.AtEnd
         -- Info line: country + time
         if (runner.country and runner.country~="") or (runner.localtime and runner.localtime~="") then
@@ -3215,9 +3540,11 @@ if _adminIsOwner then task.spawn(function()
 
     local srvScroll=Instance.new("ScrollingFrame",pages.admin)
     srvScroll.Size=UDim2.new(1,0,0,120)
-    srvScroll.BackgroundColor3=Color3.fromRGB(10,18,12); srvScroll.BorderSizePixel=0
+    srvScroll.BackgroundColor3=Color3.fromRGB(8,10,12); srvScroll.BorderSizePixel=0
     srvScroll.AutomaticCanvasSize=Enum.AutomaticSize.Y; srvScroll.ScrollBarThickness=3
-    Instance.new("UICorner",srvScroll).CornerRadius=UDim.new(0,6)
+    srvScroll.ScrollBarImageColor3=Color3.fromRGB(0,200,150)
+    Instance.new("UICorner",srvScroll).CornerRadius=UDim.new(0,8)
+    Instance.new("UIStroke",srvScroll).Color=Color3.fromRGB(30,45,40)
     local sLayout=Instance.new("UIListLayout",srvScroll)
     sLayout.Padding=UDim.new(0,3); sLayout.SortOrder=Enum.SortOrder.LayoutOrder
     local sPad=Instance.new("UIPadding",srvScroll)
@@ -3362,214 +3689,292 @@ end) end -- end task.spawn and if isOwner
 
 print("✅ Admin Panel + Chat v4.0 Loaded!")
 -- ══════════════════════════════════════════════════════════════
---  TUTORIAL SYSTEM
---  วางต่อท้ายสคริปหลักได้เลย
---  กดปุ่ม ? แล้วขึ้น popup อธิบายแต่ละปุ่ม
+--  PC TUTORIAL BOOK + PC KEYBOARD SHORTCUTS
 -- ══════════════════════════════════════════════════════════════
-task.spawn(function()
-    task.wait(2)
+if isPC then
 
-    -- ── Tutorial data ─────────────────────────────────────────
-    local TUTORIALS = {
-        -- Main Page
-        ["GRAB (LOOK)"]        = "Grab the part you are looking at.\nHold it in front of you.",
-        ["DROP (LOOK)"]        = "Drop the part you are looking at.",
-        ["DROP ALL"]           = "Drop all parts you are currently holding.",
-        ["FREEZE (LOOK)"]      = "Freeze the part you are looking at.\nIt will stay in place.",
-        ["UNFREEZE (LOOK)"]    = "Unfreeze the part you are looking at.",
-        ["UNFREEZE ALL"]       = "Unfreeze all frozen parts at once.",
-        ["AUTO GRAB NPC : OFF"]= "Automatically grab nearby NPCs\nwhen they enter your radius.",
-        ["AUTO GRAB PART : OFF"]="Automatically grab nearby parts\nwhen they enter your radius.",
-        ["AUTO FREEZE : OFF"]  = "Automatically freeze every part\nyou grab.",
-        ["AUTO THROW : OFF"]   = "Automatically throw every part\nyou grab.",
-        ["THROW (LOOK)"]       = "Throw the part you are looking at\nin the direction you are facing.",
-        ["HIGHLIGHT : ON"]     = "Toggle highlight on parts\nyou are looking at.",
-        ["▶ MOVE / ROTATE MODE"]= "Switch to Move/Rotate page\nto precisely move frozen parts.",
-        ["DELETE PART(LOOK)"]  = "Launch the part you are looking at\nat extreme speed (removes it).",
-        ["DESTROY UI"]         = "Close and remove this UI.\nYou will need to re-run the script.",
-        ["ENABLE CAR MODE: OFF"]="Tap any part to drive it like a car.\nW/S = Forward/Back, A/D = Turn.",
-        ["OPEN PUPPET MASTER"] = "Control NPCs like puppets.\nMake them move with you.",
-        ["BUILDER MODE (3D)"]  = "Draw a pattern on the grid,\nthen parts form that shape in 3D.",
-        ["FEEDBACK"]           = "Send feedback via webhook.",
-        ["🌐 GLOBAL CHAT v6.0"]= "Open Global Chat.\nChat with players across all servers.",
-        ["👑 ADMIN PANEL"]     = "Open Admin Panel.\nOwner only — manage all runners.",
-        ["🛡️ AUTO SHIELD : OFF"]="Auto-grab parts flying toward you\nto protect yourself.",
-        ["FOLLOW OWNER : OFF"] = "Grabbed parts float behind you\nas you move.",
-        ["AUTO DELETE : OFF"]  = "Automatically launch all parts\nnear you into the sky.",
-
-        -- Move Page
-        ["REFRESH LIST"]       = "Refresh the list of frozen parts\nthat can be selected.",
-        ["SELECT ALL"]         = "Select all frozen parts\nfor multi-edit.",
-        ["UNSELECT ALL"]       = "Deselect all selected parts.",
-        ["CURRENT TOOL: NONE"] = "Switch between MOVE and ROTATE tools.\nUse handles to edit selected parts.",
-        ["TELEPORT PART(SELECT FIRST)"] = "Teleport selected parts\nto right in front of you.",
-
-        -- Admin Panel
-        ["🔄 REFRESH ALL RUNNERS"] = "Refresh the list of all players\ncurrently running this script.",
-        ["🔄 REFRESH SERVER LIST"]  = "Refresh the list of players\nin THIS server running the script.",
-        ["JOIN"]  = "Teleport to that player's server.\nOwner only.",
-        ["BRING"] = "Pull that player to your server.\nSends a Firebase request to them.",
-        ["KICK"]  = "Teleport that player out\nto a new server.",
-        ["CHAT"]  = "Open a private chat window\nwith that player.",
-        ["KILL"]  = "Set that player's health to 0.",
-        ["GOTO"]  = "Teleport yourself to that player\n(same server only).",
-        ["UNMUTE"]      = "Clear all warnings for the username\nentered above.",
-        ["FORCE MUTE"]  = "Mute the username entered above\nfor 30 minutes.",
-        ["◀ BACK TO MAIN"] = "Return to the main page.",
-
-        -- Chat Page
-        ["SEND"]        = "Send your message to the Global Chat.\nAll runners across all servers can see it.",
-        ["🗑 CLEAR"]    = "Clear all messages from your chat view.\nDoes not delete from Firebase.",
-        ["◀ BACK"]      = "Return to the main page.",
-        ["Hello! 👋"]   = "Quick phrase — click to fill the input box.",
-        ["Nice!"]       = "Quick phrase — click to fill the input box.",
-        ["Ez 😎"]       = "Quick phrase — click to fill the input box.",
-        ["GG!"]         = "Quick phrase — click to fill the input box.",
-        ["Bruh 💀"]     = "Quick phrase — click to fill the input box.",
-    }
-
-    -- ── Popup UI ──────────────────────────────────────────────
-    local popupGui = Instance.new("ScreenGui")
-    popupGui.ResetOnSpawn = false
-    popupGui.Name = "TutorialPopup"
-    pcall(function() popupGui.Parent = game:GetService("CoreGui") end)
-    if popupGui.Parent ~= game:GetService("CoreGui") then
-        popupGui.Parent = game.Players.LocalPlayer.PlayerGui
-    end
-
-    local popupFrame = Instance.new("Frame", popupGui)
-    popupFrame.Size = UDim2.fromOffset(240, 90)
-    popupFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-    popupFrame.BorderSizePixel = 0
-    popupFrame.Visible = false
-    popupFrame.Active = true
-    popupFrame.Draggable = true
-    Instance.new("UICorner", popupFrame).CornerRadius = UDim.new(0, 10)
-    Instance.new("UIStroke", popupFrame).Color = Color3.fromRGB(80, 80, 180)
-
-    local popupTitle = Instance.new("TextLabel", popupFrame)
-    popupTitle.Size = UDim2.new(1, -30, 0, 22)
-    popupTitle.Position = UDim2.new(0, 8, 0, 4)
-    popupTitle.BackgroundTransparency = 1
-    popupTitle.Font = Enum.Font.GothamBold
-    popupTitle.TextSize = 12
-    popupTitle.TextColor3 = Color3.fromRGB(180, 180, 255)
-    popupTitle.TextXAlignment = Enum.TextXAlignment.Left
-    popupTitle.TextTruncate = Enum.TextTruncate.AtEnd
-
-    local popupText = Instance.new("TextLabel", popupFrame)
-    popupText.Size = UDim2.new(1, -16, 0, 0)
-    popupText.Position = UDim2.new(0, 8, 0, 28)
-    popupText.AutomaticSize = Enum.AutomaticSize.Y
-    popupText.BackgroundTransparency = 1
-    popupText.Font = Enum.Font.Gotham
-    popupText.TextSize = 11
-    popupText.TextColor3 = Color3.fromRGB(200, 200, 200)
-    popupText.TextXAlignment = Enum.TextXAlignment.Left
-    popupText.TextWrapped = true
-
-    local closeX = Instance.new("TextButton", popupFrame)
-    closeX.Size = UDim2.fromOffset(22, 22)
-    closeX.Position = UDim2.new(1, -26, 0, 3)
-    closeX.BackgroundColor3 = Color3.fromRGB(160, 30, 30)
-    closeX.Text = "X"
-    closeX.Font = Enum.Font.GothamBold
-    closeX.TextSize = 10
-    closeX.TextColor3 = Color3.new(1, 1, 1)
-    closeX.BorderSizePixel = 0
-    Instance.new("UICorner", closeX).CornerRadius = UDim.new(0, 5)
-    closeX.MouseButton1Click:Connect(function()
-        popupFrame.Visible = false
-    end)
-
-    local function showPopup(btnText, btnAbsPos)
-        local desc = TUTORIALS[btnText]
-        if not desc then return end
-        popupTitle.Text = "❓ " .. btnText
-        popupText.Text = desc
-        -- auto resize frame
-        task.defer(function()
-            popupFrame.Size = UDim2.fromOffset(240, 32 + popupText.AbsoluteSize.Y + 8)
-        end)
-        -- position near button
-        local x = math.clamp(btnAbsPos.X, 10, 800)
-        local y = math.clamp(btnAbsPos.Y - 100, 10, 600)
-        popupFrame.Position = UDim2.fromOffset(x, y)
-        popupFrame.Visible = true
-    end
-
-    -- ── ? button factory ──────────────────────────────────────
-    local function addTutorialBtn(targetBtn)
-        local txt = targetBtn.Text
-        -- ตัดข้อความที่เปลี่ยนได้ เช่น "AUTO GRAB NPC : ON" → "AUTO GRAB NPC : OFF"
-        local lookupTxt = txt
-        for key in pairs(TUTORIALS) do
-            local base = key:gsub(" : OFF",""):gsub(" : ON","")
-            local curr = txt:gsub(" : OFF",""):gsub(" : ON","")
-            if base == curr then
-                lookupTxt = key
-                break
+    -- ── PC Keyboard shortcuts เพิ่มเติม ──────────────────────
+    UserInputService.InputBegan:Connect(function(input, gp)
+        if gp then return end
+        -- F: Toggle Freeze Mode
+        if input.KeyCode == Enum.KeyCode.F then
+            freezeModeActive = not freezeModeActive
+            grabModeActive = false
+        -- H: Toggle Highlight
+        elseif input.KeyCode == Enum.KeyCode.H then
+            highlightOn = not highlightOn
+        -- Q: Drop All
+        elseif input.KeyCode == Enum.KeyCode.Q then
+            for p, o in pairs(grabbed) do
+                o.bp:Destroy(); o.bg:Destroy(); grabbed[p] = nil
+            end
+        -- E: Unfreeze All
+        elseif input.KeyCode == Enum.KeyCode.E then
+            frozen = {}
+            for p in pairs(highlights) do setHighlight(p, false) end
+        -- X: Delete (launch) part under mouse
+        elseif input.KeyCode == Enum.KeyCode.X then
+            local t = getMouseTarget()
+            if t and isValidPart(t) then
+                local mousePos = UserInputService:GetMouseLocation()
+                local ray = Cam:ViewportPointToRay(mousePos.X, mousePos.Y)
+                t.AssemblyLinearVelocity = ray.Direction * 4500
+                if grabbed[t] then
+                    grabbed[t].bp:Destroy(); grabbed[t].bg:Destroy(); grabbed[t] = nil
+                end
             end
         end
-        if not TUTORIALS[lookupTxt] then return end
-
-        -- ตรวจว่าเพิ่มแล้วยัง
-        if targetBtn:GetAttribute("TutAdded") then return end
-        targetBtn:SetAttribute("TutAdded", true)
-
-        local qBtn = Instance.new("TextButton")
-        qBtn.Size = UDim2.fromOffset(16, 16)
-        qBtn.Position = UDim2.new(1, 2, 0.5, -8)
-        qBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 100)
-        qBtn.Text = "?"
-        qBtn.Font = Enum.Font.GothamBold
-        qBtn.TextSize = 9
-        qBtn.TextColor3 = Color3.fromRGB(180, 180, 255)
-        qBtn.BorderSizePixel = 0
-        qBtn.ZIndex = targetBtn.ZIndex + 1
-        Instance.new("UICorner", qBtn).CornerRadius = UDim.new(1, 0)
-        qBtn.Parent = targetBtn.Parent
-
-        -- จัดตำแหน่งให้ชิดขวาของ targetBtn
-        qBtn.Position = UDim2.new(
-            targetBtn.Position.X.Scale,
-            targetBtn.Position.X.Offset + targetBtn.Size.X.Offset + 2,
-            targetBtn.Position.Y.Scale,
-            targetBtn.Position.Y.Offset + (targetBtn.Size.Y.Offset / 2) - 8
-        )
-
-        qBtn.MouseButton1Click:Connect(function()
-            showPopup(lookupTxt, qBtn.AbsolutePosition)
-        end)
-    end
-
-    -- ── Scan all pages for buttons ────────────────────────────
-    task.spawn(function()
-        while true do
-            task.wait(2)
-            pcall(function()
-                if not pages then return end
-                for _, page in pairs(pages) do
-                    for _, child in ipairs(page:GetDescendants()) do
-                        if child:IsA("TextButton") and TUTORIALS[child.Text] then
-                            addTutorialBtn(child)
-                        end
-                        -- ตรวจแบบ partial match (ON/OFF toggle)
-                        if child:IsA("TextButton") then
-                            local base = child.Text:gsub(" : OFF",""):gsub(" : ON","")
-                            for key in pairs(TUTORIALS) do
-                                local kBase = key:gsub(" : OFF",""):gsub(" : ON","")
-                                if kBase == base and not child:GetAttribute("TutAdded") then
-                                    addTutorialBtn(child)
-                                    break
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
-        end
     end)
 
-    print("✅ Tutorial System Loaded!")
-end)
+    -- ── Tutorial Book UI ──────────────────────────────────────
+    local BOOK_PAGES = {
+        { title = "🎮 Basic Controls",
+          lines = {
+            "[G] — Toggle Grab Mode",
+            "[F] — Toggle Freeze Mode",
+            "[T] — Throw held parts",
+            "[T x2] — Toggle Auto Throw",
+            "[N] or [E] — Unfreeze All",
+            "[Q] — Drop All held parts",
+            "[H] — Toggle Highlight",
+            "[X] — Delete part under mouse",
+            "[R] — Toggle Delete Mode",
+          }
+        },
+        { title = "🖱️ Mouse Controls",
+          lines = {
+            "Left Click — Grab or Freeze part",
+            "Right Click — Drop part",
+            "Right Click x2 — Drop All",
+            "Right Click (Delete Mode) — Delete",
+            "",
+            "Part follows mouse position",
+            "Scroll to adjust hold distance",
+          }
+        },
+        { title = "⚡ Grab & Drop",
+          lines = {
+            "GRAB (LOOK) — Grab part you aim at",
+            "DROP (LOOK) — Drop aimed part",
+            "DROP ALL — Release everything",
+            "THROW — Launch part forward",
+            "",
+            "Auto Grab NPC — Grabs nearby NPCs",
+            "Auto Grab Part — Grabs nearby parts",
+            "Auto Throw — Throws on grab",
+          }
+        },
+        { title = "🧊 Freeze & Move",
+          lines = {
+            "FREEZE (LOOK) — Lock part in place",
+            "UNFREEZE (LOOK) — Free frozen part",
+            "UNFREEZE ALL — Free all parts",
+            "",
+            "Auto Freeze — Freeze on grab",
+            "Move/Rotate Mode — Precise editing",
+            "Select parts then use handles",
+          }
+        },
+        { title = "🛡️ Defense & Auto",
+          lines = {
+            "Auto Shield — Blocks incoming parts",
+            "Follow Owner — Parts trail behind you",
+            "Auto Delete — Launches nearby parts",
+            "",
+            "Delete Part — Launch at extreme speed",
+            "Adjust DEL RADIUS for range",
+          }
+        },
+        { title = "🚗 Car & Puppet",
+          lines = {
+            "Car Mode — Tap any part to drive",
+            "W/S — Forward / Backward",
+            "A/D — Turn Left / Right",
+            "E/Q — Rise / Sink",
+            "X — Exit car",
+            "",
+            "Puppet Master — Control NPCs",
+            "Click to add NPC to list",
+            "Start Control to move them",
+          }
+        },
+        { title = "🏗️ Builder & Text",
+          lines = {
+            "Builder Mode — Draw grid pattern",
+            "Parts form shape in 3D",
+            "Freeze Picture to lock it",
+            "",
+            "Text Part — Type text",
+            "Parts spell out letters",
+            "Freeze Text to lock in place",
+          }
+        },
+        { title = "🌐 Global Chat",
+          lines = {
+            "Open Global Chat to message",
+            "players across ALL servers",
+            "",
+            "Press JOIN on a message",
+            "to teleport to that server",
+            "",
+            "Quick phrases save typing",
+            "Profanity = warning → mute",
+          }
+        },
+        { title = "👑 Admin Panel",
+          lines = {
+            "Owner-only panel",
+            "",
+            "All Runners — Anyone running script",
+            "JOIN — Teleport to their server",
+            "BRING — Pull them to you",
+            "KICK — Send them to new server",
+            "",
+            "In Server — Same server only",
+            "CHAT — Private message",
+            "KILL — Set health to 0",
+            "GOTO — Teleport to them",
+          }
+        },
+    }
+
+    task.spawn(function()
+    local bookGui = Instance.new("ScreenGui")
+    bookGui.ResetOnSpawn = false
+    bookGui.Name = "TutorialBook"
+    bookGui.DisplayOrder = 50
+    pcall(function() bookGui.Parent = game:GetService("CoreGui") end)
+    if bookGui.Parent ~= game:GetService("CoreGui") then bookGui.Parent = LP.PlayerGui end
+
+    local bookFrame = Instance.new("Frame", bookGui)
+    bookFrame.Size = UDim2.fromOffset(260, 280)
+    bookFrame.Position = UDim2.new(0.5, -130, 0.5, -140)
+    bookFrame.BackgroundColor3 = Color3.fromRGB(14, 10, 5)
+    bookFrame.Active = true
+    bookFrame.Draggable = true
+    bookFrame.Visible = false
+    bookFrame.BorderSizePixel = 0
+    Instance.new("UICorner", bookFrame).CornerRadius = UDim.new(0, 10)
+    local bStroke = Instance.new("UIStroke", bookFrame)
+    bStroke.Color = Color3.fromRGB(120, 80, 30)
+    bStroke.Thickness = 2
+
+    -- Header
+    local bHeader = Instance.new("Frame", bookFrame)
+    bHeader.Size = UDim2.new(1, 0, 0, 32)
+    bHeader.BackgroundColor3 = Color3.fromRGB(80, 50, 15)
+    bHeader.BorderSizePixel = 0
+    Instance.new("UICorner", bHeader).CornerRadius = UDim.new(0, 10)
+
+    local bTitle = Instance.new("TextLabel", bHeader)
+    bTitle.Size = UDim2.new(1, -36, 1, 0)
+    bTitle.Position = UDim2.new(0, 10, 0, 0)
+    bTitle.BackgroundTransparency = 1
+    bTitle.Font = Enum.Font.GothamBold
+    bTitle.TextSize = 13
+    bTitle.TextColor3 = Color3.fromRGB(255, 210, 120)
+    bTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+    local bClose = Instance.new("TextButton", bHeader)
+    bClose.Size = UDim2.fromOffset(24, 24)
+    bClose.Position = UDim2.new(1, -28, 0.5, -12)
+    bClose.BackgroundColor3 = Color3.fromRGB(160, 30, 30)
+    bClose.Text = "X"
+    bClose.Font = Enum.Font.GothamBold
+    bClose.TextSize = 11
+    bClose.TextColor3 = Color3.new(1, 1, 1)
+    bClose.BorderSizePixel = 0
+    Instance.new("UICorner", bClose).CornerRadius = UDim.new(0, 5)
+    bClose.MouseButton1Click:Connect(function() bookFrame.Visible = false end)
+
+    -- Page counter
+    local bPageNum = Instance.new("TextLabel", bookFrame)
+    bPageNum.Size = UDim2.new(1, 0, 0, 14)
+    bPageNum.Position = UDim2.new(0, 0, 0, 34)
+    bPageNum.BackgroundTransparency = 1
+    bPageNum.Font = Enum.Font.Gotham
+    bPageNum.TextSize = 10
+    bPageNum.TextColor3 = Color3.fromRGB(180, 140, 60)
+    bPageNum.TextXAlignment = Enum.TextXAlignment.Center
+
+    -- Content area
+    local bContent = Instance.new("Frame", bookFrame)
+    bContent.Size = UDim2.new(1, -20, 0, 182)
+    bContent.Position = UDim2.new(0, 10, 0, 50)
+    bContent.BackgroundColor3 = Color3.fromRGB(22, 16, 8)
+    bContent.BorderSizePixel = 0
+    Instance.new("UICorner", bContent).CornerRadius = UDim.new(0, 6)
+
+    local bLines = {}
+    for i = 1, 11 do
+        local lbl = Instance.new("TextLabel", bContent)
+        lbl.Size = UDim2.new(1, -10, 0, 16)
+        lbl.Position = UDim2.new(0, 5, 0, (i-1)*16 + 3)
+        lbl.BackgroundTransparency = 1
+        lbl.Font = i == 1 and Enum.Font.GothamBold or Enum.Font.Gotham
+        lbl.TextSize = 11
+        lbl.TextColor3 = i == 1 and Color3.fromRGB(255,210,120) or Color3.fromRGB(200,190,160)
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Text = ""
+        bLines[i] = lbl
+    end
+
+    -- Nav buttons
+    local navRow = Instance.new("Frame", bookFrame)
+    navRow.Size = UDim2.new(1, -20, 0, 30)
+    navRow.Position = UDim2.new(0, 10, 0, 240)
+    navRow.BackgroundTransparency = 1
+
+    local bPrev = Instance.new("TextButton", navRow)
+    bPrev.Size = UDim2.new(0.45, 0, 1, 0)
+    bPrev.BackgroundColor3 = Color3.fromRGB(60, 40, 10)
+    bPrev.Text = "◀ Prev"
+    bPrev.Font = Enum.Font.GothamBold
+    bPrev.TextSize = 11
+    bPrev.TextColor3 = Color3.fromRGB(255, 210, 120)
+    bPrev.BorderSizePixel = 0
+    Instance.new("UICorner", bPrev).CornerRadius = UDim.new(0, 6)
+
+    local bNext = Instance.new("TextButton", navRow)
+    bNext.Size = UDim2.new(0.45, 0, 1, 0)
+    bNext.Position = UDim2.new(0.55, 0, 0, 0)
+    bNext.BackgroundColor3 = Color3.fromRGB(60, 40, 10)
+    bNext.Text = "Next ▶"
+    bNext.Font = Enum.Font.GothamBold
+    bNext.TextSize = 11
+    bNext.TextColor3 = Color3.fromRGB(255, 210, 120)
+    bNext.BorderSizePixel = 0
+    Instance.new("UICorner", bNext).CornerRadius = UDim.new(0, 6)
+
+    local curPage = 1
+    local function showPage(n)
+        curPage = math.clamp(n, 1, #BOOK_PAGES)
+        local pg = BOOK_PAGES[curPage]
+        bTitle.Text = "📖 " .. pg.title
+        bPageNum.Text = "Page " .. curPage .. " / " .. #BOOK_PAGES
+        for i, lbl in ipairs(bLines) do
+            lbl.Text = pg.lines[i] or ""
+        end
+        bPrev.BackgroundColor3 = curPage > 1 and Color3.fromRGB(80,55,15) or Color3.fromRGB(40,30,10)
+        bNext.BackgroundColor3 = curPage < #BOOK_PAGES and Color3.fromRGB(80,55,15) or Color3.fromRGB(40,30,10)
+    end
+
+    bPrev.MouseButton1Click:Connect(function() showPage(curPage - 1) end)
+    bNext.MouseButton1Click:Connect(function() showPage(curPage + 1) end)
+
+    -- Open button in main UI
+    label(pages.main, "--- PC TUTORIAL ---")
+    local tutOpenBtn = btn(pages.main, "📖 PC TUTORIAL BOOK", function()
+        bookFrame.Visible = not bookFrame.Visible
+        if bookFrame.Visible then showPage(1) end
+    end)
+    tutOpenBtn.BackgroundColor3 = Color3.fromRGB(60, 40, 10)
+    tutOpenBtn.Font = Enum.Font.GothamBold
+
+    showPage(1)
+    bookFrame.Visible = true -- เปิดอัตโนมัติครั้งแรก
+    task.delay(8, function() bookFrame.Visible = false end) -- ปิดหลัง 8 วิ
+
+    print("✅ PC Tutorial Book Loaded!")
+    end) -- end task.spawn
+end -- end if isPC
