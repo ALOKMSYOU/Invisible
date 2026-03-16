@@ -213,26 +213,10 @@ local function setHighlight(p, state)
     end
 end
 
--- UI Component Helpers
-local _origBtn -- forward declare for tutorial system
-local function btn(page, text, cb)
-    local b = Instance.new("TextButton", page)
-    b.Size = UDim2.new(1,0,0,28)
-    b.Text = text
-    b.Font = Enum.Font.Gotham
-    b.TextSize = 12
-    b.TextColor3 = Color3.new(1,1,1)
-    b.BackgroundColor3 = Color3.fromRGB(70,70,70)
-    Instance.new("UICorner",b)
-    b.MouseButton1Click:Connect(function() cb(b) end)
-    return b
-end
--- tutorial wrapper assigned after _wrapBtn is defined below
-_origBtn = btn
-btn = _wrapBtn
 
-
--- ── Tutorial System ───────────────────────────────────────────
+-- ══════════════════════════════════════════════════════════════
+--  TUTORIAL DATA
+-- ══════════════════════════════════════════════════════════════
 local _TUT = {
     ["GRAB (LOOK)"]={t="How To Grab",d="Look at any part then press GRAB.\nIt floats in front of you.\nMove camera to move the part."},
     ["DROP (LOOK)"]={t="How To Drop",d="Look at a held part\nand press DROP to release it."},
@@ -272,64 +256,6 @@ local _TUT = {
     ["🗑 CLEAR"]={t="Clear Chat",d="Clears all messages from\nyour local chat view."},
 }
 
--- Popup UI (สร้างครั้งเดียว)
-local _tutGui = Instance.new("ScreenGui")
-_tutGui.ResetOnSpawn = false
-_tutGui.Name = "TutPopup"
-_tutGui.DisplayOrder = 999
-pcall(function() _tutGui.Parent = game:GetService("CoreGui") end)
-if _tutGui.Parent ~= game:GetService("CoreGui") then _tutGui.Parent = game:GetService("Players").LocalPlayer.PlayerGui end
-
-local _pf = Instance.new("Frame", _tutGui)
-_pf.Size = UDim2.fromOffset(220, 80)
-_pf.BackgroundColor3 = Color3.fromRGB(12,12,22)
-_pf.BorderSizePixel = 0; _pf.Visible = false
-_pf.Active = true; _pf.Draggable = true; _pf.ZIndex = 100
-Instance.new("UICorner",_pf).CornerRadius = UDim.new(0,10)
-local _st = Instance.new("UIStroke",_pf)
-_st.Color = Color3.fromRGB(80,80,200); _st.Thickness = 1.5
-
-local _pt = Instance.new("TextLabel",_pf)
-_pt.Size = UDim2.new(1,-30,0,20); _pt.Position = UDim2.new(0,8,0,5)
-_pt.BackgroundTransparency = 1; _pt.Font = Enum.Font.GothamBold
-_pt.TextSize = 13; _pt.TextColor3 = Color3.fromRGB(160,200,255)
-_pt.TextXAlignment = Enum.TextXAlignment.Left; _pt.ZIndex = 101
-
-local _pd = Instance.new("TextLabel",_pf)
-_pd.Size = UDim2.new(1,-16,0,0); _pd.Position = UDim2.new(0,8,0,28)
-_pd.AutomaticSize = Enum.AutomaticSize.Y; _pd.BackgroundTransparency = 1
-_pd.Font = Enum.Font.Gotham; _pd.TextSize = 11
-_pd.TextColor3 = Color3.fromRGB(200,200,210)
-_pd.TextXAlignment = Enum.TextXAlignment.Left
-_pd.TextWrapped = true; _pd.ZIndex = 101
-
-local _xb = Instance.new("TextButton",_pf)
-_xb.Size = UDim2.fromOffset(20,20); _xb.Position = UDim2.new(1,-24,0,4)
-_xb.BackgroundColor3 = Color3.fromRGB(160,30,30)
-_xb.Text = "X"; _xb.Font = Enum.Font.GothamBold
-_xb.TextSize = 10; _xb.TextColor3 = Color3.new(1,1,1)
-_xb.BorderSizePixel = 0; _xb.ZIndex = 102
-Instance.new("UICorner",_xb).CornerRadius = UDim.new(0,4)
-_xb.MouseButton1Click:Connect(function() _pf.Visible = false end)
-
-local function _showTut(tdata, srcBtn)
-    _pt.Text = tdata.t
-    _pd.Text = tdata.d
-    _pf.Visible = true
-    task.defer(function()
-        local h = 32 + _pd.AbsoluteSize.Y + 10
-        _pf.Size = UDim2.fromOffset(220, h)
-        local sw, sh = 800, 600
-        pcall(function() sw = workspace.CurrentCamera.ViewportSize.X sh = workspace.CurrentCamera.ViewportSize.Y end)
-        local ap = srcBtn.AbsolutePosition
-        local aw = srcBtn.AbsoluteSize.X
-        local px = ap.X - 225
-        if px < 5 then px = ap.X + aw + 5 end
-        local py = math.clamp(ap.Y, 5, sh - h - 5)
-        _pf.Position = UDim2.fromOffset(math.clamp(px,5,sw-225), py)
-    end)
-end
-
 local function _getTdata(txt)
     if _TUT[txt] then return _TUT[txt] end
     for k,v in pairs(_TUT) do
@@ -339,29 +265,118 @@ local function _getTdata(txt)
     end
 end
 
--- btn wrapper ที่เพิ่ม ? ทันทีตอนสร้าง
-local function _wrapBtn(page, text, cb)
-    local b = _origBtn(page, text, cb)
-    local tdata = _getTdata(text)
-    if tdata then
-        -- ย่อปุ่มเดิม 22px
-        b.Size = UDim2.new(b.Size.X.Scale, b.Size.X.Offset - 22, b.Size.Y.Scale, b.Size.Y.Offset)
-        -- สร้างปุ่ม ? ใน parent เดียวกัน
+-- Popup UI
+local _tutGui = Instance.new("ScreenGui")
+_tutGui.ResetOnSpawn = false
+_tutGui.Name = "TutPopup"
+_tutGui.DisplayOrder = 999
+pcall(function() _tutGui.Parent = game:GetService("CoreGui") end)
+if _tutGui.Parent ~= game:GetService("CoreGui") then
+    _tutGui.Parent = game:GetService("Players").LocalPlayer.PlayerGui
+end
+
+local _pf = Instance.new("Frame", _tutGui)
+_pf.Size = UDim2.fromOffset(220, 80)
+_pf.BackgroundColor3 = Color3.fromRGB(12,12,22)
+_pf.BorderSizePixel = 0
+_pf.Visible = false
+_pf.Active = true
+_pf.Draggable = true
+_pf.ZIndex = 100
+Instance.new("UICorner",_pf).CornerRadius = UDim.new(0,10)
+local _st = Instance.new("UIStroke",_pf)
+_st.Color = Color3.fromRGB(80,80,200); _st.Thickness = 1.5
+
+local _pt = Instance.new("TextLabel",_pf)
+_pt.Size = UDim2.new(1,-30,0,22)
+_pt.Position = UDim2.new(0,8,0,5)
+_pt.BackgroundTransparency = 1
+_pt.Font = Enum.Font.GothamBold
+_pt.TextSize = 13
+_pt.TextColor3 = Color3.fromRGB(160,200,255)
+_pt.TextXAlignment = Enum.TextXAlignment.Left
+_pt.ZIndex = 101
+
+local _pd = Instance.new("TextLabel",_pf)
+_pd.Size = UDim2.new(1,-16,0,0)
+_pd.Position = UDim2.new(0,8,0,30)
+_pd.AutomaticSize = Enum.AutomaticSize.Y
+_pd.BackgroundTransparency = 1
+_pd.Font = Enum.Font.Gotham
+_pd.TextSize = 11
+_pd.TextColor3 = Color3.fromRGB(200,200,210)
+_pd.TextXAlignment = Enum.TextXAlignment.Left
+_pd.TextWrapped = true
+_pd.ZIndex = 101
+
+local _xb = Instance.new("TextButton",_pf)
+_xb.Size = UDim2.fromOffset(20,20)
+_xb.Position = UDim2.new(1,-24,0,4)
+_xb.BackgroundColor3 = Color3.fromRGB(160,30,30)
+_xb.Text = "X"
+_xb.Font = Enum.Font.GothamBold
+_xb.TextSize = 10
+_xb.TextColor3 = Color3.new(1,1,1)
+_xb.BorderSizePixel = 0
+_xb.ZIndex = 102
+Instance.new("UICorner",_xb).CornerRadius = UDim.new(0,4)
+_xb.MouseButton1Click:Connect(function() _pf.Visible = false end)
+
+local function _showTut(tdata, srcBtn)
+    _pt.Text = tdata.t
+    _pd.Text = tdata.d
+    _pf.Visible = true
+    task.defer(function()
+        local h = 34 + _pd.AbsoluteSize.Y + 10
+        _pf.Size = UDim2.fromOffset(220, h)
+        local sw, sh = 800, 600
+        pcall(function()
+            sw = workspace.CurrentCamera.ViewportSize.X
+            sh = workspace.CurrentCamera.ViewportSize.Y
+        end)
+        local ap = srcBtn.AbsolutePosition
+        local px = ap.X - 225
+        if px < 5 then px = ap.X + srcBtn.AbsoluteSize.X + 5 end
+        _pf.Position = UDim2.fromOffset(
+            math.clamp(px, 5, sw - 225),
+            math.clamp(ap.Y, 5, sh - h - 5)
+        )
+    end)
+end
+
+-- UI Component Helpers
+local function btn(page, text, cb)
+    local _td = _getTdata(text)
+    local b = Instance.new("TextButton", page)
+    b.Size = UDim2.new(1, _td and -22 or 0, 0, 28)
+    b.Text = text
+    b.Font = Enum.Font.Gotham
+    b.TextSize = 12
+    b.TextColor3 = Color3.new(1,1,1)
+    b.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    Instance.new("UICorner",b)
+    b.MouseButton1Click:Connect(function() cb(b) end)
+    if _td then
         local qb = Instance.new("TextButton", page)
-        qb.Size = UDim2.fromOffset(20, b.Size.Y.Offset > 0 and b.Size.Y.Offset or 28)
-        qb.Position = UDim2.new(1, -20, b.Position.Y.Scale, b.Position.Y.Offset)
+        qb.Size = UDim2.fromOffset(20, 28)
+        qb.AnchorPoint = Vector2.new(1,0)
+        qb.Position = UDim2.new(1, 0, b.Position.Y.Scale, b.Position.Y.Offset)
         qb.BackgroundColor3 = Color3.fromRGB(40,40,110)
-        qb.Text = "?"; qb.Font = Enum.Font.GothamBold
-        qb.TextSize = 10; qb.TextColor3 = Color3.fromRGB(160,180,255)
-        qb.BorderSizePixel = 0; qb.ZIndex = b.ZIndex + 1
+        qb.Text = "?"
+        qb.Font = Enum.Font.GothamBold
+        qb.TextSize = 10
+        qb.TextColor3 = Color3.fromRGB(160,180,255)
+        qb.BorderSizePixel = 0
+        qb.ZIndex = 2
         Instance.new("UICorner",qb).CornerRadius = UDim.new(0,4)
         qb.MouseButton1Click:Connect(function()
-            local td = _getTdata(b.Text) or tdata
-            _showTut(td, qb)
+            local td2 = _getTdata(b.Text) or _td
+            _showTut(td2, qb)
         end)
     end
     return b
 end
+
 local function label(page, text)
     local l = Instance.new("TextLabel", page)
     l.Size = UDim2.new(1,0,0,20)
@@ -2808,11 +2823,8 @@ task.spawn(function()
     while task.wait(5) do
         pcall(function()
             fbReq("PUT", "/runners/" .. LP.Name, {
-                name     = LP.Name,
-                job      = game.JobId,
-                placeid  = game.PlaceId,
-                ts       = os.time(),
-                gamename = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name or "Unknown"
+                name = LP.Name, job = game.JobId,
+                placeid = game.PlaceId, ts = os.time()
             })
         end)
     end
@@ -3128,26 +3140,18 @@ if _adminIsOwner then task.spawn(function()
         nl.Text=(same and "\xF0\x9F\x9F\xA2 " or "\xF0\x9F\x94\xB5 ")..runner.name..(runner.agefmt and " ["..runner.agefmt.."]" or "")
         nl.Font=Enum.Font.GothamBold; nl.TextSize=9; nl.TextColor3=Color3.new(1,1,1)
         nl.TextXAlignment=Enum.TextXAlignment.Left; nl.TextTruncate=Enum.TextTruncate.AtEnd
-        -- Info line: gamename + country + time
-        local infoText = ""
-        if runner.gamename and runner.gamename~="" then infoText = "🎮 "..runner.gamename end
-        if runner.country and runner.country~="" then
-            infoText = infoText..(infoText~="" and "  " or "")..runner.country
-        end
-        if runner.localtime and runner.localtime~="" then
-            infoText = infoText.." "..runner.localtime
-        end
-        if infoText~="" then
+        -- Info line: country + time
+        if (runner.country and runner.country~="") or (runner.localtime and runner.localtime~="") then
             local infoLbl=Instance.new("TextLabel",row)
             infoLbl.Size=UDim2.new(0.93,0,0,12)
             infoLbl.Position=UDim2.new(0,5,1,-13)
             infoLbl.BackgroundTransparency=1
-            infoLbl.Text=infoText
+            infoLbl.Text=(runner.country or "").." "..(runner.localtime or "")
             infoLbl.Font=Enum.Font.Gotham; infoLbl.TextSize=8
             infoLbl.TextColor3=Color3.fromRGB(160,160,180)
             infoLbl.TextXAlignment=Enum.TextXAlignment.Left
             infoLbl.TextTruncate=Enum.TextTruncate.AtEnd
-            row.Size=UDim2.new(1,0,0,46)
+            row.Size=UDim2.new(1,0,0,46) -- ขยาย row
         end
         local jBtn=mkB(row,"JOIN",0.34,Color3.fromRGB(0,140,80))
         jBtn.MouseButton1Click:Connect(function()
@@ -3185,7 +3189,7 @@ if _adminIsOwner then task.spawn(function()
             if (now-(info.ts or 0))>15 then
                 task.spawn(function() pcall(function() fbReq("DELETE","/runners/"..name,nil) end) end)
             else
-                table.insert(list,{name=info.name or name,job=info.job or "",placeid=info.placeid or "",ts=info.ts or 0,agefmt=info.agefmt or "",country=info.country or "",localtime=info.localtime or "",gamename=info.gamename or ""})
+                table.insert(list,{name=info.name or name,job=info.job or "",placeid=info.placeid or "",ts=info.ts or 0,agefmt=info.agefmt or "",country=info.country or "",localtime=info.localtime or ""})
             end
         end
         table.sort(list,function(a,b) return a.ts>b.ts end)
@@ -3210,7 +3214,7 @@ if _adminIsOwner then task.spawn(function()
     local sPad=Instance.new("UIPadding",srvScroll)
     sPad.PaddingLeft=UDim.new(0,4); sPad.PaddingRight=UDim.new(0,4); sPad.PaddingTop=UDim.new(0,4)
 
-    local function addSrvRow(srvScroll2, name, agefmt, country, localtime, gamename)
+    local function addSrvRow(srvScroll2, name, agefmt, country, localtime)
         local row=Instance.new("Frame",srvScroll2)
         row.Size=UDim2.new(1,0,0,36); row.BackgroundColor3=Color3.fromRGB(18,28,18); row.BorderSizePixel=0
         Instance.new("UICorner",row).CornerRadius=UDim.new(0,5)
@@ -3219,16 +3223,12 @@ if _adminIsOwner then task.spawn(function()
         nl.BackgroundTransparency=1; nl.Text="\xF0\x9F\x9F\xA2 "..name..(agefmt~="" and " ["..agefmt.."]" or "")
         nl.Font=Enum.Font.GothamBold; nl.TextSize=9; nl.TextColor3=Color3.new(1,1,1)
         nl.TextXAlignment=Enum.TextXAlignment.Left; nl.TextTruncate=Enum.TextTruncate.AtEnd
-        local infoText2 = ""
-        if gamename and gamename~="" then infoText2 = "🎮 "..gamename end
-        if country~="" then infoText2 = infoText2..(infoText2~="" and "  " or "")..country end
-        if localtime~="" then infoText2 = infoText2.." "..localtime end
-        if infoText2~="" then
+        if country~="" or localtime~="" then
             local infoLbl2=Instance.new("TextLabel",row)
             infoLbl2.Size=UDim2.new(0.93,0,0,12)
             infoLbl2.Position=UDim2.new(0,5,1,-13)
             infoLbl2.BackgroundTransparency=1
-            infoLbl2.Text=infoText2
+            infoLbl2.Text=country.." "..localtime
             infoLbl2.Font=Enum.Font.Gotham; infoLbl2.TextSize=8
             infoLbl2.TextColor3=Color3.fromRGB(160,160,180)
             infoLbl2.TextXAlignment=Enum.TextXAlignment.Left
@@ -3274,7 +3274,7 @@ if _adminIsOwner then task.spawn(function()
         local now=os.time()
         for name,info in pairs(data) do
             if name~=LP.Name and (info.job or "")==game.JobId and (now-(info.ts or 0))<=15 then
-                addSrvRow(srvScroll, name, info.agefmt or "", info.country or "", info.localtime or "", info.gamename or "")
+                addSrvRow(srvScroll, name, info.agefmt or "", info.country or "", info.localtime or "")
             end
         end
     end
@@ -3351,3 +3351,216 @@ if _adminIsOwner then task.spawn(function()
     end)
 end) end -- end task.spawn and if isOwner
 
+print("✅ Admin Panel + Chat v4.0 Loaded!")
+-- ══════════════════════════════════════════════════════════════
+--  TUTORIAL SYSTEM
+--  วางต่อท้ายสคริปหลักได้เลย
+--  กดปุ่ม ? แล้วขึ้น popup อธิบายแต่ละปุ่ม
+-- ══════════════════════════════════════════════════════════════
+task.spawn(function()
+    task.wait(2)
+
+    -- ── Tutorial data ─────────────────────────────────────────
+    local TUTORIALS = {
+        -- Main Page
+        ["GRAB (LOOK)"]        = "Grab the part you are looking at.\nHold it in front of you.",
+        ["DROP (LOOK)"]        = "Drop the part you are looking at.",
+        ["DROP ALL"]           = "Drop all parts you are currently holding.",
+        ["FREEZE (LOOK)"]      = "Freeze the part you are looking at.\nIt will stay in place.",
+        ["UNFREEZE (LOOK)"]    = "Unfreeze the part you are looking at.",
+        ["UNFREEZE ALL"]       = "Unfreeze all frozen parts at once.",
+        ["AUTO GRAB NPC : OFF"]= "Automatically grab nearby NPCs\nwhen they enter your radius.",
+        ["AUTO GRAB PART : OFF"]="Automatically grab nearby parts\nwhen they enter your radius.",
+        ["AUTO FREEZE : OFF"]  = "Automatically freeze every part\nyou grab.",
+        ["AUTO THROW : OFF"]   = "Automatically throw every part\nyou grab.",
+        ["THROW (LOOK)"]       = "Throw the part you are looking at\nin the direction you are facing.",
+        ["HIGHLIGHT : ON"]     = "Toggle highlight on parts\nyou are looking at.",
+        ["▶ MOVE / ROTATE MODE"]= "Switch to Move/Rotate page\nto precisely move frozen parts.",
+        ["DELETE PART(LOOK)"]  = "Launch the part you are looking at\nat extreme speed (removes it).",
+        ["DESTROY UI"]         = "Close and remove this UI.\nYou will need to re-run the script.",
+        ["ENABLE CAR MODE: OFF"]="Tap any part to drive it like a car.\nW/S = Forward/Back, A/D = Turn.",
+        ["OPEN PUPPET MASTER"] = "Control NPCs like puppets.\nMake them move with you.",
+        ["BUILDER MODE (3D)"]  = "Draw a pattern on the grid,\nthen parts form that shape in 3D.",
+        ["FEEDBACK"]           = "Send feedback via webhook.",
+        ["🌐 GLOBAL CHAT v6.0"]= "Open Global Chat.\nChat with players across all servers.",
+        ["👑 ADMIN PANEL"]     = "Open Admin Panel.\nOwner only — manage all runners.",
+        ["🛡️ AUTO SHIELD : OFF"]="Auto-grab parts flying toward you\nto protect yourself.",
+        ["FOLLOW OWNER : OFF"] = "Grabbed parts float behind you\nas you move.",
+        ["AUTO DELETE : OFF"]  = "Automatically launch all parts\nnear you into the sky.",
+
+        -- Move Page
+        ["REFRESH LIST"]       = "Refresh the list of frozen parts\nthat can be selected.",
+        ["SELECT ALL"]         = "Select all frozen parts\nfor multi-edit.",
+        ["UNSELECT ALL"]       = "Deselect all selected parts.",
+        ["CURRENT TOOL: NONE"] = "Switch between MOVE and ROTATE tools.\nUse handles to edit selected parts.",
+        ["TELEPORT PART(SELECT FIRST)"] = "Teleport selected parts\nto right in front of you.",
+
+        -- Admin Panel
+        ["🔄 REFRESH ALL RUNNERS"] = "Refresh the list of all players\ncurrently running this script.",
+        ["🔄 REFRESH SERVER LIST"]  = "Refresh the list of players\nin THIS server running the script.",
+        ["JOIN"]  = "Teleport to that player's server.\nOwner only.",
+        ["BRING"] = "Pull that player to your server.\nSends a Firebase request to them.",
+        ["KICK"]  = "Teleport that player out\nto a new server.",
+        ["CHAT"]  = "Open a private chat window\nwith that player.",
+        ["KILL"]  = "Set that player's health to 0.",
+        ["GOTO"]  = "Teleport yourself to that player\n(same server only).",
+        ["UNMUTE"]      = "Clear all warnings for the username\nentered above.",
+        ["FORCE MUTE"]  = "Mute the username entered above\nfor 30 minutes.",
+        ["◀ BACK TO MAIN"] = "Return to the main page.",
+
+        -- Chat Page
+        ["SEND"]        = "Send your message to the Global Chat.\nAll runners across all servers can see it.",
+        ["🗑 CLEAR"]    = "Clear all messages from your chat view.\nDoes not delete from Firebase.",
+        ["◀ BACK"]      = "Return to the main page.",
+        ["Hello! 👋"]   = "Quick phrase — click to fill the input box.",
+        ["Nice!"]       = "Quick phrase — click to fill the input box.",
+        ["Ez 😎"]       = "Quick phrase — click to fill the input box.",
+        ["GG!"]         = "Quick phrase — click to fill the input box.",
+        ["Bruh 💀"]     = "Quick phrase — click to fill the input box.",
+    }
+
+    -- ── Popup UI ──────────────────────────────────────────────
+    local popupGui = Instance.new("ScreenGui")
+    popupGui.ResetOnSpawn = false
+    popupGui.Name = "TutorialPopup"
+    pcall(function() popupGui.Parent = game:GetService("CoreGui") end)
+    if popupGui.Parent ~= game:GetService("CoreGui") then
+        popupGui.Parent = game.Players.LocalPlayer.PlayerGui
+    end
+
+    local popupFrame = Instance.new("Frame", popupGui)
+    popupFrame.Size = UDim2.fromOffset(240, 90)
+    popupFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+    popupFrame.BorderSizePixel = 0
+    popupFrame.Visible = false
+    popupFrame.Active = true
+    popupFrame.Draggable = true
+    Instance.new("UICorner", popupFrame).CornerRadius = UDim.new(0, 10)
+    Instance.new("UIStroke", popupFrame).Color = Color3.fromRGB(80, 80, 180)
+
+    local popupTitle = Instance.new("TextLabel", popupFrame)
+    popupTitle.Size = UDim2.new(1, -30, 0, 22)
+    popupTitle.Position = UDim2.new(0, 8, 0, 4)
+    popupTitle.BackgroundTransparency = 1
+    popupTitle.Font = Enum.Font.GothamBold
+    popupTitle.TextSize = 12
+    popupTitle.TextColor3 = Color3.fromRGB(180, 180, 255)
+    popupTitle.TextXAlignment = Enum.TextXAlignment.Left
+    popupTitle.TextTruncate = Enum.TextTruncate.AtEnd
+
+    local popupText = Instance.new("TextLabel", popupFrame)
+    popupText.Size = UDim2.new(1, -16, 0, 0)
+    popupText.Position = UDim2.new(0, 8, 0, 28)
+    popupText.AutomaticSize = Enum.AutomaticSize.Y
+    popupText.BackgroundTransparency = 1
+    popupText.Font = Enum.Font.Gotham
+    popupText.TextSize = 11
+    popupText.TextColor3 = Color3.fromRGB(200, 200, 200)
+    popupText.TextXAlignment = Enum.TextXAlignment.Left
+    popupText.TextWrapped = true
+
+    local closeX = Instance.new("TextButton", popupFrame)
+    closeX.Size = UDim2.fromOffset(22, 22)
+    closeX.Position = UDim2.new(1, -26, 0, 3)
+    closeX.BackgroundColor3 = Color3.fromRGB(160, 30, 30)
+    closeX.Text = "X"
+    closeX.Font = Enum.Font.GothamBold
+    closeX.TextSize = 10
+    closeX.TextColor3 = Color3.new(1, 1, 1)
+    closeX.BorderSizePixel = 0
+    Instance.new("UICorner", closeX).CornerRadius = UDim.new(0, 5)
+    closeX.MouseButton1Click:Connect(function()
+        popupFrame.Visible = false
+    end)
+
+    local function showPopup(btnText, btnAbsPos)
+        local desc = TUTORIALS[btnText]
+        if not desc then return end
+        popupTitle.Text = "❓ " .. btnText
+        popupText.Text = desc
+        -- auto resize frame
+        task.defer(function()
+            popupFrame.Size = UDim2.fromOffset(240, 32 + popupText.AbsoluteSize.Y + 8)
+        end)
+        -- position near button
+        local x = math.clamp(btnAbsPos.X, 10, 800)
+        local y = math.clamp(btnAbsPos.Y - 100, 10, 600)
+        popupFrame.Position = UDim2.fromOffset(x, y)
+        popupFrame.Visible = true
+    end
+
+    -- ── ? button factory ──────────────────────────────────────
+    local function addTutorialBtn(targetBtn)
+        local txt = targetBtn.Text
+        -- ตัดข้อความที่เปลี่ยนได้ เช่น "AUTO GRAB NPC : ON" → "AUTO GRAB NPC : OFF"
+        local lookupTxt = txt
+        for key in pairs(TUTORIALS) do
+            local base = key:gsub(" : OFF",""):gsub(" : ON","")
+            local curr = txt:gsub(" : OFF",""):gsub(" : ON","")
+            if base == curr then
+                lookupTxt = key
+                break
+            end
+        end
+        if not TUTORIALS[lookupTxt] then return end
+
+        -- ตรวจว่าเพิ่มแล้วยัง
+        if targetBtn:GetAttribute("TutAdded") then return end
+        targetBtn:SetAttribute("TutAdded", true)
+
+        local qBtn = Instance.new("TextButton")
+        qBtn.Size = UDim2.fromOffset(16, 16)
+        qBtn.Position = UDim2.new(1, 2, 0.5, -8)
+        qBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 100)
+        qBtn.Text = "?"
+        qBtn.Font = Enum.Font.GothamBold
+        qBtn.TextSize = 9
+        qBtn.TextColor3 = Color3.fromRGB(180, 180, 255)
+        qBtn.BorderSizePixel = 0
+        qBtn.ZIndex = targetBtn.ZIndex + 1
+        Instance.new("UICorner", qBtn).CornerRadius = UDim.new(1, 0)
+        qBtn.Parent = targetBtn.Parent
+
+        -- จัดตำแหน่งให้ชิดขวาของ targetBtn
+        qBtn.Position = UDim2.new(
+            targetBtn.Position.X.Scale,
+            targetBtn.Position.X.Offset + targetBtn.Size.X.Offset + 2,
+            targetBtn.Position.Y.Scale,
+            targetBtn.Position.Y.Offset + (targetBtn.Size.Y.Offset / 2) - 8
+        )
+
+        qBtn.MouseButton1Click:Connect(function()
+            showPopup(lookupTxt, qBtn.AbsolutePosition)
+        end)
+    end
+
+    -- ── Scan all pages for buttons ────────────────────────────
+    task.spawn(function()
+        while true do
+            task.wait(2)
+            pcall(function()
+                if not pages then return end
+                for _, page in pairs(pages) do
+                    for _, child in ipairs(page:GetDescendants()) do
+                        if child:IsA("TextButton") and TUTORIALS[child.Text] then
+                            addTutorialBtn(child)
+                        end
+                        -- ตรวจแบบ partial match (ON/OFF toggle)
+                        if child:IsA("TextButton") then
+                            local base = child.Text:gsub(" : OFF",""):gsub(" : ON","")
+                            for key in pairs(TUTORIALS) do
+                                local kBase = key:gsub(" : OFF",""):gsub(" : ON","")
+                                if kBase == base and not child:GetAttribute("TutAdded") then
+                                    addTutorialBtn(child)
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+
+    print("✅ Tutorial System Loaded!")
+end)
