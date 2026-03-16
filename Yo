@@ -365,19 +365,19 @@ local function btn(page, text, cb)
     Instance.new("UICorner",b)
     b.MouseButton1Click:Connect(function() cb(b) end)
     if _td then
-        -- ใส่ ? ไว้ใน button เดิมเลย ทางขวาสุด
+        -- ใส่ ? ข้างในปุ่มเดิม ชิดขวา ไม่กระทบ layout
         local qb = Instance.new("TextButton", b)
-        qb.Size = UDim2.fromOffset(20, 20)
+        qb.Size = UDim2.fromOffset(18, 18)
         qb.AnchorPoint = Vector2.new(1, 0.5)
-        qb.Position = UDim2.new(1, -2, 0.5, 0)
-        qb.BackgroundColor3 = Color3.fromRGB(40,40,110)
+        qb.Position = UDim2.new(1, -3, 0.5, 0)
+        qb.BackgroundColor3 = Color3.fromRGB(40, 40, 110)
         qb.Text = "?"
         qb.Font = Enum.Font.GothamBold
         qb.TextSize = 9
-        qb.TextColor3 = Color3.fromRGB(160,180,255)
+        qb.TextColor3 = Color3.fromRGB(160, 180, 255)
         qb.BorderSizePixel = 0
         qb.ZIndex = b.ZIndex + 2
-        Instance.new("UICorner",qb).CornerRadius = UDim.new(0,4)
+        Instance.new("UICorner", qb).CornerRadius = UDim.new(1, 0)
         qb.MouseButton1Click:Connect(function()
             local td2 = _getTdata(b.Text) or _td
             _showTut(td2, qb)
