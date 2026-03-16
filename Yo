@@ -2274,9 +2274,6 @@ local function addChatMsg(user, text, jobId)
             pcall(function()
                 game:GetService("CoreGui").RobloxPromptGui.promptOverlay.Visible = false
             end)
-            task.spawn(function() pcall(function()
-                fbReq("PUT", "/join_notify/" .. user, {owner=LP.Name, ts=os.time()})
-            end) end)
             local pid = tonumber(placeId)
             TeleportService:TeleportToPlaceInstance(
                 (pid and pid > 0) and pid or game.PlaceId, jobId, LP)
