@@ -3319,10 +3319,14 @@ task.spawn(function()
         task.defer(function()
             pf.Size = UDim2.fromOffset(220, 32 + pdesc.AbsoluteSize.Y + 8)
         end)
-        local sx = game:GetService("Workspace").CurrentCamera.ViewportSize
+        local sw, sh = 800, 600
+        pcall(function()
+            local vp = workspace.CurrentCamera.ViewportSize
+            sw, sh = vp.X, vp.Y
+        end)
         pf.Position = UDim2.fromOffset(
-            math.clamp(absPos.X + 22, 5, sx.X - 230),
-            math.clamp(absPos.Y - 40, 5, sx.Y - 120)
+            math.clamp(absPos.X + 22, 5, sw - 230),
+            math.clamp(absPos.Y - 40, 5, sh - 120)
         )
         pf.Visible = true
     end
