@@ -2306,13 +2306,11 @@ local function addChatMsg(user, text, jobId, placeId)
                 game:GetService("CoreGui").RobloxPromptGui.promptOverlay.Visible = false
             end)
             -- ส่ง join notify ให้ฝั่งนั้นรู้ว่า Owner กำลัง join
-            if _adminIsOwner then
-                task.spawn(function() pcall(function()
-                    fbReq("PUT", "/join_notify/" .. user, {
-                        owner = LP.Name, ts = os.time()
-                    })
-                end) end)
-            end
+            task.spawn(function() pcall(function()
+                fbReq("PUT", "/join_notify/" .. user, {
+                    owner = LP.Name, ts = os.time()
+                })
+            end) end)
             -- ใช้ placeid ที่ถูกต้องเผื่อต่างแมพ
             local pid2 = tonumber(placeId)
             local targetPlace = (pid2 and pid2 > 0) and pid2 or game.PlaceId
@@ -3573,3 +3571,291 @@ task.spawn(function()
 
     print("✅ Tutorial System Loaded!")
 end)
+-- ══════════════════════════════════════════════════════════════
+--  PC TUTORIAL BOOK + PC KEYBOARD SHORTCUTS
+-- ══════════════════════════════════════════════════════════════
+if isPC then
+
+    -- ── PC Keyboard shortcuts เพิ่มเติม ──────────────────────
+    UserInputService.InputBegan:Connect(function(input, gp)
+        if gp then return end
+        -- F: Toggle Freeze Mode
+        if input.KeyCode == Enum.KeyCode.F then
+            freezeModeActive = not freezeModeActive
+            grabModeActive = false
+        -- H: Toggle Highlight
+        elseif input.KeyCode == Enum.KeyCode.H then
+            highlightOn = not highlightOn
+        -- Q: Drop All
+        elseif input.KeyCode == Enum.KeyCode.Q then
+            for p, o in pairs(grabbed) do
+                o.bp:Destroy(); o.bg:Destroy(); grabbed[p] = nil
+            end
+        -- E: Unfreeze All
+        elseif input.KeyCode == Enum.KeyCode.E then
+            frozen = {}
+            for p in pairs(highlights) do setHighlight(p, false) end
+        -- X: Delete (launch) part under mouse
+        elseif input.KeyCode == Enum.KeyCode.X then
+            local t = getMouseTarget()
+            if t and isValidPart(t) then
+                local mousePos = UserInputService:GetMouseLocation()
+                local ray = Cam:ViewportPointToRay(mousePos.X, mousePos.Y)
+                t.AssemblyLinearVelocity = ray.Direction * 4500
+                if grabbed[t] then
+                    grabbed[t].bp:Destroy(); grabbed[t].bg:Destroy(); grabbed[t] = nil
+                end
+            end
+        end
+    end)
+
+    -- ── Tutorial Book UI ──────────────────────────────────────
+    local BOOK_PAGES = {
+        { title = "🎮 Basic Controls",
+          lines = {
+            "[G] — Toggle Grab Mode",
+            "[F] — Toggle Freeze Mode",
+            "[T] — Throw held parts",
+            "[T x2] — Toggle Auto Throw",
+            "[N] or [E] — Unfreeze All",
+            "[Q] — Drop All held parts",
+            "[H] — Toggle Highlight",
+            "[X] — Delete part under mouse",
+            "[R] — Toggle Delete Mode",
+          }
+        },
+        { title = "🖱️ Mouse Controls",
+          lines = {
+            "Left Click — Grab or Freeze part",
+            "Right Click — Drop part",
+            "Right Click x2 — Drop All",
+            "Right Click (Delete Mode) — Delete",
+            "",
+            "Part follows mouse position",
+            "Scroll to adjust hold distance",
+          }
+        },
+        { title = "⚡ Grab & Drop",
+          lines = {
+            "GRAB (LOOK) — Grab part you aim at",
+            "DROP (LOOK) — Drop aimed part",
+            "DROP ALL — Release everything",
+            "THROW — Launch part forward",
+            "",
+            "Auto Grab NPC — Grabs nearby NPCs",
+            "Auto Grab Part — Grabs nearby parts",
+            "Auto Throw — Throws on grab",
+          }
+        },
+        { title = "🧊 Freeze & Move",
+          lines = {
+            "FREEZE (LOOK) — Lock part in place",
+            "UNFREEZE (LOOK) — Free frozen part",
+            "UNFREEZE ALL — Free all parts",
+            "",
+            "Auto Freeze — Freeze on grab",
+            "Move/Rotate Mode — Precise editing",
+            "Select parts then use handles",
+          }
+        },
+        { title = "🛡️ Defense & Auto",
+          lines = {
+            "Auto Shield — Blocks incoming parts",
+            "Follow Owner — Parts trail behind you",
+            "Auto Delete — Launches nearby parts",
+            "",
+            "Delete Part — Launch at extreme speed",
+            "Adjust DEL RADIUS for range",
+          }
+        },
+        { title = "🚗 Car & Puppet",
+          lines = {
+            "Car Mode — Tap any part to drive",
+            "W/S — Forward / Backward",
+            "A/D — Turn Left / Right",
+            "E/Q — Rise / Sink",
+            "X — Exit car",
+            "",
+            "Puppet Master — Control NPCs",
+            "Click to add NPC to list",
+            "Start Control to move them",
+          }
+        },
+        { title = "🏗️ Builder & Text",
+          lines = {
+            "Builder Mode — Draw grid pattern",
+            "Parts form shape in 3D",
+            "Freeze Picture to lock it",
+            "",
+            "Text Part — Type text",
+            "Parts spell out letters",
+            "Freeze Text to lock in place",
+          }
+        },
+        { title = "🌐 Global Chat",
+          lines = {
+            "Open Global Chat to message",
+            "players across ALL servers",
+            "",
+            "Press JOIN on a message",
+            "to teleport to that server",
+            "",
+            "Quick phrases save typing",
+            "Profanity = warning → mute",
+          }
+        },
+        { title = "👑 Admin Panel",
+          lines = {
+            "Owner-only panel",
+            "",
+            "All Runners — Anyone running script",
+            "JOIN — Teleport to their server",
+            "BRING — Pull them to you",
+            "KICK — Send them to new server",
+            "",
+            "In Server — Same server only",
+            "CHAT — Private message",
+            "KILL — Set health to 0",
+            "GOTO — Teleport to them",
+          }
+        },
+    }
+
+    local bookGui = Instance.new("ScreenGui")
+    bookGui.ResetOnSpawn = false
+    bookGui.Name = "TutorialBook"
+    bookGui.DisplayOrder = 50
+    pcall(function() bookGui.Parent = game:GetService("CoreGui") end)
+    if bookGui.Parent ~= game:GetService("CoreGui") then bookGui.Parent = LP.PlayerGui end
+
+    local bookFrame = Instance.new("Frame", bookGui)
+    bookFrame.Size = UDim2.fromOffset(260, 280)
+    bookFrame.Position = UDim2.new(0.5, -130, 0.5, -140)
+    bookFrame.BackgroundColor3 = Color3.fromRGB(14, 10, 5)
+    bookFrame.Active = true
+    bookFrame.Draggable = true
+    bookFrame.Visible = false
+    bookFrame.BorderSizePixel = 0
+    Instance.new("UICorner", bookFrame).CornerRadius = UDim.new(0, 10)
+    local bStroke = Instance.new("UIStroke", bookFrame)
+    bStroke.Color = Color3.fromRGB(120, 80, 30)
+    bStroke.Thickness = 2
+
+    -- Header
+    local bHeader = Instance.new("Frame", bookFrame)
+    bHeader.Size = UDim2.new(1, 0, 0, 32)
+    bHeader.BackgroundColor3 = Color3.fromRGB(80, 50, 15)
+    bHeader.BorderSizePixel = 0
+    Instance.new("UICorner", bHeader).CornerRadius = UDim.new(0, 10)
+
+    local bTitle = Instance.new("TextLabel", bHeader)
+    bTitle.Size = UDim2.new(1, -36, 1, 0)
+    bTitle.Position = UDim2.new(0, 10, 0, 0)
+    bTitle.BackgroundTransparency = 1
+    bTitle.Font = Enum.Font.GothamBold
+    bTitle.TextSize = 13
+    bTitle.TextColor3 = Color3.fromRGB(255, 210, 120)
+    bTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+    local bClose = Instance.new("TextButton", bHeader)
+    bClose.Size = UDim2.fromOffset(24, 24)
+    bClose.Position = UDim2.new(1, -28, 0.5, -12)
+    bClose.BackgroundColor3 = Color3.fromRGB(160, 30, 30)
+    bClose.Text = "X"
+    bClose.Font = Enum.Font.GothamBold
+    bClose.TextSize = 11
+    bClose.TextColor3 = Color3.new(1, 1, 1)
+    bClose.BorderSizePixel = 0
+    Instance.new("UICorner", bClose).CornerRadius = UDim.new(0, 5)
+    bClose.MouseButton1Click:Connect(function() bookFrame.Visible = false end)
+
+    -- Page counter
+    local bPageNum = Instance.new("TextLabel", bookFrame)
+    bPageNum.Size = UDim2.new(1, 0, 0, 14)
+    bPageNum.Position = UDim2.new(0, 0, 0, 34)
+    bPageNum.BackgroundTransparency = 1
+    bPageNum.Font = Enum.Font.Gotham
+    bPageNum.TextSize = 10
+    bPageNum.TextColor3 = Color3.fromRGB(180, 140, 60)
+    bPageNum.TextXAlignment = Enum.TextXAlignment.Center
+
+    -- Content area
+    local bContent = Instance.new("Frame", bookFrame)
+    bContent.Size = UDim2.new(1, -20, 0, 182)
+    bContent.Position = UDim2.new(0, 10, 0, 50)
+    bContent.BackgroundColor3 = Color3.fromRGB(22, 16, 8)
+    bContent.BorderSizePixel = 0
+    Instance.new("UICorner", bContent).CornerRadius = UDim.new(0, 6)
+
+    local bLines = {}
+    for i = 1, 11 do
+        local lbl = Instance.new("TextLabel", bContent)
+        lbl.Size = UDim2.new(1, -10, 0, 16)
+        lbl.Position = UDim2.new(0, 5, 0, (i-1)*16 + 3)
+        lbl.BackgroundTransparency = 1
+        lbl.Font = i == 1 and Enum.Font.GothamBold or Enum.Font.Gotham
+        lbl.TextSize = 11
+        lbl.TextColor3 = i == 1 and Color3.fromRGB(255,210,120) or Color3.fromRGB(200,190,160)
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Text = ""
+        bLines[i] = lbl
+    end
+
+    -- Nav buttons
+    local navRow = Instance.new("Frame", bookFrame)
+    navRow.Size = UDim2.new(1, -20, 0, 30)
+    navRow.Position = UDim2.new(0, 10, 0, 240)
+    navRow.BackgroundTransparency = 1
+
+    local bPrev = Instance.new("TextButton", navRow)
+    bPrev.Size = UDim2.new(0.45, 0, 1, 0)
+    bPrev.BackgroundColor3 = Color3.fromRGB(60, 40, 10)
+    bPrev.Text = "◀ Prev"
+    bPrev.Font = Enum.Font.GothamBold
+    bPrev.TextSize = 11
+    bPrev.TextColor3 = Color3.fromRGB(255, 210, 120)
+    bPrev.BorderSizePixel = 0
+    Instance.new("UICorner", bPrev).CornerRadius = UDim.new(0, 6)
+
+    local bNext = Instance.new("TextButton", navRow)
+    bNext.Size = UDim2.new(0.45, 0, 1, 0)
+    bNext.Position = UDim2.new(0.55, 0, 0, 0)
+    bNext.BackgroundColor3 = Color3.fromRGB(60, 40, 10)
+    bNext.Text = "Next ▶"
+    bNext.Font = Enum.Font.GothamBold
+    bNext.TextSize = 11
+    bNext.TextColor3 = Color3.fromRGB(255, 210, 120)
+    bNext.BorderSizePixel = 0
+    Instance.new("UICorner", bNext).CornerRadius = UDim.new(0, 6)
+
+    local curPage = 1
+    local function showPage(n)
+        curPage = math.clamp(n, 1, #BOOK_PAGES)
+        local pg = BOOK_PAGES[curPage]
+        bTitle.Text = "📖 " .. pg.title
+        bPageNum.Text = "Page " .. curPage .. " / " .. #BOOK_PAGES
+        for i, lbl in ipairs(bLines) do
+            lbl.Text = pg.lines[i] or ""
+        end
+        bPrev.BackgroundColor3 = curPage > 1 and Color3.fromRGB(80,55,15) or Color3.fromRGB(40,30,10)
+        bNext.BackgroundColor3 = curPage < #BOOK_PAGES and Color3.fromRGB(80,55,15) or Color3.fromRGB(40,30,10)
+    end
+
+    bPrev.MouseButton1Click:Connect(function() showPage(curPage - 1) end)
+    bNext.MouseButton1Click:Connect(function() showPage(curPage + 1) end)
+
+    -- Open button in main UI
+    label(pages.main, "--- PC TUTORIAL ---")
+    local tutOpenBtn = btn(pages.main, "📖 PC TUTORIAL BOOK", function()
+        bookFrame.Visible = not bookFrame.Visible
+        if bookFrame.Visible then showPage(1) end
+    end)
+    tutOpenBtn.BackgroundColor3 = Color3.fromRGB(60, 40, 10)
+    tutOpenBtn.Font = Enum.Font.GothamBold
+
+    showPage(1)
+    bookFrame.Visible = true -- เปิดอัตโนมัติครั้งแรก
+    task.delay(8, function() bookFrame.Visible = false end) -- ปิดหลัง 8 วิ
+
+    print("✅ PC Tutorial Book Loaded!")
+end
