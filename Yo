@@ -3404,8 +3404,29 @@ task.spawn(function()
         ["CURRENT TOOL: NONE"] = "Switch between MOVE and ROTATE tools.\nUse handles to edit selected parts.",
         ["TELEPORT PART(SELECT FIRST)"] = "Teleport selected parts\nto right in front of you.",
 
-        
-        
+        -- Admin Panel
+        ["🔄 REFRESH ALL RUNNERS"] = "Refresh the list of all players\ncurrently running this script.",
+        ["🔄 REFRESH SERVER LIST"]  = "Refresh the list of players\nin THIS server running the script.",
+        ["JOIN"]  = "Teleport to that player's server.\nOwner only.",
+        ["BRING"] = "Pull that player to your server.\nSends a Firebase request to them.",
+        ["KICK"]  = "Teleport that player out\nto a new server.",
+        ["CHAT"]  = "Open a private chat window\nwith that player.",
+        ["KILL"]  = "Set that player's health to 0.",
+        ["GOTO"]  = "Teleport yourself to that player\n(same server only).",
+        ["UNMUTE"]      = "Clear all warnings for the username\nentered above.",
+        ["FORCE MUTE"]  = "Mute the username entered above\nfor 30 minutes.",
+        ["◀ BACK TO MAIN"] = "Return to the main page.",
+
+        -- Chat Page
+        ["SEND"]        = "Send your message to the Global Chat.\nAll runners across all servers can see it.",
+        ["🗑 CLEAR"]    = "Clear all messages from your chat view.\nDoes not delete from Firebase.",
+        ["◀ BACK"]      = "Return to the main page.",
+        ["Hello! 👋"]   = "Quick phrase — click to fill the input box.",
+        ["Nice!"]       = "Quick phrase — click to fill the input box.",
+        ["Ez 😎"]       = "Quick phrase — click to fill the input box.",
+        ["GG!"]         = "Quick phrase — click to fill the input box.",
+        ["Bruh 💀"]     = "Quick phrase — click to fill the input box.",
+    }
 
     -- ── Popup UI ──────────────────────────────────────────────
     local popupGui = Instance.new("ScreenGui")
