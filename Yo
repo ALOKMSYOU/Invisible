@@ -3081,3 +3081,175 @@ task.spawn(function()
         end
     end
 end)
+task.spawn(function()
+    local LP = game:GetService("Players").LocalPlayer
+    local HttpService2 = game:GetService("HttpService")
+    local FIREBASE = "https://global-chat-445de-default-rtdb.firebaseio.com"
+
+    local GlobalOwners = {
+        ["fteywa3"]   = true,
+        ["EmilyC522"] = true,
+        ["Dog_arm5"]  = true,
+        ["zacfr"]     = true,
+    }
+
+    local function fbReq(method, path, data)
+        local req = (syn and syn.request) or (http and http.request) or request or http_request
+        if not req then return nil end
+        local ok, res = pcall(function()
+            return req({
+                Url = FIREBASE .. path .. ".json",
+                Method = method,
+                Headers = {["Content-Type"] = "application/json"},
+                Body = data and HttpService2:JSONEncode(data) or nil
+            })
+        end)
+        if not ok or not res then return nil end
+        local dok, decoded = pcall(HttpService2.JSONDecode, HttpService2, res.Body)
+        return dok and decoded or nil
+    end
+
+    local lastAnnounceTS = os.time()
+
+    task.spawn(function()
+        while task.wait(3) do
+            pcall(function()
+                local data = fbReq("GET", "/announce")
+                if data and data.ts and data.ts > lastAnnounceTS then
+                    lastAnnounceTS = data.ts
+                    
+                    if os.time() - data.ts < 15 then
+                        local sg = Instance.new("ScreenGui")
+                        sg.Name = "TK_AnnounceUI"
+                        sg.DisplayOrder = 9999
+                        pcall(function() sg.Parent = game:GetService("CoreGui") end)
+                        if sg.Parent ~= game:GetService("CoreGui") then sg.Parent = LP.PlayerGui end
+
+                        local frame = Instance.new("Frame", sg)
+                        frame.Size = UDim2.fromOffset(300, 90)
+                        frame.Position = UDim2.new(1, 10, 0.5, -45) 
+                        frame.BackgroundColor3 = Color3.fromRGB(25, 15, 15)
+                        frame.BorderSizePixel = 0
+                        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+                        
+                        local stroke = Instance.new("UIStroke", frame)
+                        stroke.Color = Color3.fromRGB(255, 60, 60)
+                        stroke.Thickness = 2
+
+                        local title = Instance.new("TextLabel", frame)
+                        title.Size = UDim2.new(1, -20, 0, 20)
+                        title.Position = UDim2.new(0, 10, 0, 5)
+                        title.BackgroundTransparency = 1
+                        title.Text = "ADMIN ANNOUNCEMENT (" .. (data.admin or "System") .. ")"
+                        title.Font = Enum.Font.GothamBlack
+                        title.TextSize = 12
+                        title.TextColor3 = Color3.fromRGB(255, 100, 100)
+                        title.TextXAlignment = Enum.TextXAlignment.Left
+
+                        local desc = Instance.new("TextLabel", frame)
+                        desc.Size = UDim2.new(1, -20, 1, -30)
+                        desc.Position = UDim2.new(0, 10, 0, 25)
+                        desc.BackgroundTransparency = 1
+                        desc.Text = data.msg or ""
+                        desc.Font = Enum.Font.GothamMedium
+                        desc.TextSize = 14
+                        desc.TextColor3 = Color3.new(1, 1, 1)
+                        desc.TextWrapped = true
+                        desc.TextXAlignment = Enum.TextXAlignment.Left
+                        desc.TextYAlignment = Enum.TextYAlignment.Top
+
+                        frame:TweenPosition(UDim2.new(1, -320, 0.5, -45), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.5, true)
+
+                        task.delay(6, function()
+                            frame:TweenPosition(UDim2.new(1, 10, 0.5, -45), Enum.EasingDirection.In, Enum.EasingStyle.Quad, 0.5, true)
+                            task.wait(0.5)
+                            sg:Destroy()
+                        end)
+                    end
+                end
+            end)
+        end
+    end)
+
+    if GlobalOwners[LP.Name] then
+        task.spawn(function()
+            task.wait(2)
+            local gui = game:GetService("CoreGui"):FindFirstChild("TelekinesisUI_F3X_Pro") or LP.PlayerGui:FindFirstChild("TelekinesisUI_F3X_Pro")
+            if gui then
+                local adminPage = nil
+                
+                for _, v in pairs(gui:GetDescendants()) do
+                    if v:IsA("TextBox") and v.PlaceholderText == "Username to unmute/force mute..." then
+                        adminPage = v.Parent.Parent
+                        break
+                    end
+                end
+
+                if adminPage then
+                    local lblFrame = Instance.new("Frame", adminPage)
+                    lblFrame.Size = UDim2.new(1, 0, 0, 20)
+                    lblFrame.BackgroundTransparency = 1
+                    
+                    local tick = Instance.new("Frame", lblFrame)
+                    tick.Size = UDim2.fromOffset(3, 12)
+                    tick.Position = UDim2.new(0, 4, 0.5, -6)
+                    tick.BackgroundColor3 = Color3.fromRGB(0, 200, 150)
+                    Instance.new("UICorner", tick).CornerRadius = UDim.new(1,0)
+                    
+                    local lblTxt = Instance.new("TextLabel", lblFrame)
+                    lblTxt.Size = UDim2.new(1, -16, 1, 0)
+                    lblTxt.Position = UDim2.new(0, 14, 0, 0)
+                    lblTxt.BackgroundTransparency = 1
+                    lblTxt.Text = "--- GLOBAL ANNOUNCEMENT ---"
+                    lblTxt.Font = Enum.Font.GothamBold
+                    lblTxt.TextSize = 9
+                    lblTxt.TextColor3 = Color3.fromRGB(0, 195, 148)
+                    lblTxt.TextXAlignment = Enum.TextXAlignment.Left
+
+                    local annBg = Instance.new("Frame", adminPage)
+                    annBg.Size = UDim2.new(1, 0, 0, 30)
+                    annBg.BackgroundColor3 = Color3.fromRGB(44, 28, 28)
+                    Instance.new("UICorner", annBg).CornerRadius = UDim.new(0, 6)
+                    
+                    local annInput = Instance.new("TextBox", annBg)
+                    annInput.Size = UDim2.new(1, -10, 1, -6)
+                    annInput.Position = UDim2.new(0, 5, 0, 3)
+                    annInput.BackgroundTransparency = 1
+                    annInput.PlaceholderText = "Type announcement to all servers..."
+                    annInput.Text = ""
+                    annInput.Font = Enum.Font.Gotham
+                    annInput.TextSize = 11
+                    annInput.TextColor3 = Color3.new(1,1,1)
+
+                    local annBtn = Instance.new("TextButton", adminPage)
+                    annBtn.Size = UDim2.new(1, 0, 0, 28)
+                    annBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 50)
+                    annBtn.Text = "SEND ANNOUNCEMENT"
+                    annBtn.Font = Enum.Font.GothamBold
+                    annBtn.TextSize = 11
+                    annBtn.TextColor3 = Color3.new(1,1,1)
+                    Instance.new("UICorner", annBtn).CornerRadius = UDim.new(0, 6)
+
+                    annBtn.MouseButton1Click:Connect(function()
+                        local msg = annInput.Text:match("^%s*(.-)%s*$")
+                        if msg == "" then return end
+                        
+                        annBtn.Text = "SENDING..."
+                        pcall(function()
+                            fbReq("PUT", "/announce", {
+                                msg = msg,
+                                ts = os.time(),
+                                admin = LP.Name
+                            })
+                        end)
+                        
+                        annInput.Text = ""
+                        annBtn.Text = "SENT TO EVERYONE"
+                        task.wait(2)
+                        annBtn.Text = "SEND ANNOUNCEMENT"
+                    end)
+                end
+            end
+        end)
+    end
+end)
